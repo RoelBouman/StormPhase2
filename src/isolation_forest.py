@@ -4,9 +4,6 @@ import numpy as np
 import pandas as pd
 from sklearn.ensemble import IsolationForest
 
-def threshold_scores(y_scores: np.ndarray, threshold:float):
-    (y_scores < threshold).astype(float)
-
 def isolation_forest(df: pd.DataFrame, threshold: float) -> pd.DataFrame:
     """Apply isolation forest method.
 

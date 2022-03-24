@@ -17,6 +17,8 @@ data_folder = "data"
 
 output_folder = "results"
 
+remove_missing = True
+
 #%% Preprocess data 
 subsets = ["train", "test"]
 
@@ -69,11 +71,13 @@ for subset in subsets:
             
             #write minimal X, y, lengths pickle
             
-            X = X_df_preprocessed["diff"].values[X_df_preprocessed['diff_original'].notnull()]
+            filter_con = X_df_preprocessed['diff_original'].notnull() & (X_df_preprocessed['diff_original'] == 0) if remove_missing else X_df_preprocessed['diff_original'].notnull() 
             
-            y = y_df["label"].values[X_df_preprocessed['diff_original'].notnull()]
+            X = X_df_preprocessed["diff"].values[filter_con]
             
-            lengths = X = X_df_preprocessed["length"].values[X_df_preprocessed['diff_original'].notnull()]
+            y = y_df["label"].values[filter_con]
+            
+            lengths = X = X_df_preprocessed["length"].values[filter_con]
             
             data_dict = {"X":X , "y":y, "lengths":lengths}
             
