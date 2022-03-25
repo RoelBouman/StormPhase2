@@ -71,7 +71,7 @@ for subset in subsets:
             
             #write minimal X, y, lengths pickle
             
-            filter_con = X_df_preprocessed['diff_original'].notnull() & (X_df_preprocessed['diff_original'] == 0) if remove_missing else X_df_preprocessed['diff_original'].notnull() 
+            filter_con = X_df_preprocessed['diff_original'].notnull() & (X_df_preprocessed['missing'] == 0) if remove_missing else X_df_preprocessed['diff_original'].notnull() 
             
             X = X_df_preprocessed["diff"].values[filter_con]
             
