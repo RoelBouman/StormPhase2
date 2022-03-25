@@ -55,6 +55,9 @@ def STORM_score(y_true: np.array, y_pred: np.array, lengths: np.array, cutoffs: 
 def threshold_scores(y_scores: np.ndarray, threshold:float) -> np.array:
     return (y_scores < threshold).astype(float)
 
+def double_threshold_scores(y_scores: np.ndarray, thresholds:float) -> np.array:
+    return np.logical_or(y_scores < thresholds[0], y_scores > thresholds[1]).astype(float)
+
 def threshold_and_score(threshold: float, y_true: np.array, y_scores: np.array, lengths: np.array, cutoffs: List[Tuple], beta=10) -> float:
     if type(threshold) is tuple:
         threshold = threshold[0]
@@ -65,3 +68,8 @@ def inv_threshold_and_score(threshold: float, y_true: np.array, y_scores: np.arr
         threshold = threshold[0]
     return(-STORM_score(y_true, threshold_scores(y_scores, threshold), lengths, cutoffs, beta))
     
+def double_threshold_and_score(thresholds: Tuple, y_true: np.array, y_scores: np.array, lengths: np.array, cutoffs: List[Tuple], beta=10) -> float:
+    return(STORM_score(y_true, double_threshold_scores(y_scores, thresholds), lengths, cutoffs, beta))
+
+def inv_double_threshold_and_score(thresholds: Tuple, y_true: np.array, y_scores: np.array, lengths: np.array, cutoffs: List[Tuple], beta=10) -> float:
+    return(-STORM_score(y_true, double_threshold_scores(y_scores, thresholds), lengths, cutoffs, beta))
