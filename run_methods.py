@@ -6,7 +6,6 @@
 
 import os
 import pickle
-import re
 
 import pandas as pd
 import numpy as np
@@ -15,16 +14,12 @@ from scipy.optimize import minimize
 
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import ParameterGrid
-from sklearn.metrics import fbeta_score
 
-from src.evaluation import calculate_stats
 from src.evaluation import STORM_score
 from src.evaluation import threshold_scores
-from src.evaluation import threshold_and_score
 from src.evaluation import inv_threshold_and_score
 
 cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
-
 
 data_folder = "data"
 result_folder = "results"
