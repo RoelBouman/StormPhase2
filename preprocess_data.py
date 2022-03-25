@@ -77,7 +77,7 @@ for subset in subsets:
             
             y = y_df["label"].values[filter_con]
             
-            lengths = X = X_df_preprocessed["length"].values[filter_con]
+            lengths = X_df_preprocessed["length"].values[filter_con]
             
             data_dict = {"X":X , "y":y, "lengths":lengths}
             
