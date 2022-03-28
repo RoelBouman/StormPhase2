@@ -22,6 +22,11 @@ from src.evaluation import double_threshold_scores
 from src.evaluation import inv_threshold_and_score
 from src.evaluation import inv_double_threshold_and_score
 
+import rpy2.robjects.packages as rpackages
+from rpy2.robjects import r, pandas2ri
+
+changepoint = rpackages.importr('changepoint')
+
 cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 data_folder = "data"
@@ -266,3 +271,81 @@ storm_score = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutof
 
 print("STORM score on test:")
 print(storm_score)
+
+#%% Get segments from Binseg:
+    
+pandas2ri.activate()
+
+def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
+    for pickle_file in os.listdir(pickle_folder):
+        method_name = "BS"
+        substation_name = pickle_file[:-7]
+        
+        print("Station: ")
+        print(substation_name)
+        
+        data = pickle.load(open(os.path.join(pickle_folder, pickle_file), 'rb'))
+        X, y = pd.DataFrame(data["X"])[0], np.squeeze(data["y"].reshape(-1,1))
+        
+        for hyperparameter_settings in hyperparameter_list:
+            #hyperparameter_string = re.sub(r"[^a-zA-Z0-9_ ]","",str(hyperparameter_settings))
+            hyperparameter_string = str(hyperparameter_settings)
+            
+            result_file_path = os.path.join(result_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+            
+            if os.path.exists(result_file_path):
+                pass
+            else:        
+                print("evaluating hyperparameter setting:")
+                print(hyperparameter_settings)
+                #evaluate method using hyperparameter_settings
+                segments = changepoint.cpt_meanvar(X, **hyperparameter_settings)
+                
+                if not os.path.exists(os.path.join(result_folder, data_name, method_name, hyperparameter_string)):
+                    os.makedirs(os.path.join(result_folder, data_name, method_name, hyperparameter_string))
+                
+                with open(result_file_path, 'wb') as handle:
+                    pickle.dump(segments, handle)
+
+
+#calculate combinations from hyperparameters[method_name]
+hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
+
+hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
+
+get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+
+#%% evaluate segments as labels:
+    
+
+method_name="BS"
+
+best_score = 0
+best_hyperparameters= []
+best_thresholds = 0
+
+
+print("Evaluate training data:")
+for hyperparameter_settings in hyperparameter_list:
+    hyperparameter_string = str(hyperparameter_settings)
+    print(hyperparameter_string)
+    
+    # check if all results have actually been calculated
+    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+
+    #res = minimize(inv_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+    
+    #thresholds = res.x
+    
+    #y_pred = double_threshold_scores(y_scores_filtered, thresholds)
+    
+    storm_score = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs)
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
