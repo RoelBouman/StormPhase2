@@ -31,44 +31,64 @@ cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 data_folder = "data"
 result_folder = "results"
+intermediate_folder = "intermediates"
 
 pickle_train_file_folder = os.path.join(data_folder, "X_train_preprocessed_pickle")
 pickle_test_file_folder = os.path.join(data_folder, "X_test_preprocessed_pickle")
 
 #%% define station data getter function
 
-def get_all_station_data(data_name, result_folder, method_name, hyperparameter_string, pickle_folder):
+
+def get_y_true_and_lengths(pickle_folder, filter_labels=False):
+    
+    X_files = os.listdir(pickle_folder)
+    
+    y_true = []
+    event_lengths = []
+    
+    for X_file in X_files:
+        
+        data = pickle.load(open(os.path.join(pickle_folder, X_file), 'rb'))
+        
+        y_true.append(data["y"])
+        
+        event_lengths.append(data["lengths"])
+        
+
+    y_true_combined = np.concatenate(y_true)
+    event_lengths_combined = np.concatenate(event_lengths)
+    
+    if filter_labels:
+        y_true_filtered = y_true_combined[y_true_combined != 5]
+        event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+        
+        return (y_true_filtered, event_lengths_filtered)
+    else:
+        return (y_true_combined, event_lengths_combined)
+
+def get_all_station_data(data_name, result_folder, method_name, hyperparameter_string, pickle_folder, get_scores=True):
     
     station_score_folder = os.path.join(result_folder, data_name, method_name, hyperparameter_string)
-    X_file_folder = pickle_folder
     
     station_score_files = os.listdir(station_score_folder)
     
-    X_files = os.listdir(X_file_folder)
+    X_files = os.listdir(pickle_folder)
     
     if station_score_files == X_files:
         #Current method of appending is fast as long as memory is not limiting, if memory is limiting, matches should be calculated per station, and recombined afterwards.
+        
+        y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_folder)
+        
         y_scores = []
-        y_true = []        
-        event_lengths = []
         
         for station_score_file in station_score_files:
             
             y_scores.append(pickle.load(open(os.path.join(station_score_folder, station_score_file), 'rb')))
-            #y_score = pickle.load(open(os.path.join(station_score_folder, station_score_file), 'rb'))
-            data = pickle.load(open(os.path.join(X_file_folder, station_score_file), 'rb'))
-            
-            y_true.append(data["y"])
-            
-            event_lengths.append(data["lengths"])
             
         y_scores_combined = np.concatenate(y_scores)
-        y_true_combined = np.concatenate(y_true)
-        event_lengths_combined = np.concatenate(event_lengths)
+        y_scores_filtered = y_scores_combined[y_true_combined != 5]
         
         #remove samples where y_true == 5
-        
-        y_scores_filtered = y_scores_combined[y_true_combined != 5]
         y_true_filtered = y_true_combined[y_true_combined != 5]
         event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
         
