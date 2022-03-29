@@ -126,3 +126,4 @@ dmypy.json
 data/
 results/
 results_old/
+intermediates/

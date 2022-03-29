@@ -296,7 +296,7 @@ print(storm_score)
     
 pandas2ri.activate()
 
-def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
+def get_BS_changepoints(pickle_folder, data_name, hyperparameter_list):
     for pickle_file in os.listdir(pickle_folder):
         method_name = "BS"
         substation_name = pickle_file[:-7]
@@ -311,21 +311,24 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
             #hyperparameter_string = re.sub(r"[^a-zA-Z0-9_ ]","",str(hyperparameter_settings))
             hyperparameter_string = str(hyperparameter_settings)
             
-            result_file_path = os.path.join(result_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+            intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
             
-            if os.path.exists(result_file_path):
+            if os.path.exists(intermediate_file_path):
                 pass
             else:        
                 print("evaluating hyperparameter setting:")
                 print(hyperparameter_settings)
                 #evaluate method using hyperparameter_settings
-                segments = changepoint.cpt_meanvar(X, **hyperparameter_settings)
+                changepoint_object = changepoint.cpt_meanvar(X, **hyperparameter_settings)
                 
-                if not os.path.exists(os.path.join(result_folder, data_name, method_name, hyperparameter_string)):
-                    os.makedirs(os.path.join(result_folder, data_name, method_name, hyperparameter_string))
+                changepoints = changepoint.cpts(changepoint_object).astype(int)
                 
-                with open(result_file_path, 'wb') as handle:
-                    pickle.dump(segments, handle)
+                
+                if not os.path.exists(os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string)):
+                    os.makedirs(os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string))
+                
+                with open(intermediate_file_path, 'wb') as handle:
+                    pickle.dump(changepoints, handle)
 
 
 #calculate combinations from hyperparameters[method_name]
@@ -333,11 +336,13 @@ hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500], "method":["BinS
 
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
-get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+get_BS_changepoints(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
 
 #%% evaluate segments as labels:
     
 
+
+#%%
 method_name="BS"
 
 best_score = 0
@@ -351,7 +356,7 @@ for hyperparameter_settings in hyperparameter_list:
     print(hyperparameter_string)
     
     # check if all results have actually been calculated
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+    y_true_filtered, event_lengths_filtered = get_y_true_and_lengths(pickle_train_file_folder)
 
     #res = minimize(inv_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
@@ -369,3 +374,12 @@ for hyperparameter_settings in hyperparameter_list:
         best_score = storm_score
         best_hyperparameters = hyperparameter_settings
         best_thresholds = thresholds
+        
+        
+#%% test changepoint properties
+
+with open("results/X_train/BS/{'Q': 200, 'method': 'BinSeg', 'minseglen': 288, 'pen_value': 7500, 'penalty': 'Manual'}/000.pickle", "rb") as handle:
+    test = pickle.load(handle)
+    test2 = changepoint.cpts(test).astype(int)
+    
+    print(test2)
