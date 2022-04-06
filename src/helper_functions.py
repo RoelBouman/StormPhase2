@@ -10,7 +10,7 @@ from src.evaluation import threshold_and_score
 from src.evaluation import inverse_threshold_and_score
 
 #uses single + double cutoff method for fewer passes, redoes initial upper_threshold guess
-def find_BS_thresholds5(y_scores, y_true, lengths, cutoffs):
+def find_BS_thresholds(y_scores, y_true, lengths, cutoffs):
     unique_scores = np.unique(y_scores)
     
     thresholds = (unique_scores[:-1] + unique_scores[1:])/2
