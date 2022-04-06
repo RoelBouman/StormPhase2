@@ -11,6 +11,7 @@ import pandas as pd
 import numpy as np
 
 from scipy.optimize import minimize
+from scipy import optimize
 
 from sklearn.ensemble import IsolationForest
 from sklearn.model_selection import ParameterGrid
@@ -19,8 +20,8 @@ from sklearn.preprocessing import RobustScaler
 from src.evaluation import STORM_score
 from src.evaluation import threshold_scores
 from src.evaluation import double_threshold_scores
-from src.evaluation import inv_threshold_and_score
-from src.evaluation import inv_double_threshold_and_score
+from src.evaluation import neg_threshold_and_score
+from src.evaluation import neg_double_threshold_and_score
 
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects import r, pandas2ri
@@ -166,7 +167,7 @@ for hyperparameter_settings in hyperparameter_list:
     # check if all results have actually been calculated
     y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
 
-    res = minimize(inv_threshold_and_score, 0, args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+    res = minimize(neg_threshold_and_score, 0, args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
     threshold = res.x[0]
     
@@ -262,7 +263,7 @@ for hyperparameter_settings in hyperparameter_list:
     # check if all results have actually been calculated
     y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
 
-    res = minimize(inv_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+    res = minimize(neg_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
     thresholds = res.x
     
@@ -296,7 +297,7 @@ print(storm_score)
     
 pandas2ri.activate()
 
-def get_BS_changepoints(pickle_folder, data_name, hyperparameter_list):
+def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
     for pickle_file in os.listdir(pickle_folder):
         method_name = "BS"
         substation_name = pickle_file[:-7]
@@ -307,6 +308,7 @@ def get_BS_changepoints(pickle_folder, data_name, hyperparameter_list):
         data = pickle.load(open(os.path.join(pickle_folder, pickle_file), 'rb'))
         X, y = pd.DataFrame(data["X"])[0], np.squeeze(data["y"].reshape(-1,1))
         
+        print("evaluating hyperparameter setting:")
         for hyperparameter_settings in hyperparameter_list:
             #hyperparameter_string = re.sub(r"[^a-zA-Z0-9_ ]","",str(hyperparameter_settings))
             hyperparameter_string = str(hyperparameter_settings)
@@ -316,53 +318,80 @@ def get_BS_changepoints(pickle_folder, data_name, hyperparameter_list):
             if os.path.exists(intermediate_file_path):
                 pass
             else:        
-                print("evaluating hyperparameter setting:")
+
                 print(hyperparameter_settings)
                 #evaluate method using hyperparameter_settings
                 changepoint_object = changepoint.cpt_meanvar(X, **hyperparameter_settings)
                 
                 changepoints = changepoint.cpts(changepoint_object).astype(int)
                 
+                segments = np.split(X, changepoints)
                 
                 if not os.path.exists(os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string)):
                     os.makedirs(os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string))
                 
                 with open(intermediate_file_path, 'wb') as handle:
-                    pickle.dump(changepoints, handle)
+                    pickle.dump(segments, handle)
 
 
 #calculate combinations from hyperparameters[method_name]
-hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
+hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
 
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
-get_BS_changepoints(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
 
-#%% evaluate segments as labels:
-    
-
-
-#%%
+#%% evaluate binary segmentation based on distance of mean of segments to mean of station X
 method_name="BS"
 
 best_score = 0
 best_hyperparameters= []
 best_thresholds = 0
 
+data_name = "X_train"
+
+
+y_true_filtered, event_lengths_filtered = get_y_true_and_lengths(pickle_train_file_folder)
 
 print("Evaluate training data:")
+    
+    
 for hyperparameter_settings in hyperparameter_list:
-    hyperparameter_string = str(hyperparameter_settings)
-    print(hyperparameter_string)
+    print("Hyperparameters:")
+    print(hyperparameter_settings)
+    segment_features = []
     
-    # check if all results have actually been calculated
-    y_true_filtered, event_lengths_filtered = get_y_true_and_lengths(pickle_train_file_folder)
+    for pickle_file in os.listdir(pickle_train_file_folder):
+        substation_name = pickle_file[:-7]
+        
+        hyperparameter_string = str(hyperparameter_settings)
+        data = pickle.load(open(os.path.join(pickle_train_file_folder, pickle_file), 'rb'))
+        X = pd.DataFrame(data["X"])[0]
+        
+        intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+        
+        with open(intermediate_file_path, 'rb') as handle:
+            segments = pickle.load(handle)
+        
+        segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+        
+        
+    print("optimizing cutoffs:")
+    y_scores = np.concatenate(segment_features)
+    
+    y_scores = y_scores
+        
 
-    #res = minimize(inv_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
-    #thresholds = res.x
+    thresholds = find_BS_thresholds5(y_scores, y_true_filtered, event_lengths_filtered, cutoffs)
     
-    #y_pred = double_threshold_scores(y_scores_filtered, thresholds)
+    
+    
+    y_pred = double_threshold_scores(y_scores, thresholds)
+    
+    #threshold = find_BS_thresholds3(y_scores, y_true_filtered, event_lengths_filtered, cutoffs)
+    
+    #y_pred = inverse_threshold_scores(y_scores, threshold)
     
     storm_score = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs)
     print("Best STORM score:")
@@ -376,10 +405,7 @@ for hyperparameter_settings in hyperparameter_list:
         best_thresholds = thresholds
         
         
-#%% test changepoint properties
+        
 
-with open("results/X_train/BS/{'Q': 200, 'method': 'BinSeg', 'minseglen': 288, 'pen_value': 7500, 'penalty': 'Manual'}/000.pickle", "rb") as handle:
-    test = pickle.load(handle)
-    test2 = changepoint.cpts(test).astype(int)
-    
-    print(test2)
+        
+        
