@@ -15,8 +15,8 @@ def find_BS_thresholds(y_scores, y_true, lengths, cutoffs):
     
     thresholds = (unique_scores[:-1] + unique_scores[1:])/2
     
-    lower_thresholds = thresholds[:len(thresholds)//2]
-    upper_thresholds = thresholds[len(thresholds)//2:]
+    lower_thresholds = thresholds[thresholds < 0]
+    upper_thresholds = thresholds[thresholds >= 0]
     
     best_score = 0
     
