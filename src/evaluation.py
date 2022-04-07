@@ -40,17 +40,27 @@ def calculate_stats(y_true: np.array, y_pred: np.array, lengths: np.array, cutof
 def fbeta_from_confmat(tn, fp, fn, tp, beta=10):
     return (1+beta**2)*tp / ((1+beta**2) * tp + beta**2 * fn + fp)
 
-def _STORM_score(TN, FP, FN, TP, beta=10):
+def _STORM_score(TN, FP, FN, TP, beta=10, return_subscores=False):
     
     score_part = np.zeros((len(TN)))
     for i, (tn, fp, fn, tp) in enumerate(zip(TN, FP, FN, TP)):
         score_part[i] = fbeta_from_confmat(fn, fp, fn, tp, beta)
         
-    return(np.mean(score_part))
+        
+    if return_subscores:
+        return((np.mean(score_part), score_part))
+    else:
+        return(np.mean(score_part))
     
-def STORM_score(y_true: np.array, y_pred: np.array, lengths: np.array, cutoffs: List[Tuple], beta=10) -> float:
+def STORM_score(y_true: np.array, y_pred: np.array, lengths: np.array, cutoffs: List[Tuple], beta=10, return_subscores=False, return_confmat=False) -> float:
     TN, FP, FN, TP = calculate_stats(y_true, y_pred, lengths, cutoffs)
-    return _STORM_score(TN, FP, FN, TP, beta)
+    if return_confmat:
+        if return_subscores:
+            return _STORM_score(TN, FP, FN, TP, beta, return_subscores) + (TN,FP,FN,TP)
+        else:
+            return (_STORM_score(TN, FP, FN, TP, beta, return_subscores),) + (TN,FP,FN,TP)
+    else:
+        return _STORM_score(TN, FP, FN, TP, beta, return_subscores)
     
 def threshold_scores(y_scores: np.ndarray, threshold:float) -> np.array:
     return (y_scores < threshold).astype(float) # works for IF, where lower likely indicates more anomalous
