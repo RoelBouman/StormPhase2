@@ -23,6 +23,8 @@ from src.evaluation import double_threshold_scores
 from src.evaluation import neg_threshold_and_score
 from src.evaluation import neg_double_threshold_and_score
 
+from src.helper_functions import find_BS_thresholds
+
 import rpy2.robjects.packages as rpackages
 from rpy2.robjects import r, pandas2ri
 
@@ -31,8 +33,9 @@ changepoint = rpackages.importr('changepoint')
 cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 data_folder = "data"
-result_folder = "results"
+prediction_folder = "predictions"
 intermediate_folder = "intermediates"
+result_folder = "results"
 
 pickle_train_file_folder = os.path.join(data_folder, "X_train_preprocessed_pickle")
 pickle_test_file_folder = os.path.join(data_folder, "X_test_preprocessed_pickle")
@@ -67,9 +70,9 @@ def get_y_true_and_lengths(pickle_folder, filter_labels=False):
     else:
         return (y_true_combined, event_lengths_combined)
 
-def get_all_station_data(data_name, result_folder, method_name, hyperparameter_string, pickle_folder, get_scores=True):
+def get_all_station_data(data_name, prediction_folder, method_name, hyperparameter_string, pickle_folder, get_scores=True):
     
-    station_score_folder = os.path.join(result_folder, data_name, method_name, hyperparameter_string)
+    station_score_folder = os.path.join(prediction_folder, data_name, method_name, hyperparameter_string)
     
     station_score_files = os.listdir(station_score_folder)
     
@@ -127,7 +130,7 @@ def get_IF_scores(pickle_folder, data_name, hyperparameter_list):
             #hyperparameter_string = re.sub(r"[^a-zA-Z0-9_ ]","",str(hyperparameter_settings))
             hyperparameter_string = str(hyperparameter_settings)
             
-            result_file_path = os.path.join(result_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+            result_file_path = os.path.join(prediction_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
             
             if os.path.exists(result_file_path):
                 pass
@@ -140,8 +143,8 @@ def get_IF_scores(pickle_folder, data_name, hyperparameter_list):
                 model.fit(X)
                 y_scores = model.decision_function(X)
                 
-                if not os.path.exists(os.path.join(result_folder, data_name, method_name, hyperparameter_string)):
-                    os.makedirs(os.path.join(result_folder, data_name, method_name, hyperparameter_string))
+                if not os.path.exists(os.path.join(prediction_folder, data_name, method_name, hyperparameter_string)):
+                    os.makedirs(os.path.join(prediction_folder, data_name, method_name, hyperparameter_string))
                 
                 with open(result_file_path, 'wb') as handle:
                     pickle.dump(y_scores, handle)
@@ -165,7 +168,7 @@ for hyperparameter_settings in hyperparameter_list:
     print(hyperparameter_string)
     
     # check if all results have actually been calculated
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
 
     res = minimize(neg_threshold_and_score, 0, args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
@@ -189,7 +192,7 @@ print("Evaluate test data:")
 get_IF_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
 hyperparameter_string = str(best_hyperparameters)
 
-y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", result_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
 
 y_pred = threshold_scores(y_scores_filtered, best_threshold)
 
@@ -219,7 +222,7 @@ def get_RI_scores(pickle_folder, data_name, hyperparameter_list):
             #hyperparameter_string = re.sub(r"[^a-zA-Z0-9_ ]","",str(hyperparameter_settings))
             hyperparameter_string = str(hyperparameter_settings)
             
-            result_file_path = os.path.join(result_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+            result_file_path = os.path.join(prediction_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
             
             if os.path.exists(result_file_path):
                 pass
@@ -232,8 +235,8 @@ def get_RI_scores(pickle_folder, data_name, hyperparameter_list):
                 
                 y_scores = np.squeeze(model.fit_transform(X))
                 
-                if not os.path.exists(os.path.join(result_folder, data_name, method_name, hyperparameter_string)):
-                    os.makedirs(os.path.join(result_folder, data_name, method_name, hyperparameter_string))
+                if not os.path.exists(os.path.join(prediction_folder, data_name, method_name, hyperparameter_string)):
+                    os.makedirs(os.path.join(prediction_folder, data_name, method_name, hyperparameter_string))
                 
                 with open(result_file_path, 'wb') as handle:
                     pickle.dump(y_scores, handle)
@@ -261,7 +264,7 @@ for hyperparameter_settings in hyperparameter_list:
     print(hyperparameter_string)
     
     # check if all results have actually been calculated
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", result_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
 
     res = minimize(neg_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
     
@@ -284,7 +287,7 @@ for hyperparameter_settings in hyperparameter_list:
 print("Evaluate test data:")
 get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
 
-y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", result_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
 
 y_pred = double_threshold_scores(y_scores_filtered, best_thresholds)
 
@@ -335,8 +338,8 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
 
 
 #calculate combinations from hyperparameters[method_name]
-hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
-
+#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
+hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
 get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
@@ -381,8 +384,7 @@ for hyperparameter_settings in hyperparameter_list:
     
     y_scores = y_scores
     
-    thresholds = find_BS_thresholds5(y_scores, y_true_filtered, event_lengths_filtered, cutoffs)
-    
+    thresholds = find_BS_thresholds(y_scores, y_true_filtered, event_lengths_filtered, cutoffs)
     
     y_pred = double_threshold_scores(y_scores, thresholds)
     
