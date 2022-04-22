@@ -467,6 +467,8 @@ for hyperparameter_settings in hyperparameter_list:
     print(hyperparameter_settings)
     segment_features = []
     
+    hyperparameter_string = str(hyperparameter_settings)
+    
     result_file_path = os.path.join(result_folder, "X_train", method_name, hyperparameter_string)
     result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
     
@@ -478,7 +480,7 @@ for hyperparameter_settings in hyperparameter_list:
         for pickle_file in os.listdir(pickle_train_file_folder):
             substation_name = pickle_file[:-7]
             
-            hyperparameter_string = str(hyperparameter_settings)
+            
             data = pickle.load(open(os.path.join(pickle_train_file_folder, pickle_file), 'rb'))
             X = pd.DataFrame(data["X"])[0]
             
@@ -511,7 +513,6 @@ for hyperparameter_settings in hyperparameter_list:
         with open(thresholds_pickle_path, 'wb') as handle:
             pickle.dump(thresholds, handle)
     else:
-        
         with open(result_pickle_path, 'rb') as handle:
             storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
 
@@ -519,7 +520,7 @@ for hyperparameter_settings in hyperparameter_list:
             thresholds = pickle.load(handle)
             
     
-    storm_score = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs)
+
     print("Best STORM score:")
     print(storm_score)
     print("thresholds:")
