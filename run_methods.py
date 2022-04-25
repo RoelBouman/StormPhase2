@@ -297,7 +297,7 @@ def get_RI_scores(pickle_folder, data_name, hyperparameter_list):
 
 #Perform grid search
 #calculate combinations from hyperparameters[method_name]
-hyperparameter_grid = {"quantile_range":[(10,90), (5, 95), (2.5, 97.5), (15,85), (20,80),(25,75)]}
+hyperparameter_grid = {"quantile_range":[(10,90), (5, 95), (2.5, 97.5), (15,85), (20,80)]} #,(25,75)
 
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
@@ -366,6 +366,10 @@ for hyperparameter_settings in hyperparameter_list:
 result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
 
 result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+
+thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
+thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+
 
 if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
     
@@ -441,7 +445,8 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
 
 
 #calculate combinations from hyperparameters[method_name]
-hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
+#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
+hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50,4000], "method":["BinSeg"], "Q":[50, 400], "minseglen":[100, 500]}
 #hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
@@ -533,6 +538,44 @@ for hyperparameter_settings in hyperparameter_list:
         
         
         
+#evaluate on test data:
+result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
 
+result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+
+thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
+thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+
+
+if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
+    
+    os.makedirs(result_file_path)
+    
+    get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+
+    hyperparameter_string = str(best_hyperparameters)
+    
+    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+    
+    y_pred = double_threshold_scores(y_scores_filtered, best_thresholds)
+    
+    score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
+    
+    storm_score, sub_scores, TN, FP, FN, TP = score_stats
+    
+    os.makedirs(result_file_path, exist_ok=True)
+    with open(result_pickle_path, 'wb') as handle:
+        pickle.dump(score_stats, handle)
+        
+    os.makedirs(thresholds_file_path, exist_ok=True)
+    with open(thresholds_pickle_path, 'wb') as handle:
+        pickle.dump(best_thresholds, handle)
+    
+else:
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+    
+print("STORM score on test:")
+print(storm_score)
         
         
