@@ -363,6 +363,7 @@ for hyperparameter_settings in hyperparameter_list:
         best_thresholds = thresholds
         
 #evaluate on test data:
+print("Evaluate test data:")
 result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
 
 result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
@@ -373,7 +374,7 @@ thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
 
 if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
     
-    os.makedirs(result_file_path)
+    os.makedirs(result_file_path, exist_ok=True)
     
     get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
 
@@ -445,7 +446,7 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
 
 
 #calculate combinations from hyperparameters[method_name]
-#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50, 100, 250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
+#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
 hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50,4000], "method":["BinSeg"], "Q":[50, 400], "minseglen":[100, 500]}
 #hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
 hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
@@ -496,11 +497,10 @@ for hyperparameter_settings in hyperparameter_list:
             
             segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
             
-            
-        print("optimizing cutoffs:")
         y_scores = np.concatenate(segment_features)
         
-        y_scores = y_scores
+        
+        print("optimizing cutoffs:")
         
         thresholds = find_BS_thresholds(y_scores, y_true_filtered, event_lengths_filtered, cutoffs)
         
@@ -539,6 +539,7 @@ for hyperparameter_settings in hyperparameter_list:
         
         
 #evaluate on test data:
+    print("Evaluate test data:")
 result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
 
 result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
@@ -546,16 +547,42 @@ result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
 thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
 thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
 
+data_name = "X_test"
 
 if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
     
-    os.makedirs(result_file_path)
+    os.makedirs(result_file_path, exist_ok=True)
     
-    get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
-
+    get_BS_segments(pickle_test_file_folder, "X_test", [best_hyperparameters])
+    
     hyperparameter_string = str(best_hyperparameters)
+
+    for pickle_file in os.listdir(pickle_test_file_folder):
+        substation_name = pickle_file[:-7]
+        
+        
+        data = pickle.load(open(os.path.join(pickle_test_file_folder, pickle_file), 'rb'))
+        X = pd.DataFrame(data["X"])[0]
+        
+        intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+        
+        with open(intermediate_file_path, 'rb') as handle:
+            segments = pickle.load(handle)
+        
+        segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+            
+            
+    y_scores = np.concatenate(segment_features)
+        
+
+    y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_test_file_folder)
     
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+    
+    y_true_filtered = y_true_combined[y_true_combined != 5]
+    event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+    y_scores_filtered = y_scores[y_true_combined != 5]
+    
+    #y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
     
     y_pred = double_threshold_scores(y_scores_filtered, best_thresholds)
     
