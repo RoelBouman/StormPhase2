@@ -228,10 +228,10 @@ for cutoffs in low_and_all_cutoffs:
     print("Evaluate test data:")
     
     
-    result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_test", method_name, hyperparameter_string)
     result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
     
-    thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_test", method_name, hyperparameter_string)
     thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
     
     if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
