@@ -30,7 +30,12 @@ from rpy2.robjects import r, pandas2ri
 
 changepoint = rpackages.importr('changepoint')
 
-cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+
+all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+low_cutoffs = [(0, 24), (24, 288)]
+high_cutoffs = [(288, 4032), (4032, np.inf)]
+low_and_all_cutoffs = [low_cutoffs, all_cutoffs]
+high_and_all_cutoffs = [high_cutoffs, all_cutoffs]
 
 data_folder = "data"
 prediction_folder = "predictions"
@@ -159,32 +164,86 @@ print("Isolation Forest")
 
 method_name="IF"
 
-best_score = 0
-best_hyperparameters= []
-best_threshold = 0
-
-print("Evaluate training data:")
-for hyperparameter_settings in hyperparameter_list:
-    hyperparameter_string = str(hyperparameter_settings)
-    print(hyperparameter_string)
+for cutoffs in low_and_all_cutoffs:
+    cutoffs_string = str(cutoffs)
+    print("Evaluating cutoffs:" + cutoffs_string)
+    
+    best_score = 0
+    best_hyperparameters= []
+    best_threshold = 0
+    
+    print("Evaluate training data:")
+    for hyperparameter_settings in hyperparameter_list:
+        hyperparameter_string = str(hyperparameter_settings)
+        print(hyperparameter_string)
+        
+        
+        result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+        result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+        
+        thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+        thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+        
+        if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
+            
+            # check if all predictions have actually been calculated
+            y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+        
+            res = minimize(neg_threshold_and_score, 0, args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+            
+            threshold = res.x[0]
+            
+            y_pred = threshold_scores(y_scores_filtered, threshold)
+            
+            score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
+            
+            storm_score, sub_scores, TN, FP, FN, TP = score_stats
+            
+            os.makedirs(result_file_path, exist_ok=True)
+            with open(result_pickle_path, 'wb') as handle:
+                pickle.dump(score_stats, handle)
+                
+            os.makedirs(thresholds_file_path, exist_ok=True)
+            with open(thresholds_pickle_path, 'wb') as handle:
+                pickle.dump(threshold, handle)
+        else:
+            
+            with open(result_pickle_path, 'rb') as handle:
+                storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+            with open(thresholds_pickle_path, 'rb') as handle:
+                threshold = pickle.load(handle)
+            
+            
+        print("Best STORM score:")
+        print(storm_score)
+        print("threshold:")
+        print(threshold)
+        
+        if storm_score > best_score:
+            best_score = storm_score
+            best_hyperparameters = hyperparameter_settings
+            best_threshold = threshold
+            
+    #evaluate on test data:
+    print("Evaluate test data:")
     
     
-    result_file_path = os.path.join(result_folder, "X_train", method_name, hyperparameter_string)
+    result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
     result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
     
-    thresholds_file_path = os.path.join(thresholds_folder, "X_train", method_name, hyperparameter_string)
+    thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
     thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
     
     if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
         
-        # check if all predictions have actually been calculated
-        y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
     
-        res = minimize(neg_threshold_and_score, 0, args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
         
-        threshold = res.x[0]
+        get_IF_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+        hyperparameter_string = str(best_hyperparameters)
         
-        y_pred = threshold_scores(y_scores_filtered, threshold)
+        y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+        
+        y_pred = threshold_scores(y_scores_filtered, best_threshold)
         
         score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
         
@@ -196,63 +255,13 @@ for hyperparameter_settings in hyperparameter_list:
             
         os.makedirs(thresholds_file_path, exist_ok=True)
         with open(thresholds_pickle_path, 'wb') as handle:
-            pickle.dump(threshold, handle)
+            pickle.dump(best_threshold, handle)
     else:
-        
         with open(result_pickle_path, 'rb') as handle:
             storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
-        with open(thresholds_pickle_path, 'rb') as handle:
-            threshold = pickle.load(handle)
         
-        
-    print("Best STORM score:")
+    print("STORM score on test:")
     print(storm_score)
-    print("threshold:")
-    print(threshold)
-    
-    if storm_score > best_score:
-        best_score = storm_score
-        best_hyperparameters = hyperparameter_settings
-        best_threshold = threshold
-        
-#evaluate on test data:
-print("Evaluate test data:")
-
-
-result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
-result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
-
-thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
-thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
-
-if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
-    
-
-    
-    get_IF_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
-    hyperparameter_string = str(best_hyperparameters)
-    
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
-    
-    y_pred = threshold_scores(y_scores_filtered, best_threshold)
-    
-    score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
-    
-    storm_score, sub_scores, TN, FP, FN, TP = score_stats
-    
-    os.makedirs(result_file_path, exist_ok=True)
-    with open(result_pickle_path, 'wb') as handle:
-        pickle.dump(score_stats, handle)
-        
-    os.makedirs(thresholds_file_path, exist_ok=True)
-    with open(thresholds_pickle_path, 'wb') as handle:
-        pickle.dump(best_threshold, handle)
-else:
-    with open(result_pickle_path, 'rb') as handle:
-        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
-    
-print("STORM score on test:")
-print(storm_score)
 
 #%%Robust interval calculation:
 
