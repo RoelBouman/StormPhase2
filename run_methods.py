@@ -118,7 +118,7 @@ print("Isolation Forest")
 #calculate combinations from hyperparameters[method_name]
 hyperparameter_grid = {"n_estimators":[1000], "bootstrap":[True, False], "max_samples":[128,256,512,1024]}
 
-hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
+IF_hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
 
 def get_IF_scores(pickle_folder, data_name, hyperparameter_list):
@@ -156,7 +156,7 @@ def get_IF_scores(pickle_folder, data_name, hyperparameter_list):
                     pickle.dump(y_scores, handle)
 
 print("Calculating train scores:")
-get_IF_scores(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+get_IF_scores(pickle_train_file_folder, data_name="X_train", hyperparameter_list=IF_hyperparameter_list)
 
 #%% Isolation Forest score evaluation
 print("Now evaluating:")
@@ -173,7 +173,7 @@ for cutoffs in low_and_all_cutoffs:
     best_threshold = 0
     
     print("Evaluate training data:")
-    for hyperparameter_settings in hyperparameter_list:
+    for hyperparameter_settings in IF_hyperparameter_list:
         hyperparameter_string = str(hyperparameter_settings)
         print(hyperparameter_string)
         
@@ -308,9 +308,9 @@ def get_RI_scores(pickle_folder, data_name, hyperparameter_list):
 #calculate combinations from hyperparameters[method_name]
 hyperparameter_grid = {"quantile_range":[(10,90), (5, 95), (2.5, 97.5), (15,85), (20,80)]} #,(25,75)
 
-hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
+RI_hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
-get_RI_scores(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+get_RI_scores(pickle_train_file_folder, data_name="X_train", hyperparameter_list=RI_hyperparameter_list)
 
 #%% evaluate Robust interval
 
@@ -328,7 +328,7 @@ for cutoffs in low_and_all_cutoffs:
     
     
     print("Evaluate training data:")
-    for hyperparameter_settings in hyperparameter_list:
+    for hyperparameter_settings in RI_hyperparameter_list:
         hyperparameter_string = str(hyperparameter_settings)
         print(hyperparameter_string)
         
@@ -465,9 +465,9 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
 #hyperparameter_grid = {"penalty":["Manual"], "pen_value":[250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
 hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50,4000], "method":["BinSeg"], "Q":[100, 400], "minseglen":[200, 500]}
 #hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
-hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
+BS_hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
-get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
+get_BS_segments(pickle_train_file_folder, data_name="X_train", hyperparameter_list=BS_hyperparameter_list)
 
 #%% evaluate binary segmentation based on distance of mean of segments to mean of station X
 method_name="BS"
@@ -490,7 +490,7 @@ for cutoffs in high_and_all_cutoffs:
     print("Evaluate training data:")
         
         
-    for hyperparameter_settings in hyperparameter_list:
+    for hyperparameter_settings in BS_hyperparameter_list:
         print("Hyperparameters:")
         print(hyperparameter_settings)
         segment_features = []
@@ -570,6 +570,7 @@ for cutoffs in high_and_all_cutoffs:
     thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
     
     data_name = "X_test"
+    segment_features = []
     
     if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
         
