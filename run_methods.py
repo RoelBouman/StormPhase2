@@ -561,7 +561,7 @@ for cutoffs in high_and_all_cutoffs:
             
             
     #evaluate on test data:
-        print("Evaluate test data:")
+    print("Evaluate test data:")
     result_file_path = os.path.join(result_folder, cutoffs_string, "X_test", method_name, hyperparameter_string)
     
     result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
@@ -631,3 +631,97 @@ for cutoffs in high_and_all_cutoffs:
         
 #%% Evaluate ensembling methods:
     
+#Evaluate naive ensembling of RI+BS and IF+BS based on highest 4part STORM score
+
+#Find best BS scores:
+for hyperparameter_settings in BS_hyperparameter_list:
+    
+    hyperparameter_string = str(hyperparameter_settings)
+    
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+    
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+
+    with open(thresholds_pickle_path, 'rb') as handle:
+        thresholds = pickle.load(handle)
+
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
+        
+        
+get_BS_segments(pickle_test_file_folder, "X_test", [best_hyperparameters])
+get_BS_segments(pickle_test_file_folder, "X_train", [best_hyperparameters])
+
+hyperparameter_string = str(best_hyperparameters)
+
+#get segment features for test
+segment_features = []
+for pickle_file in os.listdir(pickle_test_file_folder):
+    substation_name = pickle_file[:-7]
+    
+    
+    data = pickle.load(open(os.path.join(pickle_test_file_folder, pickle_file), 'rb'))
+    X = pd.DataFrame(data["X"])[0]
+    
+    intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+    
+    with open(intermediate_file_path, 'rb') as handle:
+        segments = pickle.load(handle)
+    
+    segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+
+y_scores = np.concatenate(segment_features)
+    
+
+y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_test_file_folder)
+
+
+y_true_filtered = y_true_combined[y_true_combined != 5]
+event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+y_scores_filtered = y_scores[y_true_combined != 5]
+
+#y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_test_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
+
+#get segment features for train
+segment_features = []
+for pickle_file in os.listdir(pickle_train_file_folder):
+    substation_name = pickle_file[:-7]
+    
+    
+    data = pickle.load(open(os.path.join(pickle_train_file_folder, pickle_file), 'rb'))
+    X = pd.DataFrame(data["X"])[0]
+    
+    intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+    
+    with open(intermediate_file_path, 'rb') as handle:
+        segments = pickle.load(handle)
+    
+    segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+
+y_scores = np.concatenate(segment_features)
+    
+
+y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_train_file_folder)
+
+
+y_true_filtered = y_true_combined[y_true_combined != 5]
+event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+y_scores_filtered = y_scores[y_true_combined != 5]
+
+#y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_train_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
