@@ -313,104 +313,111 @@ hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 get_RI_scores(pickle_train_file_folder, data_name="X_train", hyperparameter_list=hyperparameter_list)
 
 #%% evaluate Robust interval
+
+print("Now evaluating:")
+print("Robust Interval")
 method_name="RI"
 
-best_score = 0
-best_hyperparameters= []
-best_thresholds = 0
-
-
-print("Evaluate training data:")
-for hyperparameter_settings in hyperparameter_list:
-    hyperparameter_string = str(hyperparameter_settings)
-    print(hyperparameter_string)
+for cutoffs in low_and_all_cutoffs:
+    cutoffs_string = str(cutoffs)
+    print("Evaluating cutoffs:" + cutoffs_string)
     
-    result_file_path = os.path.join(result_folder, "X_train", method_name, hyperparameter_string)
+    best_score = 0
+    best_hyperparameters= []
+    best_thresholds = 0
+    
+    
+    print("Evaluate training data:")
+    for hyperparameter_settings in hyperparameter_list:
+        hyperparameter_string = str(hyperparameter_settings)
+        print(hyperparameter_string)
+        
+        result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+        result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+        
+        thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+        thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+        if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
+            # check if all predictions have actually been calculated
+            y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+        
+            res = minimize(neg_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+            
+            thresholds = res.x
+            
+            y_pred = double_threshold_scores(y_scores_filtered, thresholds)
+            
+            score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
+            
+            storm_score, sub_scores, TN, FP, FN, TP = score_stats
+                
+            os.makedirs(result_file_path, exist_ok=True)
+            with open(result_pickle_path, 'wb') as handle:
+                pickle.dump(score_stats, handle)
+                
+            os.makedirs(thresholds_file_path, exist_ok=True)
+            with open(thresholds_pickle_path, 'wb') as handle:
+                pickle.dump(thresholds, handle)
+        else:
+            
+            with open(result_pickle_path, 'rb') as handle:
+                storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+    
+            with open(thresholds_pickle_path, 'rb') as handle:
+                thresholds = pickle.load(handle)
+    
+                
+        print("Best STORM score:")
+        print(storm_score)
+        print("thresholds:")
+        print(thresholds)
+        
+        if storm_score > best_score:
+            best_score = storm_score
+            best_hyperparameters = hyperparameter_settings
+            best_thresholds = thresholds
+            
+    #evaluate on test data:
+    print("Evaluate test data:")
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_test", method_name, hyperparameter_string)
+    
     result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
     
-    thresholds_file_path = os.path.join(thresholds_folder, "X_train", method_name, hyperparameter_string)
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_test", method_name, hyperparameter_string)
     thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
-
-    if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
-        # check if all predictions have actually been calculated
-        y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
     
-        res = minimize(neg_double_threshold_and_score, (-1,1), args=(y_true_filtered, y_scores_filtered, event_lengths_filtered, cutoffs), method="Nelder-Mead", options ={"disp":False})
+    
+    if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
         
-        thresholds = res.x
+        os.makedirs(result_file_path, exist_ok=True)
         
-        y_pred = double_threshold_scores(y_scores_filtered, thresholds)
+        get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+    
+        hyperparameter_string = str(best_hyperparameters)
+        
+        y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+        
+        y_pred = double_threshold_scores(y_scores_filtered, best_thresholds)
         
         score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
         
         storm_score, sub_scores, TN, FP, FN, TP = score_stats
-            
+        
         os.makedirs(result_file_path, exist_ok=True)
         with open(result_pickle_path, 'wb') as handle:
             pickle.dump(score_stats, handle)
             
         os.makedirs(thresholds_file_path, exist_ok=True)
         with open(thresholds_pickle_path, 'wb') as handle:
-            pickle.dump(thresholds, handle)
-    else:
+            pickle.dump(best_thresholds, handle)
         
+    else:
         with open(result_pickle_path, 'rb') as handle:
             storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
-
-        with open(thresholds_pickle_path, 'rb') as handle:
-            thresholds = pickle.load(handle)
-
-            
-    print("Best STORM score:")
+        
+    print("STORM score on test:")
     print(storm_score)
-    print("thresholds:")
-    print(thresholds)
-    
-    if storm_score > best_score:
-        best_score = storm_score
-        best_hyperparameters = hyperparameter_settings
-        best_thresholds = thresholds
-        
-#evaluate on test data:
-print("Evaluate test data:")
-result_file_path = os.path.join(result_folder, "X_test", method_name, hyperparameter_string)
-
-result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
-
-thresholds_file_path = os.path.join(thresholds_folder, "X_test", method_name, hyperparameter_string)
-thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
-
-
-if not (os.path.exists(result_pickle_path) and os.path.exists(thresholds_pickle_path)):
-    
-    os.makedirs(result_file_path, exist_ok=True)
-    
-    get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
-
-    hyperparameter_string = str(best_hyperparameters)
-    
-    y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
-    
-    y_pred = double_threshold_scores(y_scores_filtered, best_thresholds)
-    
-    score_stats  = STORM_score(y_true_filtered, y_pred, event_lengths_filtered, cutoffs, return_subscores=True, return_confmat=True)
-    
-    storm_score, sub_scores, TN, FP, FN, TP = score_stats
-    
-    os.makedirs(result_file_path, exist_ok=True)
-    with open(result_pickle_path, 'wb') as handle:
-        pickle.dump(score_stats, handle)
-        
-    os.makedirs(thresholds_file_path, exist_ok=True)
-    with open(thresholds_pickle_path, 'wb') as handle:
-        pickle.dump(best_thresholds, handle)
-    
-else:
-    with open(result_pickle_path, 'rb') as handle:
-        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
-    
-print("STORM score on test:")
-print(storm_score)
 
 
 #%% Get segments from Binseg:
