@@ -474,7 +474,7 @@ method_name="BS"
 print("Now evaluating:")
 print("Binary Segmentation")
 
-for cutoffs in low_and_all_cutoffs:
+for cutoffs in high_and_all_cutoffs:
     cutoffs_string = str(cutoffs)
     print("Evaluating cutoffs:" + cutoffs_string)
     
@@ -628,3 +628,5 @@ for cutoffs in low_and_all_cutoffs:
     print(storm_score)
         
         
+#%% Evaluate ensembling methods:
+    
