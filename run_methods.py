@@ -732,6 +732,7 @@ y_pred_train_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
 
 # find best IF scores
 method_name = "IF"
+best_score = 0
 for hyperparameter_settings in IF_hyperparameter_list:
     
     hyperparameter_string = str(hyperparameter_settings)
