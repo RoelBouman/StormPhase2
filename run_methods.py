@@ -669,6 +669,7 @@ get_BS_segments(pickle_test_file_folder, "X_train", [best_hyperparameters])
 hyperparameter_string = str(best_hyperparameters)
 
 #get segment features for test
+data_name = "X_test"
 segment_features = []
 for pickle_file in os.listdir(pickle_test_file_folder):
     substation_name = pickle_file[:-7]
@@ -700,6 +701,7 @@ y_pred_test_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
 
 #get segment features for train
 segment_features = []
+data_name = "X_train"
 for pickle_file in os.listdir(pickle_train_file_folder):
     substation_name = pickle_file[:-7]
     
