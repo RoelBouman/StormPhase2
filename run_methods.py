@@ -462,8 +462,8 @@ def get_BS_segments(pickle_folder, data_name, hyperparameter_list):
 
 
 #calculate combinations from hyperparameters[method_name]
-#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
-hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50,4000], "method":["BinSeg"], "Q":[100, 400], "minseglen":[200, 500]}
+hyperparameter_grid = {"penalty":["Manual"], "pen_value":[250, 500, 750, 1000, 1250, 1500, 1750, 2000, 3000, 4000], "method":["BinSeg"], "Q":[50, 100, 200, 300, 400], "minseglen":[100, 200, 300, 400, 500]}
+#hyperparameter_grid = {"penalty":["Manual"], "pen_value":[50,4000], "method":["BinSeg"], "Q":[100, 400], "minseglen":[200, 500]}
 #hyperparameter_grid = {"penalty":["Manual"], "pen_value":[7500, 7000], "method":["BinSeg"], "Q":[200], "minseglen":[max(2,288)]}
 BS_hyperparameter_list = list(ParameterGrid(hyperparameter_grid))
 
