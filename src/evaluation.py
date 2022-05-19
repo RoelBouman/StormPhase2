@@ -17,10 +17,10 @@ def stats_per_cutoff(y_true: np.array, y_pred: np.array, lengths: np.array, lowe
     y_true = y_true[filter_condition]
     y_pred = y_pred[filter_condition]
     
-    TN = np.logical_and(y_true == 0, y_pred == 0).sum()
-    FP = np.logical_and(y_true == 0, y_pred == 1).sum()
-    FN = np.logical_and(y_true == 1, y_pred == 0).sum()
-    TP = np.logical_and(y_true == 1, y_pred == 1).sum()
+    TN = np.sum(np.logical_and(y_true == 0, y_pred == 0))
+    FP = np.sum(np.logical_and(y_true == 0, y_pred == 1))
+    FN = np.sum(np.logical_and(y_true == 1, y_pred == 0))
+    TP = np.sum(np.logical_and(y_true == 1, y_pred == 1))
     
     return (TN, FP, FN, TP)
 
