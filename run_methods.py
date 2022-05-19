@@ -104,7 +104,7 @@ def get_all_station_data(data_name, prediction_folder, method_name, hyperparamet
         
         return (y_scores_filtered, y_true_filtered, event_lengths_filtered)
     else:
-        Warning("Not all scores for this hyperparameter setting have been calculated yet. Skipping...")
+        raise RuntimeError("Not all scores for this hyperparameter setting have been calculated yet. Skipping...")
 
 #%% Isolation Forest score calculation
 
@@ -633,9 +633,12 @@ for cutoffs in high_and_all_cutoffs:
     
 #Evaluate naive ensembling of RI+BS and IF+BS based on highest 4part STORM score
 
+cutoffs_string = str(all_cutoffs)
+
 #Find best BS scores:
     
 method_name = "BS"
+best_score = 0
 for hyperparameter_settings in BS_hyperparameter_list:
     
     hyperparameter_string = str(hyperparameter_settings)
@@ -664,7 +667,7 @@ for hyperparameter_settings in BS_hyperparameter_list:
         
         
 get_BS_segments(pickle_test_file_folder, "X_test", [best_hyperparameters])
-get_BS_segments(pickle_test_file_folder, "X_train", [best_hyperparameters])
+get_BS_segments(pickle_train_file_folder, "X_train", [best_hyperparameters])
 
 hyperparameter_string = str(best_hyperparameters)
 
@@ -761,7 +764,7 @@ for hyperparameter_settings in IF_hyperparameter_list:
         
         
 get_IF_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
-get_IF_scores(pickle_test_file_folder, "X_train", [best_hyperparameters])
+get_IF_scores(pickle_train_file_folder, "X_train", [best_hyperparameters])
 
 hyperparameter_string = str(best_hyperparameters)
 
@@ -773,6 +776,385 @@ y_pred_test_IF = threshold_scores(y_scores_filtered, best_thresholds)
         
 
 #get predictions for train
-y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
 
 y_pred_train_IF = threshold_scores(y_scores_filtered, best_thresholds)
+
+# find best RI scores
+method_name = "RI"
+best_score = 0
+for hyperparameter_settings in RI_hyperparameter_list:
+    
+    hyperparameter_string = str(hyperparameter_settings)
+    
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+    
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+
+    with open(thresholds_pickle_path, 'rb') as handle:
+        thresholds = pickle.load(handle)
+
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
+        
+        
+get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+get_RI_scores(pickle_train_file_folder, "X_train", [best_hyperparameters])
+
+hyperparameter_string = str(best_hyperparameters)
+
+#get predictions for test
+
+y_scores_filtered, y_true_filtered_test, event_lengths_filtered_test = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_test_RI = double_threshold_scores(y_scores_filtered, best_thresholds)
+        
+
+#get predictions for train
+y_scores_filtered, y_true_filtered_train, event_lengths_filtered_train = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+
+y_pred_train_RI = double_threshold_scores(y_scores_filtered, best_thresholds)
+
+
+#%% enaive nsemble results:
+    
+print_subscores = True
+print_confmat = False
+    
+print("\n\n")
+print("BS:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("IF:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_IF, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_IF, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("RI:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_RI, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_RI, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("Ensemble BS+IF:")
+y_pred_test_BS_IF = np.logical_or(y_pred_test_BS, y_pred_test_IF)
+y_pred_train_BS_IF = np.logical_or(y_pred_train_BS, y_pred_train_IF)
+
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS_IF, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS_IF, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("Ensemble BS+RI:")
+y_pred_test_BS_RI = np.logical_or(y_pred_test_BS, y_pred_test_RI)
+y_pred_train_BS_RI = np.logical_or(y_pred_train_BS, y_pred_train_RI)
+
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS_RI, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS_RI, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+#%% Evaluate smart ensembling of RI+BS and IF+BS based on multi-objective STORM score
+
+cutoffs_string = str(all_cutoffs)
+
+#Find best BS scores:
+    
+method_name = "BS"
+best_score = 0
+for hyperparameter_settings in BS_hyperparameter_list:
+    
+    hyperparameter_string = str(hyperparameter_settings)
+    
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+    
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+
+    with open(thresholds_pickle_path, 'rb') as handle:
+        thresholds = pickle.load(handle)
+
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
+        
+        
+get_BS_segments(pickle_test_file_folder, "X_test", [best_hyperparameters])
+get_BS_segments(pickle_train_file_folder, "X_train", [best_hyperparameters])
+
+hyperparameter_string = str(best_hyperparameters)
+
+#get segment features for test
+data_name = "X_test"
+segment_features = []
+for pickle_file in os.listdir(pickle_test_file_folder):
+    substation_name = pickle_file[:-7]
+    
+    
+    data = pickle.load(open(os.path.join(pickle_test_file_folder, pickle_file), 'rb'))
+    X = pd.DataFrame(data["X"])[0]
+    
+    intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+    
+    with open(intermediate_file_path, 'rb') as handle:
+        segments = pickle.load(handle)
+    
+    segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+
+y_scores = np.concatenate(segment_features)
+    
+
+y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_test_file_folder)
+
+
+y_true_filtered = y_true_combined[y_true_combined != 5]
+event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+y_scores_filtered = y_scores[y_true_combined != 5]
+
+#y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_test_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
+
+#get segment features for train
+segment_features = []
+data_name = "X_train"
+for pickle_file in os.listdir(pickle_train_file_folder):
+    substation_name = pickle_file[:-7]
+    
+    
+    data = pickle.load(open(os.path.join(pickle_train_file_folder, pickle_file), 'rb'))
+    X = pd.DataFrame(data["X"])[0]
+    
+    intermediate_file_path = os.path.join(intermediate_folder, data_name, method_name, hyperparameter_string, substation_name+".pickle")
+    
+    with open(intermediate_file_path, 'rb') as handle:
+        segments = pickle.load(handle)
+    
+    segment_features += [np.full(segment.shape, np.median(segment) - np.median(X)) for segment in segments]
+
+y_scores = np.concatenate(segment_features)
+    
+
+y_true_combined, event_lengths_combined = get_y_true_and_lengths(pickle_train_file_folder)
+
+
+y_true_filtered = y_true_combined[y_true_combined != 5]
+event_lengths_filtered = event_lengths_combined[y_true_combined != 5]
+y_scores_filtered = y_scores[y_true_combined != 5]
+
+#y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_train_BS = double_threshold_scores(y_scores_filtered, best_thresholds)
+
+
+cutoffs_string = str(low_cutoffs)
+# find best IF scores
+method_name = "IF"
+best_score = 0
+for hyperparameter_settings in IF_hyperparameter_list:
+    
+    hyperparameter_string = str(hyperparameter_settings)
+    
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+    
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+
+    with open(thresholds_pickle_path, 'rb') as handle:
+        thresholds = pickle.load(handle)
+
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
+        
+        
+get_IF_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+get_IF_scores(pickle_train_file_folder, "X_train", [best_hyperparameters])
+
+hyperparameter_string = str(best_hyperparameters)
+
+#get predictions for test
+
+y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_test_IF = threshold_scores(y_scores_filtered, best_thresholds)
+        
+
+#get predictions for train
+y_scores_filtered, y_true_filtered, event_lengths_filtered = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+
+y_pred_train_IF = threshold_scores(y_scores_filtered, best_thresholds)
+
+# find best RI scores
+method_name = "RI"
+best_score = 0
+for hyperparameter_settings in RI_hyperparameter_list:
+    
+    hyperparameter_string = str(hyperparameter_settings)
+    
+    result_file_path = os.path.join(result_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    result_pickle_path = os.path.join(result_file_path, "score_stats.pickle")
+    
+    thresholds_file_path = os.path.join(thresholds_folder, cutoffs_string, "X_train", method_name, hyperparameter_string)
+    thresholds_pickle_path = os.path.join(thresholds_file_path, "thresholds.pickle")
+    
+    with open(result_pickle_path, 'rb') as handle:
+        storm_score, sub_scores, TN, FP, FN, TP = pickle.load(handle)
+
+    with open(thresholds_pickle_path, 'rb') as handle:
+        thresholds = pickle.load(handle)
+
+    print("Best STORM score:")
+    print(storm_score)
+    print("thresholds:")
+    print(thresholds)
+    
+    if storm_score > best_score:
+        best_score = storm_score
+        best_hyperparameters = hyperparameter_settings
+        best_thresholds = thresholds
+        
+        
+get_RI_scores(pickle_test_file_folder, "X_test", [best_hyperparameters])
+get_RI_scores(pickle_train_file_folder, "X_train", [best_hyperparameters])
+
+hyperparameter_string = str(best_hyperparameters)
+
+#get predictions for test
+
+y_scores_filtered, y_true_filtered_test, event_lengths_filtered_test = get_all_station_data("X_test", prediction_folder, method_name, hyperparameter_string, pickle_test_file_folder)
+
+y_pred_test_RI = double_threshold_scores(y_scores_filtered, best_thresholds)
+        
+
+#get predictions for train
+y_scores_filtered, y_true_filtered_train, event_lengths_filtered_train = get_all_station_data("X_train", prediction_folder, method_name, hyperparameter_string, pickle_train_file_folder)
+
+y_pred_train_RI = double_threshold_scores(y_scores_filtered, best_thresholds)
+
+
+#%%  multi-objective ensemble results:
+    
+print_subscores = True
+print_confmat = False
+    
+print("\n\n")
+print("BS:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("IF:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_IF, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_IF, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("RI:")
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_RI, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_RI, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("Ensemble BS+IF:")
+y_pred_test_BS_IF = np.logical_or(y_pred_test_BS, y_pred_test_IF)
+y_pred_train_BS_IF = np.logical_or(y_pred_train_BS, y_pred_train_IF)
+
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS_IF, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS_IF, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
+
+print("\n\n")
+print("Ensemble BS+RI:")
+y_pred_test_BS_RI = np.logical_or(y_pred_test_BS, y_pred_test_RI)
+y_pred_train_BS_RI = np.logical_or(y_pred_train_BS, y_pred_train_RI)
+
+storm_score_test = STORM_score(y_true_filtered_test, y_pred_test_BS_RI, event_lengths_filtered_test, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+storm_score_train = STORM_score(y_true_filtered_train, y_pred_train_BS_RI, event_lengths_filtered_train, all_cutoffs, return_subscores=print_subscores, return_confmat=print_confmat)
+
+print("Train STORM score: ")
+print(storm_score_train)
+
+print("Test STORM score: ")
+print(storm_score_test)
