@@ -49,7 +49,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     df['BU'] = a*df['BU_original']+b
     if df['S_original'].min()>0:
-        df['S'] = np.sign(df['BU_original'])*df['S']
+        df['S'] = np.sign(df['BU'])*df['S']
     df['diff'] = df['S']-df['BU']
     
     # Robust scaled difference
