@@ -50,7 +50,7 @@ preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data
 #TODO: preprocess_data needs rework
 # - The following need to be toggles/settings:
 #   - Whether to filter 'Missing' values when they are identical for N subsequent measurements
-#   - Percentiles for sign correction need to be optional
+#   - Percentiles for sign correction need to be adjustable
 # - The function needs only return a subset of columns (this will save substantially in memory/loading overhead)
 
 # Name needs to change based on settings (NYI)
@@ -77,7 +77,6 @@ if write_csv_intermediates:
         
         os.makedirs(os.path.join(preprocessed_csvs_folder, preprocessing_type), exist_ok = True)
         if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-            
             
            X_train_data_preprocessed_df.to_csv(preprocessed_file_name)
 
