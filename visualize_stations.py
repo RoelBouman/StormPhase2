@@ -19,7 +19,7 @@ preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
 
 #%% define runtime variables
-plot_station_IDs = ["1"]
+plot_station_IDs = ["1", "3"]
 
 n_xlabels = 10
 
@@ -48,13 +48,25 @@ for station_ID in plot_station_IDs:
     
     X_preprocessed_df = pd.read_csv(os.path.join(intermediates_folder, preprocessed_folder, station_dataset_dict[station_ID], preprocessing_type, station_ID + ".csv"))
     
-    fig = plt.figure(figsize=(30,16))
+    fig = plt.figure(figsize=(30,16)) # add DPI=300+ in case some missing points don't show up'    
+    plt.title("Station: " + station_ID, fontsize=60)
+    gs = GridSpec(10, 1, figure=fig)
     
+    #S/BU original plot:
+    ax1 = fig.add_subplot(gs[0:3,:])
+    sns.set_theme()
+    plot_S_original(X_preprocessed_df, label="S original")
+    plot_BU_original(X_preprocessed_df, label="BU original")
     
-    gs = GridSpec(7, 1, figure=fig)
+    plt.legend(fontsize=20)
+    
+    plt.yticks(fontsize=20)
+    plt.ylabel("S", fontsize=25)
+    
+    ax1.get_xaxis().set_visible(False)
     
     #S/BU plot:
-    ax1 = fig.add_subplot(gs[0:3,:])
+    ax2 = fig.add_subplot(gs[3:6,:], sharex=ax1)
     sns.set_theme()
     plot_S(X_preprocessed_df, label="S")
     plot_BU(X_preprocessed_df, label="BU")
@@ -64,20 +76,20 @@ for station_ID in plot_station_IDs:
     plt.yticks(fontsize=20)
     plt.ylabel("S", fontsize=25)
     
-    ax1.get_xaxis().set_visible(False)
+    ax2.get_xaxis().set_visible(False)
     
     #Missing plot:
-    ax2 = fig.add_subplot(gs[3,:],sharex=ax1)
-    plot_missing(X_preprocessed_df, label="missing")
+    ax3 = fig.add_subplot(gs[6,:],sharex=ax1)
+    plot_missing(X_preprocessed_df, label="missing", origin="lower")
     sns.set_theme()
     
-    ax2.get_xaxis().set_visible(False)
-    ax2.get_yaxis().set_visible(False)
+    ax3.get_xaxis().set_visible(False)
+    ax3.get_yaxis().set_visible(False)
     
-    plt.colorbar()
+    #plt.colorbar()
     
     #Diff plot:
-    ax3 = fig.add_subplot(gs[4:,:], sharex=ax1)
+    ax4 = fig.add_subplot(gs[7:,:], sharex=ax1)
     plot_diff(X_preprocessed_df, label="S-BU")
     sns.set_theme()
     
