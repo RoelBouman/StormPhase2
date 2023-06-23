@@ -8,6 +8,7 @@ import pickle
 
 
 from src.preprocess import preprocess_data
+from src.methods import SP
 
 #%% set process variables
 
@@ -89,11 +90,11 @@ if write_csv_intermediates:
 
 #Define hyperparameter range:
     
-hyperparameter_dict = None
+hyperparameter_dict = {"quantiles":[(10,90), (20,80), (25,75), (5,95)]}
 
-method = SP()
+method = SP(**hyperparameter_dict)
 
-SP.train(hyperparameter_dict=hyperparameter_dict)
+SP.train(X_train_data_preprocessed, y_train_data)
 
 train_result_df = SP.train_result_df_
 best_model = SP.best_model_
