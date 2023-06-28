@@ -40,7 +40,7 @@ def get_event_lengths(y_df):
             event_end_index = i+1 #not inclusive
             
             lengths[event_start_index:event_end_index] = event_end_index-event_start_index
-        return lengths
+        return pd.DataFrame({"lengths":lengths})
 
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.

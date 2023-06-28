@@ -19,8 +19,7 @@ preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
 
 #%% define runtime variables
-plot_station_IDs = ["1", "3"]
-
+plot_station_IDs = ["1", "3", "7", "9", "11", "12"]
 n_xlabels = 10
 
 
@@ -78,9 +77,9 @@ for station_ID in plot_station_IDs:
     
     ax2.get_xaxis().set_visible(False)
     
-    #Missing plot:
+    #Label plot:
     ax3 = fig.add_subplot(gs[6,:],sharex=ax1)
-    plot_missing(X_preprocessed_df, label="missing", origin="lower")
+    plot_labels(y_df, label="label", origin="lower")
     sns.set_theme()
     
     ax3.get_xaxis().set_visible(False)

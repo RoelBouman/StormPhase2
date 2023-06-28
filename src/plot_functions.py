@@ -24,3 +24,9 @@ def plot_diff(df, **kwargs):
 def plot_missing(df, **kwargs):
     cmap = ListedColormap(['white', 'red'])
     plt.imshow(df["missing"].values.reshape(1, len(df["missing"])), cmap=cmap, aspect="auto")
+    
+def plot_labels(df, **kwargs):
+    cmap = ListedColormap(['white', 'red'])
+    plt.imshow((df["label"]==1).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")
+    cmap = ListedColormap(['none', 'green'])
+    plt.imshow((df["label"]==5).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")

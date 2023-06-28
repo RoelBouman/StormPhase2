@@ -24,7 +24,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
 
 
 #%% define local helper functions
@@ -89,7 +89,7 @@ else:
         X_train_data_preprocessed = pickle.load(handle)
 
 if write_csv_intermediates:
-    print("Writing CSV intermediates: train data")
+    print("Writing CSV intermediates: X train data")
     type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
     save_dataframe_list(X_train_data_preprocessed, X_train_files, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
 
@@ -112,6 +112,10 @@ else:
     with open(preprocessed_file_name, 'rb') as handle:
         event_lengths = pickle.load(handle)
 
+if write_csv_intermediates:
+    print("Writing CSV intermediates: y train data")
+    type_event_lengths_csvs_folder = os.path.join(event_lengths_pickles_folder, preprocessing_type)
+    save_dataframe_list(event_lengths, X_train_files, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
