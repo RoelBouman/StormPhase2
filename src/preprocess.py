@@ -5,6 +5,43 @@ import pandas as pd
 import scipy.optimize as opt
 from sklearn.preprocessing import RobustScaler
 
+def get_event_lengths(y_df):
+    
+        lengths = np.zeros(len(y_df))
+        
+        event_started = False
+        event_start_index = None
+        
+        for i in range(len(y_df)):
+            
+            
+            if event_started:
+                
+                #Event ends
+                if y_df["label"][i] != 1:
+                    event_end_index = i #not inclusive
+                    
+                    lengths[event_start_index:event_end_index] = event_end_index-event_start_index
+                    event_started = False
+                #Event continues
+                else:
+                    pass
+            else:
+                #Event starts
+                if y_df["label"][i] == 1:
+                    event_start_index = i
+                    event_started = True
+                #Event has not started:
+                else:
+                    pass
+                
+        #if event has not ended at end of timeseries:
+        if event_started:
+            event_end_index = i+1 #not inclusive
+            
+            lengths[event_start_index:event_end_index] = event_end_index-event_start_index
+        return lengths
+
 def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
