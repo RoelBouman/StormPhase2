@@ -8,7 +8,7 @@ import pickle
 
 
 from src.preprocess import preprocess_data
-from src.preprocess import get_event_lengths
+from src.preprocess import get_event_lengths, get_labels_for_all_cutoffs
 from src.methods import SingleThresholdStatisticalProfiling
 
 #%% set process variables
@@ -24,7 +24,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 
 #%% define local helper functions
@@ -94,28 +94,49 @@ if write_csv_intermediates:
     save_dataframe_list(X_train_data_preprocessed, X_train_files, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
 
 #Preprocess Y_data AKA get the lengths of each event
-
-
 event_lengths_pickles_folder = os.path.join(intermediates_folder, "event_length_pickles", which_split)
 event_lengths_csvs_folder = os.path.join(intermediates_folder, "event_length_csvs", which_split)
 
 preprocessed_file_name = os.path.join(event_lengths_pickles_folder, str(all_cutoffs) + ".pickle")
 if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-    print("Preprocessing y train data")
+    print("Preprocessing event lengths")
     event_lengths = [get_event_lengths(df) for df in y_train_data]
     
     os.makedirs(event_lengths_pickles_folder, exist_ok = True)
     with open(preprocessed_file_name, 'wb') as handle:
         pickle.dump(event_lengths, handle)
 else:
-    print("Loading preprocessed y train data")
+    print("Loading preprocessed event lengths")
     with open(preprocessed_file_name, 'rb') as handle:
         event_lengths = pickle.load(handle)
 
 if write_csv_intermediates:
-    print("Writing CSV intermediates: y train data")
-    type_event_lengths_csvs_folder = os.path.join(event_lengths_pickles_folder, preprocessing_type)
+    print("Writing CSV intermediates: event lengths")
+    type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, preprocessing_type)
     save_dataframe_list(event_lengths, X_train_files, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
+
+
+# Use the event lengths to get conditional labels per cutoff
+labels_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "labels_per_cutoff_pickles", which_split)
+labels_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "labels_per_cutoff_csvs", which_split)
+
+preprocessed_file_name = os.path.join(labels_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
+if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
+    print("Preprocessing labels per cutoff")
+    labels_for_all_cutoffs = [get_labels_for_all_cutoffs(df, all_cutoffs) for df in event_lengths]
+    
+    os.makedirs(labels_per_cutoff_pickles_folder, exist_ok = True)
+    with open(preprocessed_file_name, 'wb') as handle:
+        pickle.dump(labels_for_all_cutoffs, handle)
+else:
+    print("Loading preprocessed labels per cutoff")
+    with open(preprocessed_file_name, 'rb') as handle:
+        labels_for_all_cutoffs = pickle.load(handle)
+
+if write_csv_intermediates:
+    print("Writing CSV intermediates: labels per cutoff")
+    type_labels_per_cutoff_csvs_folder = os.path.join(labels_per_cutoff_csvs_folder, preprocessing_type)
+    save_dataframe_list(labels_for_all_cutoffs, X_train_files, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly

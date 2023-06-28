@@ -5,6 +5,17 @@ import pandas as pd
 import scipy.optimize as opt
 from sklearn.preprocessing import RobustScaler
 
+def get_labels_for_all_cutoffs(event_lengths, all_cutoffs):
+    
+    labels_for_all_cutoffs = pd.DataFrame()
+    
+    #Procedure is non-inclusive on lower cutoff
+    for cutoffs in all_cutoffs:
+        low_cutoff, high_cutoff = cutoffs
+        labels_for_all_cutoffs[str(cutoffs)] = ((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)).astype(int)
+    
+    return labels_for_all_cutoffs
+
 def get_event_lengths(y_df):
     
         lengths = np.zeros(len(y_df))
