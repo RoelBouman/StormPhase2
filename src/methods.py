@@ -4,24 +4,34 @@ import numpy as np
 
 from sklearn.preprocessing import RobustScaler
 
-def produce_predictions_single_threshold(y_score_dfs, threshold):
+def predict_from_scores_single_threshold(y_score_dfs, threshold):
     y_prediction_dfs = []
     for score in y_score_dfs:
-        pred = np.zeros((len(score),))
-        pred[score > threshold]
+        pred = np.zeros((score.shape[0],))
+        pred[np.squeeze(score) > threshold] = 1
+        y_prediction_dfs.append(pd.Series(pred).to_frame())
+        
     return y_prediction_dfs
 
-def produce_predictions_double_threshold(y_score_dfs, threshold):
+def predict_from_scores_double_threshold(y_score_dfs, thresholds):
+    lower_threshold = thresholds[0]
+    upper_threshold = thresholds[1]
     
+    y_prediction_dfs = []
+    for score in y_score_dfs:
+        pred = np.zeros((score.shape[0],))
+        pred[np.squeeze(score) > lower_threshold & np.squeeze(score) < upper_threshold] = 1
+        y_prediction_dfs.append(pd.Series(pred).to_frame())
+        
     return y_prediction_dfs
 
 def optimize_single_threshold(y_dfs, y_score_dfs, score_function, objective):
     
-    return 3#optimal_threshold
+    return 2#optimal_threshold
 
 def optimize_double_threshold(y_dfs, y_score_dfs, score_function, objective):
     
-    return optimal_thresholds
+    return (2,2)
 
 
 class StatisticalProfiling:
@@ -32,7 +42,7 @@ class StatisticalProfiling:
         self.score_function=score_function
         self.objective=objective
     
-    def fit_transform(self, X_dfs, y_dfs):
+    def fit_transform_predict(self, X_dfs, y_dfs):
         #X_dfs needs at least "diff column
         
         
@@ -44,18 +54,18 @@ class StatisticalProfiling:
             
             y_score_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
             
-        #self.optimize_thresholds(y_dfs, y_score_dfs)
+        self.optimize_thresholds(y_dfs, y_score_dfs)
         
-        #y_prediction_dfs = self.produce_predictions(y_score_dfs)
+        y_prediction_dfs = self.predict_from_scores(y_score_dfs)
         
-        return y_score_dfs#, y_prediction_dfs
+        return y_score_dfs, y_prediction_dfs
     
     @abstractmethod
     def optimize_thresholds(self, y_dfs, y_score_dfs):
         raise NotImplementedError
         
     @abstractmethod
-    def produce_predictions(self, y_score_dfs):
+    def predict_from_scores(self, y_score_dfs):
         raise NotImplementedError
         
         
@@ -65,10 +75,10 @@ class SingleThresholdStatisticalProfiling(StatisticalProfiling):
         super().__init__(**params)
         
     def optimize_thresholds(self, y_dfs, y_score_dfs):
-        self.threshold = optimize_single_threshold(y_dfs, y_score_dfs, self.score_function, self.objective)
+        self.threshold_ = optimize_single_threshold(y_dfs, y_score_dfs, self.score_function, self.objective)
         
-    def produce_predictions(self, y_score_dfs):
-        return produce_predictions_single_threshold(y_score_dfs, self.threshold)
+    def predict_from_scores(self, y_score_dfs):
+        return predict_from_scores_single_threshold(y_score_dfs, self.threshold_)
     
 class DoubleThresholdStatisticalProfiling(StatisticalProfiling):
     
@@ -76,7 +86,7 @@ class DoubleThresholdStatisticalProfiling(StatisticalProfiling):
         super().__init__(**params)
         
     def optimize_thresholds(self, y_dfs, y_score_dfs):
-        self.threshold = optimize_double_threshold(y_dfs, y_score_dfs, self.score_function, self.objective)
+        self.threshold_ = optimize_double_threshold(y_dfs, y_score_dfs, self.score_function, self.objective)
         
-    def produce_predictions(self, y_score_dfs):
-        return produce_predictions_double_threshold(y_score_dfs, self.threshold)
+    def predict_from_scores(self, y_score_dfs):
+        return predict_from_scores_double_threshold(y_score_dfs, self.threshold_)

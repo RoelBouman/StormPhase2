@@ -150,15 +150,18 @@ if write_csv_intermediates:
 
 
 method = SingleThresholdStatisticalProfiling(score_function=None)
-
+method_name = "SingleThresholdSP"
 #save best scores:
 #TODO: define method for definitive selection
-best_scores_path = os.path.join(score_folder, "test")
-scores = method.fit_transform(X_train_data_preprocessed, y_train_data)
-
-save_dataframe_list(scores,X_train_files, best_scores_path, overwrite=False)
 
 
+scores, predictions = method.fit_transform_predict(X_train_data_preprocessed, labels_for_all_cutoffs)
+optimal_threshold = method.threshold_
+
+scores_path = os.path.join(score_folder, method_name, str(optimal_threshold), which_split)
+predictions_path = os.path.join(predictions_folder, method_name, str(optimal_threshold), which_split)
+save_dataframe_list(scores, X_train_files, scores_path, overwrite=False)
+save_dataframe_list(predictions, X_train_files, predictions_path, overwrite=False)
 
 #train_result_df = SP.train_result_df_
 #best_model = SP.best_model_
