@@ -1,9 +1,13 @@
 from typing import List, Tuple, Union
 
+import os
+import pickle
 import numpy as np
 import pandas as pd
 import scipy.optimize as opt
 from sklearn.preprocessing import RobustScaler
+
+from .io_functions import save_dataframe_list
 
 def get_labels_for_all_cutoffs(event_lengths, all_cutoffs):
     
@@ -133,3 +137,87 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     #Use a and b to calculate new bottom up load and adjusted measurements.
     a, b = ab.x
     return a, b
+
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs):
+    #Set preprocessing settings here:
+    preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
+    preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
+
+    #TODO: preprocess_data needs rework
+    # - The following need to be toggles/settings:
+    #   - Whether to filter 'Missing' values when they are identical for N subsequent measurements
+    #   - Percentiles for sign correction need to be adjustable
+    # - The function needs only return a subset of columns (this will save substantially in memory/loading overhead)
+
+    #TODO: Add functionality to preprocess test/validation based on statistics found in train
+
+    #TODO: Name needs to change based on settings (NYI)
+    #preprocessing_type = "basic"
+    
+    preprocessed_file_name = os.path.join(preprocessed_pickles_folder, preprocessing_type + ".pickle")
+
+    if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
+        print("Preprocessing X data")
+        X_dfs_preprocessed = [preprocess_data(df) for df in X_dfs]
+        
+        os.makedirs(preprocessed_pickles_folder, exist_ok = True)
+        with open(preprocessed_file_name, 'wb') as handle:
+            pickle.dump(X_dfs_preprocessed, handle)
+    else:
+        print("Loading preprocessed X data")
+        with open(preprocessed_file_name, 'rb') as handle:
+            X_dfs_preprocessed = pickle.load(handle)
+
+    if write_csv_intermediates:
+        print("Writing CSV intermediates: X train data")
+        type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
+        save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
+
+    #Preprocess Y_data AKA get the lengths of each event
+    event_lengths_pickles_folder = os.path.join(intermediates_folder, "event_length_pickles", which_split)
+    event_lengths_csvs_folder = os.path.join(intermediates_folder, "event_length_csvs", which_split)
+
+    preprocessed_file_name = os.path.join(event_lengths_pickles_folder, str(all_cutoffs) + ".pickle")
+    if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
+        print("Preprocessing event lengths")
+        event_lengths = [get_event_lengths(df) for df in y_dfs]
+        
+        os.makedirs(event_lengths_pickles_folder, exist_ok = True)
+        with open(preprocessed_file_name, 'wb') as handle:
+            pickle.dump(event_lengths, handle)
+    else:
+        print("Loading preprocessed event lengths")
+        with open(preprocessed_file_name, 'rb') as handle:
+            event_lengths = pickle.load(handle)
+
+    if write_csv_intermediates:
+        print("Writing CSV intermediates: event lengths")
+        type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, preprocessing_type)
+        save_dataframe_list(event_lengths, file_names, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
+
+
+    # Use the event lengths to get conditional labels per cutoff
+    labels_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "labels_per_cutoff_pickles", which_split)
+    labels_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "labels_per_cutoff_csvs", which_split)
+
+    preprocessed_file_name = os.path.join(labels_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
+    if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
+        print("Preprocessing labels per cutoff")
+        labels_for_all_cutoffs = [get_labels_for_all_cutoffs(df, all_cutoffs) for df in event_lengths]
+        
+        os.makedirs(labels_per_cutoff_pickles_folder, exist_ok = True)
+        with open(preprocessed_file_name, 'wb') as handle:
+            pickle.dump(labels_for_all_cutoffs, handle)
+    else:
+        print("Loading preprocessed labels per cutoff")
+        with open(preprocessed_file_name, 'rb') as handle:
+            labels_for_all_cutoffs = pickle.load(handle)
+
+    if write_csv_intermediates:
+        print("Writing CSV intermediates: labels per cutoff")
+        type_labels_per_cutoff_csvs_folder = os.path.join(labels_per_cutoff_csvs_folder, preprocessing_type)
+        save_dataframe_list(labels_for_all_cutoffs, file_names, type_labels_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
+        
+    preprocessing_settings = {} #TODO: implement saving of settings for some methods (not basic)
+    
+    return X_dfs_preprocessed, labels_for_all_cutoffs, event_lengths, preprocessing_settings

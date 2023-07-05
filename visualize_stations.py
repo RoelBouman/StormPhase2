@@ -19,7 +19,7 @@ preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
 
 #%% define runtime variables
-plot_station_IDs = ["1", "3", "7", "9", "11", "12"]
+plot_station_IDs = ["0", "1", "8"]
 n_xlabels = 10
 
 

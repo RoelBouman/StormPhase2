@@ -4,12 +4,9 @@ import os
 import numpy as np
 import pandas as pd
 
-import pickle
-
-
-from src.preprocess import preprocess_data
-from src.preprocess import get_event_lengths, get_labels_for_all_cutoffs
 from src.methods import SingleThresholdStatisticalProfiling
+from src.preprocess import preprocess_per_batch_and_write
+from src.io_functions import save_dataframe_list, load_batch
 
 #%% set process variables
 
@@ -28,120 +25,29 @@ preprocessing_overwrite = False #if set to True, overwrite previous preprocessed
 
 
 #%% define local helper functions
-def save_dataframe_list(dfs, station_names, folder, overwrite):
-    for df, station_name in zip(dfs, station_names):
+
         
-        file_name = os.path.join(folder, station_name)
-        
-        os.makedirs(folder, exist_ok = True)
-        if overwrite or not os.path.exists(file_name):
-            
-           df.to_csv(file_name)
-        
-#%% load data
+#%% load Train data
 # Do not load data if preprocessed data is available already
-X_train_path = os.path.join(data_folder, "Train", "X")
-y_train_path = os.path.join(data_folder, "Train", "y")
+which_split = "Train"
 
-X_train_files = sorted(os.listdir(X_train_path))
-y_train_files = sorted(os.listdir(y_train_path))
-
-if not X_train_files == y_train_files:
-    raise RuntimeError("Not all training files are present in both the X and y folders.")
-
-
-X_train_data, y_train_data = [], []
-for file in X_train_files:
-    X_train_data.append(pd.read_csv(os.path.join(X_train_path, file)))
-    y_train_data.append(pd.read_csv(os.path.join(y_train_path, file)))
+print("Split: Train")
+X_train_dfs, y_train_dfs, X_train_files= load_batch(data_folder, which_split)
     
 #%% Preprocess Train data
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
-which_split = "Train"
 
-#Set preprocessing settings here:
-preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
-preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
-
-#TODO: preprocess_data needs rework
-# - The following need to be toggles/settings:
-#   - Whether to filter 'Missing' values when they are identical for N subsequent measurements
-#   - Percentiles for sign correction need to be adjustable
-# - The function needs only return a subset of columns (this will save substantially in memory/loading overhead)
-
-#TODO: Add functionality to preprocess test/validation based on statistics found in train
-
-#TODO: Name needs to change based on settings (NYI)
 preprocessing_type = "basic"
-preprocessed_file_name = os.path.join(preprocessed_pickles_folder, preprocessing_type + ".pickle")
+file_names = X_train_files
 
-if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-    print("Preprocessing X train data")
-    X_train_data_preprocessed = [preprocess_data(df) for df in X_train_data]
-    
-    os.makedirs(preprocessed_pickles_folder, exist_ok = True)
-    with open(preprocessed_file_name, 'wb') as handle:
-        pickle.dump(X_train_data_preprocessed, handle)
-else:
-    print("Loading preprocessed X train data")
-    with open(preprocessed_file_name, 'rb') as handle:
-        X_train_data_preprocessed = pickle.load(handle)
+X_train_dfs_preprocessed, labels_for_all_cutoffs, event_lengths, preprocessing_settings = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs)
 
-if write_csv_intermediates:
-    print("Writing CSV intermediates: X train data")
-    type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
-    save_dataframe_list(X_train_data_preprocessed, X_train_files, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
-
-#Preprocess Y_data AKA get the lengths of each event
-event_lengths_pickles_folder = os.path.join(intermediates_folder, "event_length_pickles", which_split)
-event_lengths_csvs_folder = os.path.join(intermediates_folder, "event_length_csvs", which_split)
-
-preprocessed_file_name = os.path.join(event_lengths_pickles_folder, str(all_cutoffs) + ".pickle")
-if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-    print("Preprocessing event lengths")
-    event_lengths = [get_event_lengths(df) for df in y_train_data]
-    
-    os.makedirs(event_lengths_pickles_folder, exist_ok = True)
-    with open(preprocessed_file_name, 'wb') as handle:
-        pickle.dump(event_lengths, handle)
-else:
-    print("Loading preprocessed event lengths")
-    with open(preprocessed_file_name, 'rb') as handle:
-        event_lengths = pickle.load(handle)
-
-if write_csv_intermediates:
-    print("Writing CSV intermediates: event lengths")
-    type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, preprocessing_type)
-    save_dataframe_list(event_lengths, X_train_files, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
-
-
-# Use the event lengths to get conditional labels per cutoff
-labels_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "labels_per_cutoff_pickles", which_split)
-labels_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "labels_per_cutoff_csvs", which_split)
-
-preprocessed_file_name = os.path.join(labels_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
-if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-    print("Preprocessing labels per cutoff")
-    labels_for_all_cutoffs = [get_labels_for_all_cutoffs(df, all_cutoffs) for df in event_lengths]
-    
-    os.makedirs(labels_per_cutoff_pickles_folder, exist_ok = True)
-    with open(preprocessed_file_name, 'wb') as handle:
-        pickle.dump(labels_for_all_cutoffs, handle)
-else:
-    print("Loading preprocessed labels per cutoff")
-    with open(preprocessed_file_name, 'rb') as handle:
-        labels_for_all_cutoffs = pickle.load(handle)
-
-if write_csv_intermediates:
-    print("Writing CSV intermediates: labels per cutoff")
-    type_labels_per_cutoff_csvs_folder = os.path.join(labels_per_cutoff_csvs_folder, preprocessing_type)
-    save_dataframe_list(labels_for_all_cutoffs, X_train_files, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
 
-#%% Train
+#%% Train evaluation
 
 #Define hyperparameter range:
     
@@ -155,7 +61,7 @@ method_name = "SingleThresholdSP"
 #TODO: define method for definitive selection
 
 
-scores, predictions = method.fit_transform_predict(X_train_data_preprocessed, labels_for_all_cutoffs)
+scores, predictions = method.fit_transform_predict(X_train_dfs_preprocessed, labels_for_all_cutoffs)
 optimal_threshold = method.threshold_
 
 scores_path = os.path.join(score_folder, method_name, str(optimal_threshold), which_split)
@@ -166,6 +72,36 @@ save_dataframe_list(predictions, X_train_files, predictions_path, overwrite=Fals
 #train_result_df = SP.train_result_df_
 #best_model = SP.best_model_
 #best_hyperparameters = SP.best_hyperparameters_
+
+
 #%% Test
+#%% load Test data
+# Do not load data if preprocessed data is available already
+which_split = "Test"
+print("Split: Test")
+X_test_dfs, y_test_dfs, X_test_files= load_batch(data_folder, which_split)
+    
+#%% Preprocess Test data
+# Peprocess entire batch
+# Save preprocessed data for later recalculations
+
+preprocessing_type = "basic"
+file_names = X_test_files
+
+X_test_dfs_preprocessed, labels_for_all_cutoffs, event_lengths, preprocessing_settings = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs)
 
 #%% Validation
+#%% load Validation data
+# Do not load data if preprocessed data is available already
+which_split = "Validation"
+print("Split: Validation")
+X_val_dfs, y_val_dfs, X_val_files= load_batch(data_folder, which_split)
+    
+#%% Preprocess Validation data
+# Peprocess entire batch
+# Save preprocessed data for later recalculations
+
+preprocessing_type = "basic"
+file_names = X_val_files
+
+X_val_dfs_preprocessed, labels_for_all_cutoffs, event_lengths, preprocessing_settings = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs)
