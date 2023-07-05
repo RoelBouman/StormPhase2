@@ -55,7 +55,7 @@ for file in X_train_files:
     X_train_data.append(pd.read_csv(os.path.join(X_train_path, file)))
     y_train_data.append(pd.read_csv(os.path.join(y_train_path, file)))
     
-#%% Preprocess data
+#%% Preprocess Train data
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 which_split = "Train"
