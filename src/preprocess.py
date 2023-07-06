@@ -33,7 +33,7 @@ def get_event_lengths(y_df):
             if event_started:
                 
                 #Event ends
-                if y_df["label"][i] != 1:
+                if y_df["label"][i] == 0:
                     event_end_index = i #not inclusive
                     
                     lengths[event_start_index:event_end_index] = event_end_index-event_start_index
