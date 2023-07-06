@@ -19,7 +19,7 @@ preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
 
 #%% define runtime variables
-plot_station_IDs = ["0", "1", "8"]
+plot_station_IDs = ["019"]
 n_xlabels = 10
 
 
@@ -79,7 +79,7 @@ for station_ID in plot_station_IDs:
     
     #Label plot:
     ax3 = fig.add_subplot(gs[6,:],sharex=ax1)
-    plot_labels(y_df, label="label", origin="lower")
+    plot_labels(y_df, label="label")
     sns.set_theme()
     
     ax3.get_xaxis().set_visible(False)
