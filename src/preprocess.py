@@ -9,14 +9,20 @@ from sklearn.preprocessing import RobustScaler
 
 from .io_functions import save_dataframe_list
 
-def get_labels_for_all_cutoffs(event_lengths, all_cutoffs):
+def get_labels_for_all_cutoffs(y_df, event_lengths, all_cutoffs):
     
-    labels_for_all_cutoffs = pd.DataFrame()
+    labels_for_all_cutoffs = {}
     
+    filter_condition = {}
     #Procedure is non-inclusive on lower cutoff
     for cutoffs in all_cutoffs:
         low_cutoff, high_cutoff = cutoffs
-        labels_for_all_cutoffs[str(cutoffs)] = ((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)).astype(int)
+        #Only keep rows (timestamps) where the 
+        filter_condition[str(cutoffs)] = np.logical_or(np.logical_and(event_lengths["lengths"] > low_cutoff, event_lengths["lengths"] <= high_cutoff), event_lengths["lengths"] == 0)
+
+        labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
+        
+        #labels_for_all_cutoffs[str(cutoffs)] = (((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)) | event_lengths["lengths"] == 0)
     
     return labels_for_all_cutoffs
 
@@ -43,7 +49,7 @@ def get_event_lengths(y_df):
                     pass
             else:
                 #Event starts
-                if y_df["label"][i] == 1:
+                if y_df["label"][i] != 0:
                     event_start_index = i
                     event_started = True
                 #Event has not started:
@@ -64,7 +70,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         df (pd.DataFrame): Dataframe with at least the columns M_TIMESTAMP, S_original, BU_original and Flag.
 
     Returns:
-        pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, diff_robust and missing.
+        pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
     """
     #Adjust timestamp that suffer from wrong data due to the clock moving when the time period exists in the data.
     try:
@@ -104,13 +110,11 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         df['S'] = np.sign(df['BU'])*df['S']
     df['diff'] = df['S']-df['BU']
     
-    # Robust scaled difference
-    df['diff_robust'] = RobustScaler().fit_transform(np.array(df['diff']).reshape(-1, 1))
     
     return df[['M_TIMESTAMP', 
                'S_original', 'BU_original', 'diff_original', 
                'S', 'BU', 'diff', 
-               'missing', 'diff_robust']]
+               'missing']]
 
 
 def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurements: Union[pd.Series, np.ndarray]) -> Tuple[int]:
@@ -203,7 +207,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(labels_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        labels_for_all_cutoffs = [get_labels_for_all_cutoffs(df, all_cutoffs) for df in event_lengths]
+        labels_for_all_cutoffs = [get_labels_for_all_cutoffs(y_df, length_df, all_cutoffs) for y_df, length_df in zip(y_dfs, event_lengths)]
         
         os.makedirs(labels_per_cutoff_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
