@@ -9,22 +9,43 @@ from sklearn.preprocessing import RobustScaler
 
 from .io_functions import save_dataframe_list
 
-def get_labels_for_all_cutoffs(y_df, event_lengths, all_cutoffs):
+
+def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None):
     
-    labels_for_all_cutoffs = {}
+
+    uncertain_filter = y_df["label"] == 5
     
-    filter_condition = {}
+    partial_filter = {}
     #Procedure is non-inclusive on lower cutoff
     for cutoffs in all_cutoffs:
         low_cutoff, high_cutoff = cutoffs
         #Only keep rows (timestamps) where the 
-        filter_condition[str(cutoffs)] = np.logical_or(np.logical_and(event_lengths["lengths"] > low_cutoff, event_lengths["lengths"] <= high_cutoff), event_lengths["lengths"] == 0)
-
-        labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
+        partial_filter[str(cutoffs)] = np.logical_and(length_df["lengths"] > low_cutoff, length_df["lengths"] <= high_cutoff)
+        
+        #labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
         
         #labels_for_all_cutoffs[str(cutoffs)] = (((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)) | event_lengths["lengths"] == 0)
     
-    return labels_for_all_cutoffs
+    print("full filter construction")
+    full_filters = {}
+    for cutoffs in all_cutoffs:
+        other_cutoffs = list(set(all_cutoffs).difference(set([cutoffs])))
+        
+        other_partial_filters = [partial_filter[str(c)] for c in other_cutoffs]
+        
+        length_filter= np.logical_or.reduce(other_partial_filters)
+        
+        if remove_missing:
+            missing_filter = missing_df["missing"] != 0
+            full_filters[str(cutoffs)] = np.logical_or.reduce([uncertain_filter, length_filter, missing_filter])
+        else:
+            full_filters[str(cutoffs)] = np.logical_or(uncertain_filter, length_filter)
+        
+        
+        print(cutoffs)
+        print(np.sum(full_filters[str(cutoffs)]))
+        
+    return full_filters
 
 def get_event_lengths(y_df):
     
@@ -142,7 +163,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, remove_missing=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -200,28 +221,28 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         save_dataframe_list(event_lengths, file_names, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
 
 
-    # Use the event lengths to get conditional labels per cutoff
-    labels_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "labels_per_cutoff_pickles", which_split)
-    labels_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "labels_per_cutoff_csvs", which_split)
+    # Use the event lengths to get conditional label filters per cutoff
+    label_filters_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "label_filters_per_cutoff_pickles", which_split)
+    label_filters_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "label_filters_per_cutoff_csvs", which_split)
 
-    preprocessed_file_name = os.path.join(labels_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
+    preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        labels_for_all_cutoffs = [get_labels_for_all_cutoffs(y_df, length_df, all_cutoffs) for y_df, length_df in zip(y_dfs, event_lengths)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing) for y_df, length_df, X_df in zip(y_dfs, event_lengths, X_dfs)]
         
-        os.makedirs(labels_per_cutoff_pickles_folder, exist_ok = True)
+        os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
-            pickle.dump(labels_for_all_cutoffs, handle)
+            pickle.dump(label_filters_for_all_cutoffs, handle)
     else:
         print("Loading preprocessed labels per cutoff")
         with open(preprocessed_file_name, 'rb') as handle:
-            labels_for_all_cutoffs = pickle.load(handle)
+            label_filters_for_all_cutoffs = pickle.load(handle)
 
     if write_csv_intermediates:
-        print("Writing CSV intermediates: labels per cutoff")
-        type_labels_per_cutoff_csvs_folder = os.path.join(labels_per_cutoff_csvs_folder, preprocessing_type)
-        save_dataframe_list(labels_for_all_cutoffs, file_names, type_labels_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
+        print("Writing CSV intermediates: label filters per cutoff")
+        type_label_filters_per_cutoff_csvs_folder = os.path.join(label_filters_per_cutoff_csvs_folder, preprocessing_type)
+        save_dataframe_list(label_filters_for_all_cutoffs, file_names, type_label_filters_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
         
-    preprocessing_settings = {} #TODO: implement saving of settings for some methods (not basic)
+    preprocessing_parameters = {} #TODO: implement saving of settings for some methods (not basic)
     
-    return X_dfs_preprocessed, labels_for_all_cutoffs, event_lengths, preprocessing_settings
+    return X_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths, preprocessing_parameters
