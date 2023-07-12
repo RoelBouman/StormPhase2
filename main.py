@@ -7,7 +7,7 @@ import numpy as np
 from src.methods import SingleThresholdStatisticalProfiling
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, load_batch
-
+from src.evaluation import f_beta
 #%% set process variables
 
 data_folder = "data"
@@ -18,6 +18,9 @@ score_folder = os.path.join(result_folder, "scores")
 predictions_folder = os.path.join(result_folder, "predictions")
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+
+beta = 10
+score_function = lambda precision, recall: f_beta(precision, recall, beta)
 
 remove_missing = True
 

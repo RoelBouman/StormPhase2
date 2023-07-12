@@ -6,6 +6,7 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
 
 from .helper_functions import filter_dfs_to_array
+from .evaluation import f_beta
 
 def predict_from_scores_single_threshold(y_scores_dfs, threshold):
     y_prediction_dfs = []
@@ -28,9 +29,17 @@ def predict_from_scores_double_threshold(y_scores_dfs, thresholds):
         
     return y_prediction_dfs
 
-def optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, objective):
+#score function must accept precision and recall as input
+#score function should be maximized
+def optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
     all_cutoffs = label_filters_for_all_cutoffs[0].keys()
     
+    evaluation_score = {}
+    thresholds = {}
+    
+    #min and max thresholds are tracked for interpolation across all cutoff categories
+    min_threshold = 0
+    max_threshold = 0
     #for all cutoffs, calculate concatenated labels and scores, filtered
     #calculate det curve for each cutoffs in all_cutoffs
     #combine det curves according to score function and objective to find optimum
@@ -39,19 +48,43 @@ def optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs
         y_label_dfs = [df["label"] for df in y_dfs]
         
         filtered_y = filter_dfs_to_array(y_label_dfs, df_filters)
-        filtered_y_scores = filter_dfs_to_array(y_scores_dfs, df_filters).squeeze()
+        #y_scores are transformed to absolute to look for unsigned distance from median
+        filtered_y_scores = np.abs(filter_dfs_to_array(y_scores_dfs, df_filters).squeeze())
         
-        precision, recall, thresholds = precision_recall_curve(filtered_y, filtered_y_scores)
-        print(average_precision_score(filtered_y, filtered_y_scores))
+        precision, recall, thresholds[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
         
-    return 2#optimal_threshold
+        evaluation_score[str(cutoffs)] = score_function(precision, recall)
+        
+        current_min_threshold = np.min(np.min(thresholds[str(cutoffs)]))
+        if current_min_threshold < min_threshold:
+            min_threshold = current_min_threshold
+            
+        current_max_threshold = np.max(np.max(thresholds[str(cutoffs)]))
+        if current_max_threshold > max_threshold:
+            max_threshold = current_max_threshold
+    
+    interpolated_evaluation_score = {}
+    interpolation_range = np.linspace(min_threshold, max_threshold, interpolation_range_length)
+    
+    mean_score_over_cutoffs = np.zeros(interpolation_range.shape)
+    for cutoffs in all_cutoffs:
+         
+         mean_score_over_cutoffs += np.interp(interpolation_range, thresholds[str(cutoffs)], evaluation_score[str(cutoffs)][:-1])
+    
+    mean_score_over_cutoffs /= len(all_cutoffs)
+    
+    max_score_index = np.argmax(mean_score_over_cutoffs)
+    
+    optimal_threshold = interpolation_range[max_score_index]
+    
+    return optimal_threshold
 
 def optimize_double_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, objective):
     
     return (2,2)
 
+class SingleThresholdMethod:
 
-# NB: score function must take output of https://scikit-learn.org/stable/modules/generated/sklearn.metrics.det_curve.html
 class StatisticalProfiling:
     
     def __init__(self, score_function, quantiles=(10,90), objective="maximize"):
