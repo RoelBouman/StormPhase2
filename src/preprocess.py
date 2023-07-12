@@ -26,7 +26,6 @@ def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missi
         
         #labels_for_all_cutoffs[str(cutoffs)] = (((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)) | event_lengths["lengths"] == 0)
     
-    print("full filter construction")
     full_filters = {}
     for cutoffs in all_cutoffs:
         other_cutoffs = list(set(all_cutoffs).difference(set([cutoffs])))
@@ -40,10 +39,6 @@ def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missi
             full_filters[str(cutoffs)] = np.logical_or.reduce([uncertain_filter, length_filter, missing_filter])
         else:
             full_filters[str(cutoffs)] = np.logical_or(uncertain_filter, length_filter)
-        
-        
-        print(cutoffs)
-        print(np.sum(full_filters[str(cutoffs)]))
         
     return full_filters
 
@@ -194,7 +189,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
             X_dfs_preprocessed = pickle.load(handle)
 
     if write_csv_intermediates:
-        print("Writing CSV intermediates: X train data")
+        print("Writing CSV intermediates: X data")
         type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
         save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
 
