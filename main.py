@@ -26,7 +26,7 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 
 #%% define evaluation functions:
@@ -62,14 +62,14 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths, preproce
 
 
 
-method = SingleThresholdStatisticalProfiling(score_function=None)
+method = SingleThresholdStatisticalProfiling(score_function=score_function)
 method_name = "SingleThresholdSP"
 #save best scores:
 #TODO: define method for definitive selection
 
 
 y_train_scores_dfs, y_train_predictions_dfs = method.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs, label_filters_for_all_cutoffs)
-optimal_threshold = method.threshold_
+optimal_threshold = method.optimal_threshold_
 
 scores_path = os.path.join(score_folder, method_name, str(optimal_threshold), which_split)
 predictions_path = os.path.join(predictions_folder, method_name, str(optimal_threshold), which_split)
