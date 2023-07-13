@@ -169,8 +169,6 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     #   - Percentiles for sign correction need to be adjustable
     # - The function needs only return a subset of columns (this will save substantially in memory/loading overhead)
 
-    #TODO: Add functionality to preprocess test/validation based on statistics found in train
-
     #TODO: Name needs to change based on settings (NYI)
     #preprocessing_type = "basic"
     
@@ -239,6 +237,5 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         label_filters_for_all_cutoffs_dfs = [pd.DataFrame(l) for l in label_filters_for_all_cutoffs]
         save_dataframe_list(label_filters_for_all_cutoffs_dfs, file_names, type_label_filters_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
         
-    preprocessing_parameters = {} #TODO: implement saving of settings for some methods (not basic)
     
-    return X_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths, preprocessing_parameters
+    return X_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths

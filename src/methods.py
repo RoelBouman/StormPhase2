@@ -42,8 +42,8 @@ class SingleThresholdMethod:
         min_threshold = 0
         max_threshold = 0
         #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate det curve for each cutoffs in all_cutoffs
-        #combine det curves according to score function and objective to find optimum
+        #calculate pr curve for each cutoffs in all_cutoffs
+        #combine pr curves according to score function and objective to find optimum
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
@@ -61,13 +61,12 @@ class SingleThresholdMethod:
             if current_max_threshold > max_threshold:
                 max_threshold = current_max_threshold
         
-        
         self.interpolation_range_ = np.linspace(min_threshold, max_threshold, interpolation_range_length)
         
-        mean_score_over_cutoffs = np.zeros(self.interpolation_range_.shape)
+        self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
         for cutoffs in self.all_cutoffs_:
              
-             mean_score_over_cutoffs += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
+             self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
         
         self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
         
@@ -107,6 +106,23 @@ class StatisticalProfiling:
             y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
             
         self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+        
+        return y_scores_dfs, y_prediction_dfs
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+        #X_dfs needs at least "diff" column
+        #y_dfs needs at least "label" column
+        
+        
+        scaler = RobustScaler(quantile_range=self.quantiles)
+        
+        y_scores_dfs = []
+        
+        for X_df in X_dfs:
+            
+            y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+            
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
         
         return y_scores_dfs, y_prediction_dfs
