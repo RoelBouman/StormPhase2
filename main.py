@@ -2,6 +2,7 @@
 import os
 
 import numpy as np
+from sklearn.model_selection import ParameterGrid
 #import pandas as pd
 
 from src.methods import SingleThresholdStatisticalProfiling
@@ -31,11 +32,8 @@ preprocessing_overwrite = False #if set to True, overwrite previous preprocessed
 
 training_overwrite = False
 
-#%% define evaluation functions:
-    
-
-
-        
+#%% define hyperparameters per method:
+SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 #%% load Train data
 # Do not load data if preprocessed data is available already
 which_split = "Train"
@@ -58,30 +56,38 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 
 #%% Train evaluation
 
-#Define hyperparameter range:
+
+
+
+methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
+hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
+
+for method_name in methods:
+    print("Now training: " + method_name)
+    all_hyperparameters = hyperparameter_dict[method_name]
+    hyperparameter_list = list(ParameterGrid(all_hyperparameters))
+    for hyperparameters in hyperparameter_list:
+        hyperparameter_string = str(hyperparameters)
+        print(hyperparameter_string)
+        generic_method = methods[method_name]
+        method = generic_method(**hyperparameters, score_function=score_function)
     
-#hyperparameter_dict = {"quantiles":[(10,90), (20,80), (25,75), (5,95)]}
+        
+        y_train_scores_dfs, y_train_predictions_dfs = method.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs, label_filters_for_all_cutoffs_train)
+        optimal_threshold = method.optimal_threshold_
+        
+        scores_path = os.path.join(score_folder, method_name, hyperparameter_string, which_split)
+        predictions_path = os.path.join(predictions_folder, method_name, hyperparameter_string, which_split)
+        
+        save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
+        save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
+        
+        train_score = cutoff_averaged_f_beta(y_train_dfs, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+        print("Optimal threshold:" )
+        print(method.optimal_threshold_)
+        print("Train score:" )
+        print(train_score)
 
-method = SingleThresholdStatisticalProfiling(score_function=score_function)
-method_name = "SingleThresholdSP"
-#save best scores:
-#TODO: define method for definitive selection
-
-print("Now training: " + method_name)
-y_train_scores_dfs, y_train_predictions_dfs = method.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs, label_filters_for_all_cutoffs_train)
-optimal_threshold = method.optimal_threshold_
-
-scores_path = os.path.join(score_folder, method_name, str(optimal_threshold), which_split)
-predictions_path = os.path.join(predictions_folder, method_name, str(optimal_threshold), which_split)
-
-save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
-save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
-
-train_score = cutoff_averaged_f_beta(y_train_dfs, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
-print("Optimal threshold:" )
-print(method.optimal_threshold_)
-print("Train score:" )
-print(train_score)
 #train_result_df = SP.train_result_df_
 #best_model = SP.best_model_
 #best_hyperparameters = SP.best_hyperparameters_
