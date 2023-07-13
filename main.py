@@ -54,10 +54,7 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
 
-#%% Train evaluation
-
-
-
+#%% Training
 
 methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
 hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
@@ -69,9 +66,8 @@ for method_name in methods:
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
         print(hyperparameter_string)
-        generic_method = methods[method_name]
-        method = generic_method(**hyperparameters, score_function=score_function)
-    
+        
+        method = methods[method_name](**hyperparameters, score_function=score_function)
         
         y_train_scores_dfs, y_train_predictions_dfs = method.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs, label_filters_for_all_cutoffs_train)
         optimal_threshold = method.optimal_threshold_
@@ -82,11 +78,11 @@ for method_name in methods:
         save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
         save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
         
-        train_score = cutoff_averaged_f_beta(y_train_dfs, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+        train_metric = cutoff_averaged_f_beta(y_train_dfs, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
         print("Optimal threshold:" )
         print(method.optimal_threshold_)
-        print("Train score:" )
-        print(train_score)
+        print("Train metric:" )
+        print(train_metric)
 
 #train_result_df = SP.train_result_df_
 #best_model = SP.best_model_
