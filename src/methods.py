@@ -92,11 +92,9 @@ class StatisticalProfiling:
         self.quantiles=quantiles
         self.score_function=score_function
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-        
-        
         scaler = RobustScaler(quantile_range=self.quantiles)
         
         y_scores_dfs = []
@@ -105,27 +103,16 @@ class StatisticalProfiling:
             
             y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
             
-        self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+        if fit:
+            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+            
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
         
         return y_scores_dfs, y_prediction_dfs
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
-        #X_dfs needs at least "diff" column
-        #y_dfs needs at least "label" column
         
-        
-        scaler = RobustScaler(quantile_range=self.quantiles)
-        
-        y_scores_dfs = []
-        
-        for X_df in X_dfs:
-            
-            y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
-            
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
-        
-        return y_scores_dfs, y_prediction_dfs
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
     
         
 class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod):
