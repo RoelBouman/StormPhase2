@@ -8,24 +8,27 @@ from sklearn.metrics import precision_recall_curve
 from .helper_functions import filter_dfs_to_array
 from .evaluation import f_beta
 
+class DoubleThresholdMethod:
 
-def predict_from_scores_double_threshold(y_scores_dfs, thresholds):
-    lower_threshold = thresholds[0]
-    upper_threshold = thresholds[1]
+
     
-    y_prediction_dfs = []
-    for score in y_scores_dfs:
-        pred = np.zeros((score.shape[0],))
-        pred[np.squeeze(score) >= lower_threshold & np.squeeze(score) <= upper_threshold] = 1
-        y_prediction_dfs.append(pd.Series(pred).to_frame())
+    
+    
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
         
-    return y_prediction_dfs
+        return (2,2)
 
-
-
-def optimize_double_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, objective):
-    
-    return (2,2)
+    def predict_from_scores(self, y_scores_dfs, threshold):
+        lower_threshold = thresholds[0]
+        upper_threshold = thresholds[1]
+        
+        y_prediction_dfs = []
+        for score in y_scores_dfs:
+            pred = np.zeros((score.shape[0],))
+            pred[np.squeeze(score) >= lower_threshold & np.squeeze(score) <= upper_threshold] = 1
+            y_prediction_dfs.append(pd.Series(pred).to_frame())
+            
+        return y_prediction_dfs
 
 class SingleThresholdMethod:
     #score function must accept precision and recall as input
@@ -120,13 +123,7 @@ class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdM
     def __init__(self, **params):
         super().__init__(**params)
         
-class DoubleThresholdStatisticalProfiling(StatisticalProfiling):
+class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod):
     
     def __init__(self, **params):
         super().__init__(**params)
-        
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs):
-        self.threshold_ = optimize_double_threshold(label_filters_for_all_cutoffs, y_dfs, y_scores_dfs, self.score_function, self.objective)
-        
-    def predict_from_scores(self, y_scores_dfs):
-        return predict_from_scores_double_threshold(y_scores_dfs, self.threshold_)
