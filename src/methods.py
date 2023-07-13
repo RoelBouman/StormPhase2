@@ -5,7 +5,7 @@ import numpy as np
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
 
-from .helper_functions import filter_dfs_to_array
+from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta
 
 class DoubleThresholdMethod:
@@ -14,7 +14,7 @@ class DoubleThresholdMethod:
         
         return (2,2)
 
-    def predict_from_scores(self, y_scores_dfs, thresholds):
+    def predict_from_scores_dfs(self, y_scores_dfs, thresholds):
         lower_threshold = thresholds[0]
         upper_threshold = thresholds[1]
         
@@ -45,16 +45,12 @@ class SingleThresholdMethod:
         #calculate det curve for each cutoffs in all_cutoffs
         #combine det curves according to score function and objective to find optimum
         for cutoffs in self.all_cutoffs_:
-            df_filters = [filter_df[str(cutoffs)] for filter_df in label_filters_for_all_cutoffs]
-            y_label_dfs = [df["label"] for df in y_dfs]
+            filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
-            filtered_y = filter_dfs_to_array(y_label_dfs, df_filters)
-            #y_scores are transformed to absolute to look for unsigned distance from median
-            filtered_y_scores = np.abs(filter_dfs_to_array(y_scores_dfs, df_filters).squeeze())
             
+            filtered_y_scores = np.abs(filtered_y_scores)
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
-
             self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
             
             current_min_threshold = np.min(np.min(self.thresholds_[str(cutoffs)]))
@@ -80,7 +76,7 @@ class SingleThresholdMethod:
         self.optimal_threshold_ = self.interpolation_range_[max_score_index]
         
 
-    def predict_from_scores(self, y_scores_dfs, threshold):
+    def predict_from_scores_dfs(self, y_scores_dfs, threshold):
         y_prediction_dfs = []
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
@@ -111,7 +107,7 @@ class StatisticalProfiling:
             y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
             
         self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
-        y_prediction_dfs = self.predict_from_scores(y_scores_dfs, self.optimal_threshold_)
+        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
         
         return y_scores_dfs, y_prediction_dfs
     
