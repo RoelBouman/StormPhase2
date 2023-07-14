@@ -35,7 +35,8 @@ write_csv_intermediates = True
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 training_overwrite = False
-
+testing_overwrite = False
+validation_overwrite = False
 #%% define hyperparameters per method:
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 #%% load Train data
@@ -63,14 +64,10 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
 hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
 
-best_hyperparameters = {}
-
 for method_name in methods:
     print("Now training: " + method_name)
     all_hyperparameters = hyperparameter_dict[method_name]
     hyperparameter_list = list(ParameterGrid(all_hyperparameters))
-    
-    highest_train_metric = -np.inf
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
@@ -123,13 +120,52 @@ X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 test_file_names = X_test_files
 
-X_test_dfs_preprocessed, labels_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, remove_missing)
+X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, remove_missing)
 
 #%% run Test evaluation:
+
+best_hyperparameters = {}
+
+for method_name in methods:
+    print("Now testing: " + method_name)
+    all_hyperparameters = hyperparameter_dict[method_name]
+    hyperparameter_list = list(ParameterGrid(all_hyperparameters))
     
-        # if train_metric > highest_train_metric:
-        #     highest_train_metric = train_metric
-        #     best_hyperparameters = hyperparameters
+    highest_test_metric = -np.inf
+    
+    for hyperparameters in hyperparameter_list:
+        hyperparameter_string = str(hyperparameters)
+        print(hyperparameter_string)
+        
+        scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
+        predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
+        metric_path = os.path.join(metric_folder, which_split, method_name)
+        model_path = os.path.join(model_folder, method_name)
+        
+        full_metric_path = os.path.join(metric_path, hyperparameter_string+".csv")
+        if testing_overwrite or not os.path.exists(full_metric_path):
+            
+            model = load_model(model_path, hyperparameter_string)
+            
+            y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs, label_filters_for_all_cutoffs_test)
+            
+            test_metric = cutoff_averaged_f_beta(y_test_dfs, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+            
+            save_dataframe_list(y_test_scores_dfs, X_test_files, scores_path, overwrite=testing_overwrite)
+            save_dataframe_list(y_test_predictions_dfs, X_test_files, predictions_path, overwrite=testing_overwrite)
+            
+            save_metric(test_metric, metric_path, hyperparameter_string, overwrite=testing_overwrite)
+        else:
+            test_metric = load_metric(metric_path, hyperparameter_string)
+            
+        if test_metric > highest_test_metric:
+            highest_test_metric = test_metric
+            best_hyperparameters[method_name] = hyperparameters
+            
+        print("Test metric:" )
+        print(test_metric)
+    
+
 #%% Validation
 #%% load Validation data
 # Do not load data if preprocessed data is available already
@@ -144,4 +180,40 @@ X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 val_file_names = X_val_files
 
-X_val_dfs_preprocessed, labels_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, remove_missing)
+X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, remove_missing)
+
+#%% run Validation evaluation:
+
+
+for method_name in methods:
+    print("Now validating: " + method_name)
+    
+    hyperparameters = best_hyperparameters[method_name]
+    
+    hyperparameter_string = str(hyperparameters)
+    print(hyperparameter_string)
+    
+    scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
+    predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
+    metric_path = os.path.join(metric_folder, which_split, method_name)
+    model_path = os.path.join(model_folder, method_name)
+    
+    full_metric_path = os.path.join(metric_path, hyperparameter_string+".csv")
+    if validation_overwrite or not os.path.exists(full_metric_path):
+        
+        model = load_model(model_path, hyperparameter_string)
+        
+        y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs, label_filters_for_all_cutoffs_val)
+        
+        val_metric = cutoff_averaged_f_beta(y_val_dfs, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        
+        save_dataframe_list(y_val_scores_dfs, X_val_files, scores_path, overwrite=validation_overwrite)
+        save_dataframe_list(y_val_predictions_dfs, X_val_files, predictions_path, overwrite=validation_overwrite)
+        
+        save_metric(val_metric, metric_path, hyperparameter_string, overwrite=validation_overwrite)
+    else:
+        val_metric = load_metric(metric_path, hyperparameter_string)
+            
+    print("Validation metric:" )
+    print(val_metric)
+    
