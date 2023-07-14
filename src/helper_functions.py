@@ -4,51 +4,28 @@
 @author: rbouman
 """
 import numpy as np
-from src.evaluation import double_threshold_and_score
-from src.evaluation import threshold_and_score
 
-from src.evaluation import inverse_threshold_and_score
-
-#uses single + double cutoff method for fewer passes, redoes initial upper_threshold guess
-def find_BS_thresholds(y_scores, y_true, lengths, cutoffs):
-    unique_scores = np.unique(y_scores)
+def filter_dfs_to_array(dfs, df_filters):
+    #filter defines what to exclude, so, True is excluded
+    filtered_dfs = [df[np.logical_not(df_filter)] for df, df_filter in zip(dfs, df_filters)]
     
-    thresholds = (unique_scores[:-1] + unique_scores[1:])/2
+    return np.concatenate(filtered_dfs)
+
+def filter_label_and_predictions_to_array(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, cutoffs):
+    df_filters = [filter_df[str(cutoffs)] for filter_df in label_filters_for_all_cutoffs]
+    y_label_dfs = [df["label"] for df in y_dfs]
     
-    lower_thresholds = thresholds[thresholds < 0]
-    upper_thresholds = thresholds[thresholds >= 0]
+    filtered_y_labels = filter_dfs_to_array(y_label_dfs, df_filters)
+    filtered_y_preds = filter_dfs_to_array(y_preds_dfs, df_filters)
     
-    best_score = 0
+    return filtered_y_labels, filtered_y_preds
+
+
+def filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs):
+    df_filters = [filter_df[str(cutoffs)] for filter_df in label_filters_for_all_cutoffs]
+    y_label_dfs = [df["label"] for df in y_dfs]
     
-    for upper_threshold in upper_thresholds:
-        score = double_threshold_and_score((np.min(thresholds), upper_threshold), y_true, y_scores, lengths, cutoffs)
-
-
-        if score > best_score:
-            best_score = score
-            best_upper_threshold = upper_threshold
-            
-            
-
-    for lower_threshold in lower_thresholds:
-            
-        score = double_threshold_and_score((lower_threshold, best_upper_threshold), y_true, y_scores, lengths, cutoffs)
-
-        if score > best_score:
-            best_score = score
-            best_lower_threshold = lower_threshold
-            
-
-    for upper_threshold in upper_thresholds:
-
-        
-        score = double_threshold_and_score((best_lower_threshold, upper_threshold), y_true, y_scores, lengths, cutoffs)
-
-        
-
-        if score > best_score:
-            best_score = score
-            best_upper_threshold = upper_threshold
+    filtered_y_labels = filter_dfs_to_array(y_label_dfs, df_filters)
+    filtered_y_scores = filter_dfs_to_array(y_scores_dfs, df_filters).squeeze()
     
-    
-    return (best_lower_threshold, best_upper_threshold)
+    return filtered_y_labels, filtered_y_scores
