@@ -12,7 +12,7 @@ class DoubleThresholdMethod:
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
         
-        return (2,2)
+        return (-2,2)
 
     def predict_from_scores_dfs(self, y_scores_dfs, thresholds):
         lower_threshold = thresholds[0]
@@ -21,7 +21,7 @@ class DoubleThresholdMethod:
         y_prediction_dfs = []
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
-            pred[np.squeeze(score) >= lower_threshold & np.squeeze(score) <= upper_threshold] = 1
+            pred[np.logical_or(np.squeeze(score) <= lower_threshold, np.squeeze(score) >= upper_threshold)] = 1
             y_prediction_dfs.append(pd.Series(pred).to_frame())
             
         return y_prediction_dfs
@@ -29,9 +29,8 @@ class DoubleThresholdMethod:
 class SingleThresholdMethod:
     #score function must accept precision and recall as input
     #score function should be maximized
-    #TODO: save scores and ranges for later plotting functionality
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        self.all_cutoffs_ = label_filters_for_all_cutoffs[0].keys()
+        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
         
         self.evaluation_score_ = {}
         self.precision_ = {}
@@ -95,12 +94,12 @@ class StatisticalProfiling:
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-        scaler = RobustScaler(quantile_range=self.quantiles)
+        
         
         y_scores_dfs = []
         
         for X_df in X_dfs:
-            
+            scaler = RobustScaler(quantile_range=self.quantiles)
             y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
             
         if fit:
