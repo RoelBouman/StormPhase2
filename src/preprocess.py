@@ -221,7 +221,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs, event_lengths, X_dfs)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs, event_lengths, X_dfs_preprocessed)]
         
         os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
