@@ -9,7 +9,6 @@ import seaborn as sns
 from src.plot_functions import *
 
 
-
 #%% define environment variables
 data_folder = "data"
 result_folder = "results"

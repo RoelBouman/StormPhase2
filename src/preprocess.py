@@ -87,16 +87,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
 
     Returns:
         pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
-    """
-    #Adjust timestamp that suffer from wrong data due to the clock moving when the time period exists in the data.
-    try:
-        df.loc[(df['M_TIMESTAMP']>='2020-03-29 03:00:00')
-              &(df['M_TIMESTAMP']< '2020-03-29 04:00:00'),'Flag'] = "5"
-        df.loc[(df['M_TIMESTAMP']>='2020-03-29 03:00:00')
-              &(df['M_TIMESTAMP']< '2020-03-29 04:00:00'),'S_original'] = list(df[df['M_TIMESTAMP']<'2020-03-29 00:03:00']['S_original'])[-1]
-    except:
-        pass
-    
+    """ 
     # Calculate difference and add label column.
     df['diff_original'] = df['S_original']-df['BU_original']
         
@@ -173,7 +164,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     #preprocessing_type = "basic"
     
     preprocessed_file_name = os.path.join(preprocessed_pickles_folder, preprocessing_type + ".pickle")
-
+    
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing X data")
         X_dfs_preprocessed = [preprocess_data(df) for df in X_dfs]
