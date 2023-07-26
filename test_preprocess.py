@@ -8,7 +8,7 @@ from src.methods import SingleThresholdStatisticalProfiling
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, load_batch
 
-from preprocess import match_bottomup_load
+from src.preprocess import match_bottomup_load
 
 
 #%% load data
@@ -45,20 +45,22 @@ def test_preprocess(df: pd.DataFrame) -> pd.DataFrame:
     prev_v = 0
     prev_i = 0
     # make it a hyperparameter
-    count = 0
+    count = 5
     
     for i, v in enumerate(df['S']):
         # if value is same as previous, decrease count by 1
         if v == prev_v:
-            count =- 1
+            count -= 1
+            continue
+            
         # if not, check if previous count below zero, if so, set all missing values to 1
         elif count <= 0:
-            pass
+            df.loc[prev_i:i - 1, 'missing'] = 1
             
-                
-            
-    
-    print(df['missing'])
+        # reset vars
+        prev_v = v
+        prev_i = i
+        count = 5 #use hyperparameter
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
     arr = df[df['missing']==0]
@@ -79,7 +81,7 @@ def test_preprocess(df: pd.DataFrame) -> pd.DataFrame:
 #%% pre_process
 
 
-#X_dfs_preprocessed = [test_preprocess(df_X) for df_X in X_train_dfs]
+X_dfs_preprocessed = [test_preprocess(df_X) for df_X in X_train_dfs]
 
 
 

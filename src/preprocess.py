@@ -95,17 +95,31 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     # 0 okay
     # 1 measurement missing
     # 2 bottom up missing
-    # Flag measurement as missing when 5 times after each other the same value expect 0
+    
     df['S'] = df['S_original'].copy()
     df['missing'] = 0
     df.loc[df['BU_original'].isnull(),'missing'] = 2
-    df.loc[(((df['S']==df['S'].shift(1)) & (df['S']==df['S'].shift(2))&(df['S']==df['S'].shift(3))&(df['S']==df['S'].shift(4)))|
-           ((df['S']==df['S'].shift(-1)) & (df['S']==df['S'].shift(1))&(df['S']==df['S'].shift(2))&(df['S']==df['S'].shift(3)))|
-           ((df['S']==df['S'].shift(-2)) & (df['S']==df['S'].shift(-1))&(df['S']==df['S'].shift(1))&(df['S']==df['S'].shift(2)))|
-           ((df['S']==df['S'].shift(-3)) & (df['S']==df['S'].shift(-2))&(df['S']==df['S'].shift(-1))&(df['S']==df['S'].shift(1)))|
-           ((df['S']==df['S'].shift(-4)) & (df['S']==df['S'].shift(-3))&(df['S']==df['S'].shift(-2))&(df['S']==df['S'].shift(-1))))&
-           df['S']!=0
-           ,'missing'] = 1
+    
+    prev_v = 0
+    prev_i = 0
+    # make it a hyperparameter
+    count = 5
+    
+    # Flag measurement as missing when # of times after each other the same value
+    for i, v in enumerate(df['S']):
+        # if value is same as previous, decrease count by 1
+        if v == prev_v:
+            count -= 1
+            continue
+            
+        # if not, check if previous count below zero, if so, set all missing values to 1
+        elif count <= 0:
+            df.loc[prev_i:i - 1, 'missing'] = 1
+            
+        # reset vars
+        prev_v = v
+        prev_i = i
+        count = 5 #use hyperparameter
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
     arr = df[df['missing']==0]
