@@ -37,6 +37,12 @@ preprocessing_overwrite = False #if set to True, overwrite previous preprocessed
 training_overwrite = False
 testing_overwrite = False
 validation_overwrite = False
+
+#%% define hyperparemeters for preprocessing
+
+preprocessing_hyperparemeters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
+
+
 #%% define hyperparameters per method:
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 #%% load Train data
@@ -53,7 +59,7 @@ X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 train_file_names = X_train_files
 
-X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, remove_missing)
+X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparemeters, remove_missing)
 
 
 #%% Detect anomalies/switch events

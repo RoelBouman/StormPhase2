@@ -79,11 +79,13 @@ def get_event_lengths(y_df):
             lengths[event_start_index:event_end_index] = event_end_index-event_start_index
         return pd.DataFrame({"lengths":lengths})
 
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
     Args:
         df (pd.DataFrame): Dataframe with at least the columns M_TIMESTAMP, S_original, BU_original and Flag.
+        subsequent_nr (int): Integer that represents the number of subsequent equal measurements
+        line_fit_quantiles (tuple): A tuple containing the lower and upper quantiles for the linear fit model
 
     Returns:
         pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
@@ -102,8 +104,7 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     
     prev_v = 0
     prev_i = 0
-    # make it a hyperparameter
-    count = 5
+    count = subsequent_nr
     
     # Flag measurement as missing when # of times after each other the same value
     for i, v in enumerate(df['S']):
@@ -119,11 +120,13 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
         # reset vars
         prev_v = v
         prev_i = i
-        count = 5 #use hyperparameter
+        count = subsequent_nr
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
+    low_quant, up_quant = lin_fit_quantiles
+    
     arr = df[df['missing']==0]
-    arr = arr[(arr['diff_original'] > np.percentile(arr['diff_original'],10)) & (arr['diff_original'] < np.percentile(arr['diff_original'],90))]
+    arr = arr[(arr['diff_original'] > np.percentile(arr['diff_original'],low_quant)) & (arr['diff_original'] < np.percentile(arr['diff_original'],up_quant))]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     df['BU'] = a*df['BU_original']+b
@@ -163,7 +166,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, remove_missing=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, remove_missing=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -181,7 +184,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing X data")
-        X_dfs_preprocessed = [preprocess_data(df) for df in X_dfs]
+        X_dfs_preprocessed = [preprocess_data(df, hyperparameters['nr_subsequent']) for df in X_dfs]
         
         os.makedirs(preprocessed_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
