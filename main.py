@@ -32,7 +32,7 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
 
 training_overwrite = False
 testing_overwrite = False
@@ -126,7 +126,7 @@ X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 test_file_names = X_test_files
 
-X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, remove_missing)
+X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparemeters, remove_missing)
 
 #%% run Test evaluation:
 
@@ -186,7 +186,7 @@ X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 val_file_names = X_val_files
 
-X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, remove_missing)
+X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparemeters, remove_missing)
 
 #%% run Validation evaluation:
 

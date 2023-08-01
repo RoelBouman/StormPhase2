@@ -24,7 +24,7 @@ def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missi
         
         #labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
         
-        #labels_for_all_cutoffs[str(cutoffs)] = (((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)) | event_lengths["lengths"] == 0)
+        #labels_for_all_cutoffs[str(cutoffs)] = (np.logical_or(np.logical_and(event_lengths["lengths"] > low_cutoff), (event_lengths["lengths"] <= high_cutoff)), event_lengths["lengths"] == 0)
     
     full_filters = {}
     for cutoffs in all_cutoffs:
@@ -126,7 +126,7 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
     low_quant, up_quant = lin_fit_quantiles
     
     arr = df[df['missing']==0]
-    arr = arr[(arr['diff_original'] > np.percentile(arr['diff_original'],low_quant)) & (arr['diff_original'] < np.percentile(arr['diff_original'],up_quant))]
+    arr = arr[np.logical_and(arr['diff_original'] > np.percentile(arr['diff_original'],low_quant), arr['diff_original'] < np.percentile(arr['diff_original'],up_quant))]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     df['BU'] = a*df['BU_original']+b
@@ -184,7 +184,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing X data")
-        X_dfs_preprocessed = [preprocess_data(df, hyperparameters['nr_subsequent']) for df in X_dfs]
+        X_dfs_preprocessed = [preprocess_data(df, hyperparameters['subsequent_nr'], hyperparameters['lin_fit_quantiles']) for df in X_dfs]
         
         os.makedirs(preprocessed_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
