@@ -6,6 +6,7 @@ from sklearn.model_selection import ParameterGrid
 #import pandas as pd
 
 from src.methods import SingleThresholdStatisticalProfiling
+from src.methods import DoubleThresholdStatisticalProfiling
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
@@ -32,7 +33,7 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 training_overwrite = False
 testing_overwrite = False
@@ -42,9 +43,11 @@ validation_overwrite = False
 
 preprocessing_hyperparemeters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
 
-
 #%% define hyperparameters per method:
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
+
+DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
+
 #%% load Train data
 # Do not load data if preprocessed data is available already
 which_split = "Train"
@@ -67,8 +70,8 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 
 #%% Training
 
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
+methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling}
+hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -77,6 +80,7 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
+        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
@@ -129,7 +133,7 @@ test_file_names = X_test_files
 X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparemeters, remove_missing)
 
 #%% run Test evaluation:
-
+    
 best_hyperparameters = {}
 
 for method_name in methods:
@@ -141,6 +145,7 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
+        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
@@ -197,6 +202,7 @@ for method_name in methods:
     hyperparameters = best_hyperparameters[method_name]
     
     hyperparameter_string = str(hyperparameters)
+    hyperparameter_string = hyperparameter_string.replace(':', '')
     print(hyperparameter_string)
     
     scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)

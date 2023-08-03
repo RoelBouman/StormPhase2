@@ -11,8 +11,58 @@ from .evaluation import f_beta
 class DoubleThresholdMethod:
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
+        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
         
-        return (-2,2)
+        self.evaluation_score_ = {}
+        self.precision_ = {}
+        self.recall_ = {}
+        self.thresholds_ = {}
+         
+        self.optimal_threshold_ = (self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = True),
+                                   self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = False))
+        
+        
+    def optimize_single_threshold(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper, interpolation_range_length=10000):
+        #min and max thresholds are tracked for interpolation across all cutoff categories
+        min_threshold = 0
+        max_threshold = 0
+        
+        #for all cutoffs, calculate concatenated labels and scores, filtered
+        #calculate pr curve for each cutoffs in all_cutoffs
+        #combine pr curves according to score function and objective to find optimum
+        for cutoffs in self.all_cutoffs_:
+            filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
+            
+            if upper:
+                filtered_y_scores = np.array([i for i in filtered_y_scores if i >= 0])
+                upper = False
+            else:
+                filtered_y_scores = np.array([i for i in filtered_y_scores if i < 0])
+            
+            self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
+            
+            self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
+            
+            current_min_threshold = np.min(np.min(self.thresholds_[str(cutoffs)]))
+            if current_min_threshold < min_threshold:
+                min_threshold = current_min_threshold
+                
+            current_max_threshold = np.max(np.max(self.thresholds_[str(cutoffs)]))
+            if current_max_threshold > max_threshold:
+                max_threshold = current_max_threshold
+        
+        self.interpolation_range_ = np.linspace(min_threshold, max_threshold, interpolation_range_length)
+        
+        self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
+        for cutoffs in self.all_cutoffs_:
+             
+             self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
+        
+        self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
+        
+        max_score_index = np.argmax(self.mean_score_over_cutoffs_)
+        
+        return self.interpolation_range_[max_score_index]
 
     def predict_from_scores_dfs(self, y_scores_dfs, thresholds):
         lower_threshold = thresholds[0]
