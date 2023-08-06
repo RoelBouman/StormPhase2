@@ -77,9 +77,9 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 
 #%% Training
 
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
+methods = {#"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
            "SingleThresholdIF":SingleThresholdIsolationForest, "DoubleThresholdIF": DoubleThresholdIsolationForest}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
+hyperparameter_dict = {#"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
                        "SingleThresholdIF":SingleThresholdIF_hyperparameters, "DoubleThresholdIF": DoubleThresholdIF_hyperparameters}
 
 for method_name in methods:

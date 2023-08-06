@@ -187,11 +187,13 @@ class IsolationForest:
             # define IsolationForest model
             model = IF()
             
-            # fit
-            model.fit(X_df["diff"])
-            y_scores_dfs.append(model.decision_function(X_df["diff"]))
+            # replace all NaN with 0 and reshape the data
+            data = X_df['diff_original'].fillna(0).values.reshape(-1,1)
+            model.fit(data)
+            y_scores_dfs.append(pd.DataFrame(model.decision_function(data)))
             
         if fit:
+            print(y_scores_dfs[0])
             self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
             
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
