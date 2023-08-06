@@ -184,7 +184,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing X data")
-        X_dfs_preprocessed = [preprocess_data(df, hyperparameters['subsequent_nr'], hyperparameters['lin_fit_quantiles']) for df in X_dfs]
+        X_dfs_preprocessed = [preprocess_data(df, **hyperparameters) for df in X_dfs]
         
         os.makedirs(preprocessed_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:

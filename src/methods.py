@@ -4,6 +4,7 @@ import numpy as np
 
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
+from sklearn.ensemble import IsolationForest as IF
 
 from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta
@@ -17,7 +18,8 @@ class DoubleThresholdMethod:
         self.precision_ = {}
         self.recall_ = {}
         self.thresholds_ = {}
-         
+        
+        #safe the two thresholds in a tuple
         self.optimal_threshold_ = (self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = True),
                                    self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = False))
         
@@ -33,12 +35,14 @@ class DoubleThresholdMethod:
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
+            # use only negative values if searching for the lower threshold, only positive if searching for the upper threshold 
             if upper:
-                filtered_y_scores = np.array([i for i in filtered_y_scores if i >= 0])
-                upper = False
+                filtered_y = filtered_y[filtered_y_scores >= 0]
+                filtered_y_scores = filtered_y_scores[filtered_y_scores >= 0]
             else:
-                filtered_y_scores = np.array([i for i in filtered_y_scores if i < 0])
-            
+                filtered_y = filtered_y[filtered_y_scores < 0]
+                filtered_y_scores = np.abs(filtered_y_scores[filtered_y_scores < 0])
+                                            
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
             self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
@@ -51,7 +55,7 @@ class DoubleThresholdMethod:
             if current_max_threshold > max_threshold:
                 max_threshold = current_max_threshold
         
-        self.interpolation_range_ = np.linspace(min_threshold, max_threshold, interpolation_range_length)
+        self.interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
         
         self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
         for cutoffs in self.all_cutoffs_:
@@ -95,7 +99,6 @@ class SingleThresholdMethod:
         #combine pr curves according to score function and objective to find optimum
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
-            
             
             filtered_y_scores = np.abs(filtered_y_scores)
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
@@ -163,6 +166,37 @@ class StatisticalProfiling:
         
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
     
+
+class IsolationForest:
+    
+    def __init__(self, score_function=f_beta, quantiles=(10,90)):
+        # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
+        
+        self.quantiles=quantiles
+        self.score_function=score_function
+    
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+        #X_dfs needs at least "diff" column
+        #y_dfs needs at least "label" column
+        
+        
+        y_scores_dfs = []
+        
+        for X_df in X_dfs:
+            scaler = RobustScaler(quantile_range=self.quantiles)
+            y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+            
+        if fit:
+            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+            
+        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+        
+        return y_scores_dfs, y_prediction_dfs
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+        
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+    
         
 class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod):
     
@@ -170,6 +204,16 @@ class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdM
         super().__init__(**params)
         
 class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod):
+    
+    def __init__(self, **params):
+        super().__init__(**params)
+        
+class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod):
+    
+    def __init__(self, **params):
+        super().__init__(**params)
+        
+class DoubleThresholdIsolationForest(IsolationForest, DoubleThresholdMethod):
     
     def __init__(self, **params):
         super().__init__(**params)
