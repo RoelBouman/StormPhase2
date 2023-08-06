@@ -7,6 +7,9 @@ from sklearn.model_selection import ParameterGrid
 
 from src.methods import SingleThresholdStatisticalProfiling
 from src.methods import DoubleThresholdStatisticalProfiling
+from src.methods import SingleThresholdIsolationForest
+from src.methods import DoubleThresholdIsolationForest
+
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
@@ -36,8 +39,8 @@ write_csv_intermediates = True
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 training_overwrite = True
-testing_overwrite = True
-validation_overwrite = True
+testing_overwrite = False
+validation_overwrite = False
 
 #%% define hyperparemeters for preprocessing
 
@@ -47,6 +50,10 @@ preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 9
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 
 DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
+
+SingleThresholdIF_hyperparameters = {"contamination": ['auto'], 'random_state': [None]}
+
+DoubleThresholdIF_hyperparameters = {"contamination": ['auto'], 'random_state': [None]}
 
 #%% load Train data
 # Do not load data if preprocessed data is available already
@@ -70,8 +77,10 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 
 #%% Training
 
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
+methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
+           "SingleThresholdIF":SingleThresholdIsolationForest, "DoubleThresholdIF": DoubleThresholdIsolationForest}
+hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
+                       "SingleThresholdIF":SingleThresholdIF_hyperparameters, "DoubleThresholdIF": DoubleThresholdIF_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)

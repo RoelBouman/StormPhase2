@@ -169,22 +169,27 @@ class StatisticalProfiling:
 
 class IsolationForest:
     
-    def __init__(self, score_function=f_beta, quantiles=(10,90)):
+    def __init__(self, score_function=f_beta, contamination='auto', random_state=None):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
-        self.quantiles=quantiles
-        self.score_function=score_function
+        self.score_function = score_function
+        self.contamination = contamination
+        self.random_state = random_state
+        
     
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-        
-        
+
         y_scores_dfs = []
         
         for X_df in X_dfs:
-            scaler = RobustScaler(quantile_range=self.quantiles)
-            y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+            # define IsolationForest model
+            model = IF()
+            
+            # fit
+            model.fit(X_df["diff"])
+            y_scores_dfs.append(model.decision_function(X_df["diff"]))
             
         if fit:
             self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
