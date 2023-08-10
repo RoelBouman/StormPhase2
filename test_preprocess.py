@@ -3,6 +3,9 @@ import os
 
 import numpy as np
 import pandas as pd
+import ruptures as rpt
+import matplotlib.pyplot as plt
+
 
 from src.methods import SingleThresholdStatisticalProfiling
 from src.preprocess import preprocess_per_batch_and_write
@@ -78,10 +81,22 @@ def test_preprocess(df: pd.DataFrame) -> pd.DataFrame:
                'S', 'BU', 'diff', 
                'missing']]
 
-#%% pre_process
+#%% 
 
 
-X_dfs_preprocessed = [test_preprocess(df_X) for df_X in X_train_dfs]
+for i in range (0,74):
+    n_bkps = 2  # number of breakpoints
+    
+    signal = np.array(X_train_dfs[i]['S_original'])
+    # detection
+    algo = rpt.Binseg(model="l2", min_size=100, jump=10).fit(signal)
+    result = algo.fit_predict(signal, n_bkps)
+    
+    # display
+    rpt.display(signal, result)
+    plt.show()
+
+#X_dfs_preprocessed = [test_preprocess(df_X) for df_X in X_train_dfs]
 
 
 

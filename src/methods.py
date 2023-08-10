@@ -1,6 +1,7 @@
 
 import pandas as pd
 import numpy as np
+import ruptures as rpt
 
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
@@ -100,7 +101,7 @@ class SingleThresholdMethod:
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
-            filtered_y_scores = np.abs(filtered_y_scores)
+            filtered_y_scores = np.abs(filtered_y_scores) # ADD CONDITION FOR IF
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
             self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
@@ -169,12 +170,11 @@ class StatisticalProfiling:
 
 class IsolationForest:
     
-    def __init__(self, score_function=f_beta, contamination='auto', random_state=None):
+    def __init__(self, score_function=f_beta, **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
-        self.contamination = contamination
-        self.random_state = random_state
+        self.params = params
         
     
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
@@ -183,17 +183,17 @@ class IsolationForest:
 
         y_scores_dfs = []
         
+        # define IsolationForest model
+        self.model = IF(**self.params)
+        
         for X_df in X_dfs:
-            # define IsolationForest model
-            model = IF()
             
             # replace all NaN with 0 and reshape the data
             data = X_df['diff_original'].fillna(0).values.reshape(-1,1)
-            model.fit(data)
-            y_scores_dfs.append(pd.DataFrame(model.decision_function(data)))
+            self.model.fit(data)
+            y_scores_dfs.append(pd.DataFrame(self.model.decision_function(data)))
             
         if fit:
-            print(y_scores_dfs[0])
             self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
             
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
@@ -220,7 +220,3 @@ class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod):
     def __init__(self, **params):
         super().__init__(**params)
         
-class DoubleThresholdIsolationForest(IsolationForest, DoubleThresholdMethod):
-    
-    def __init__(self, **params):
-        super().__init__(**params)

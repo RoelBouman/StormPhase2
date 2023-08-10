@@ -123,10 +123,13 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
         count = subsequent_nr
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
-    low_quant, up_quant = lin_fit_quantiles
-    
     arr = df[df['missing']==0]
-    arr = arr[np.logical_and(arr['diff_original'] > np.percentile(arr['diff_original'],low_quant), arr['diff_original'] < np.percentile(arr['diff_original'],up_quant))]
+    
+    low_quant, up_quant = lin_fit_quantiles
+    low_quant_value = np.percentile(arr['diff_original'],low_quant)
+    up_quant_value = np.percentile(arr['diff_original'],up_quant)
+    
+    arr = arr[np.logical_and(arr['diff_original'] > low_quant_value, arr['diff_original'] < up_quant_value)]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     df['BU'] = a*df['BU_original']+b
