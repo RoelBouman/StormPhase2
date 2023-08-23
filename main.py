@@ -37,7 +37,7 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True
+training_overwrite = False
 testing_overwrite = False
 validation_overwrite = False
 

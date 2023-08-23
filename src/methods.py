@@ -177,7 +177,9 @@ class IsolationForest:
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
-        self.params = params
+        
+        # define IsolationForest model
+        self.model = IF(**params)
         
     
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
@@ -185,9 +187,6 @@ class IsolationForest:
         #y_dfs needs at least "label" column
 
         y_scores_dfs = []
-        
-        # define IsolationForest model
-        self.model = IF(**self.params)
         
         for X_df in X_dfs:
             
