@@ -8,7 +8,6 @@ from sklearn.model_selection import ParameterGrid
 from src.methods import SingleThresholdStatisticalProfiling
 from src.methods import DoubleThresholdStatisticalProfiling
 from src.methods import SingleThresholdIsolationForest
-from src.methods import DoubleThresholdIsolationForest
 
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
@@ -51,7 +50,7 @@ SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20
 
 DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 
-SingleThresholdIF_hyperparameters = {"n_estimators": 1000}
+SingleThresholdIF_hyperparameters = {"n_estimators": [1000]}
 
 #%% load Train data
 # Do not load data if preprocessed data is available already
@@ -75,10 +74,13 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 
 #%% Training
 
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
-           "SingleThresholdIF":SingleThresholdIsolationForest}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
-                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
+#methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
+#           "SingleThresholdIF":SingleThresholdIsolationForest}
+#hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
+#                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
+
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)

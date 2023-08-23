@@ -84,7 +84,7 @@ class DoubleThresholdMethod:
 class SingleThresholdMethod:
     #score function must accept precision and recall as input
     #score function should be maximized
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000, use_absolute = True):
         self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
         
         self.evaluation_score_ = {}
@@ -101,7 +101,10 @@ class SingleThresholdMethod:
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
-            filtered_y_scores = np.abs(filtered_y_scores) # ADD CONDITION FOR IF
+            # currently only used to make sure IF does not use absolute values
+            if use_absolute:
+                filtered_y_scores = np.abs(filtered_y_scores)
+                
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
             self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
@@ -194,7 +197,7 @@ class IsolationForest:
             y_scores_dfs.append(pd.DataFrame(self.model.decision_function(data)))
             
         if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, use_absolute = False)
             
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
         
