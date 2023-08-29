@@ -84,7 +84,7 @@ class DoubleThresholdMethod:
 class SingleThresholdMethod:
     #score function must accept precision and recall as input
     #score function should be maximized
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000, use_absolute = True):
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
         self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
         
         self.evaluation_score_ = {}
@@ -101,10 +101,8 @@ class SingleThresholdMethod:
         for cutoffs in self.all_cutoffs_:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
-            # currently only used to make sure IF does not use absolute values
-            if use_absolute:
-                filtered_y_scores = np.abs(filtered_y_scores)
-                
+            filtered_y_scores = np.abs(filtered_y_scores)
+             
             self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
             self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
@@ -152,7 +150,6 @@ class StatisticalProfiling:
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
-        
         y_scores_dfs = []
         
         for X_df in X_dfs:
@@ -187,16 +184,31 @@ class IsolationForest:
         #y_dfs needs at least "label" column
 
         y_scores_dfs = []
+        helper = []
         
-        for X_df in X_dfs:
+        for i, X_df in enumerate(X_dfs):
+            # remove all NaN in X, y and label_filters data
+            data = X_df['diff_original'].dropna().values.reshape(-1,1)
+            y_dfs[i] = y_dfs[i][X_df['diff_original'].notna()]
             
-            # replace all NaN with 0 and reshape the data
-            data = X_df['diff_original'].fillna(0).values.reshape(-1,1)
-            self.model.fit(data)
-            y_scores_dfs.append(pd.DataFrame(self.model.decision_function(data)))
+            for key in label_filters_for_all_cutoffs[i].keys():
+                label_filters_for_all_cutoffs[i][key] = label_filters_for_all_cutoffs[i][key][X_df['diff_original'].notna()]
+                
+            helper.append(data)
             
         if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, use_absolute = False)
+            #flatten helper and fit model on that
+            flat_helper = [i for sl in helper for i in sl]
+            self.model.fit(flat_helper)
+        
+        for data in helper:
+            # calculate and scale the scores
+            score = self.model.decision_function(data)
+            scaled_score = np.max(score) - (score - 1)
+            y_scores_dfs.append(pd.DataFrame(scaled_score))
+
+        if fit:
+            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
             
         y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
         

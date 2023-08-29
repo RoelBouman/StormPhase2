@@ -37,9 +37,9 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False
-testing_overwrite = False
-validation_overwrite = False
+training_overwrite = True
+testing_overwrite = True
+validation_overwrite = True
 
 #%% define hyperparemeters for preprocessing
 
