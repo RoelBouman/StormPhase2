@@ -10,6 +10,7 @@ from sklearn.ensemble import IsolationForest as IF
 from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta
 
+
 class DoubleThresholdMethod:
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
@@ -23,7 +24,6 @@ class DoubleThresholdMethod:
         #safe the two thresholds in a tuple
         self.optimal_threshold_ = (self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = True),
                                    self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = False))
-        
         
     def optimize_single_threshold(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper, interpolation_range_length=10000):
         #min and max thresholds are tracked for interpolation across all cutoff categories
@@ -81,6 +81,7 @@ class DoubleThresholdMethod:
             
         return y_prediction_dfs
 
+
 class SingleThresholdMethod:
     #score function must accept precision and recall as input
     #score function should be maximized
@@ -128,7 +129,6 @@ class SingleThresholdMethod:
         
         self.optimal_threshold_ = self.interpolation_range_[max_score_index]
         
-
     def predict_from_scores_dfs(self, y_scores_dfs, threshold):
         y_prediction_dfs = []
         for score in y_scores_dfs:
@@ -137,6 +137,7 @@ class SingleThresholdMethod:
             y_prediction_dfs.append(pd.Series(pred).to_frame())
             
         return y_prediction_dfs
+
 
 class StatisticalProfiling:
     
@@ -178,32 +179,31 @@ class IsolationForest:
         # define IsolationForest model
         self.model = IF(**params)
         
-    
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
 
         y_scores_dfs = []
-        helper = []
+        no_nan_X_dfs = []
         
         for i, X_df in enumerate(X_dfs):
             # remove all NaN in X, y and label_filters data
-            data = X_df['diff_original'].dropna().values.reshape(-1,1)
+            no_nan_X_df = X_df['diff_original'].dropna().values.reshape(-1,1)
             y_dfs[i] = y_dfs[i][X_df['diff_original'].notna()]
             
             for key in label_filters_for_all_cutoffs[i].keys():
                 label_filters_for_all_cutoffs[i][key] = label_filters_for_all_cutoffs[i][key][X_df['diff_original'].notna()]
                 
-            helper.append(data)
+            no_nan_X_dfs.append(no_nan_X_df)
             
         if fit:
             #flatten helper and fit model on that
-            flat_helper = [i for sl in helper for i in sl]
-            self.model.fit(flat_helper)
+            flat_no_nan_X_dfs = [i for sl in no_nan_X_dfs for i in sl]
+            self.model.fit(flat_no_nan_X_dfs)
         
-        for data in helper:
+        for X_df in no_nan_X_dfs:
             # calculate and scale the scores
-            score = self.model.decision_function(data)
+            score = self.model.decision_function(X_df)
             scaled_score = np.max(score) - (score - 1)
             y_scores_dfs.append(pd.DataFrame(scaled_score))
 
@@ -217,7 +217,78 @@ class IsolationForest:
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
         
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+
     
+class BinarySegmentation:
+    
+    def __init__(self, score_function=f_beta, **params):
+        # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
+        
+        self.score_function = score_function
+        
+        # define IsolationForest model
+        self.model = rpt.Binseg(**params)
+        
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+        #X_dfs needs at least "diff" column
+        #y_dfs needs at least "label" column
+
+        y_scores_dfs = []
+        
+        no_nan_X_dfs = []
+        
+        for i, X_df in enumerate(X_dfs):
+            # remove all NaN in X, y and label_filters data
+            no_nan_X_df = X_df['diff_original'].dropna().values.reshape(-1,1)
+            y_dfs[i] = y_dfs[i][X_df['diff_original'].notna()]
+            
+            for key in label_filters_for_all_cutoffs[i].keys():
+                label_filters_for_all_cutoffs[i][key] = label_filters_for_all_cutoffs[i][key][X_df['diff_original'].notna()]
+                
+            no_nan_X_dfs.append(no_nan_X_df)
+        
+        for i, X_df in enumerate(no_nan_X_dfs):
+            signal = X_df['diff_original']
+            
+            # defining the penalty
+            n = len(signal) # nr of samples
+            sigma = np.std(signal) * 3 # noise standard deviation
+            penalty = np.log(n) * sigma**2
+            
+            bkps = self.model.fit_predict(signal, pen = penalty)
+            
+            y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
+
+        if fit:
+            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+            
+        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+        
+        return y_scores_dfs, y_prediction_dfs
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+        
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+    
+    def data_to_score(df, bkps):
+        y_score = np.zeros(len(df))
+        total_mean = np.mean(df) # calculate mean of all values in timeseries
+        
+        prev_bkp = 0
+        
+        bkps.append(len(df)) # add the end of the df as breakpoint
+        
+        for bkp in bkps:
+            segment = df[prev_bkp, bkp] # define a segment between two breakpoints
+            segment_mean = np.mean(segment)
+            
+            # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
+            y_score[prev_bkp, bkp] = total_mean - segment_mean   
+            
+            prev_bkp = bkp
+        
+        return y_score            
+        
         
 class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod):
     
@@ -233,4 +304,13 @@ class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod):
     
     def __init__(self, **params):
         super().__init__(**params)
+
+class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod):
+    
+    def __init__(self, **params):
+        super().__init__(**params)
         
+class DoubleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod):
+    
+    def __init__(self, **params):
+        super().__init__(**params)

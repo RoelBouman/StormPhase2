@@ -83,20 +83,34 @@ def test_preprocess(df: pd.DataFrame) -> pd.DataFrame:
 
 #%% 
 
+"""
+# check which files have NaN values
 
-for i in range (0,74):
-    n_bkps = 2  # number of breakpoints
+for i, df in enumerate(X_train_dfs):
+    if df["BU_original"].isna().sum() != 0:
+        print(X_train_files[i])
+"""
+
+for i in range (78):
+    df = X_train_dfs[i]
+    signal = np.array(df['S_original']-df['BU_original'])
     
-    signal = np.array(X_train_dfs[i]['S_original'])
+    n = len(signal) # nr of samples
+    sigma = np.std(signal) * 3 #noise standard deviation
+    
+    # hyperparameters
+    model = "l1"
+    min_size = 100
+    jump = 10
+    penalty = np.log(n) * sigma**2
+    
     # detection
-    algo = rpt.Binseg(model="l2", min_size=100, jump=10).fit(signal)
-    result = algo.fit_predict(signal, n_bkps)
+    algo = rpt.Binseg(model=model, min_size=min_size, jump=jump)
+    result = algo.fit_predict(signal, pen = penalty)
     
     # display
     rpt.display(signal, result)
     plt.show()
-
-#X_dfs_preprocessed = [test_preprocess(df_X) for df_X in X_train_dfs]
 
 
 

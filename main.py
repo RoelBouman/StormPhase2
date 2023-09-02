@@ -12,7 +12,9 @@ from src.methods import SingleThresholdIsolationForest
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
+from src.io_functions import print_count_nan
 from src.evaluation import f_beta, cutoff_averaged_f_beta
+
 
 #%% set process variables
 
@@ -37,9 +39,9 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True
-testing_overwrite = True
-validation_overwrite = True
+training_overwrite = False
+testing_overwrite = False
+validation_overwrite = False
 
 #%% define hyperparemeters for preprocessing
 
@@ -51,6 +53,10 @@ SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20
 DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 
 SingleThresholdIF_hyperparameters = {"n_estimators": [1000]}
+
+SingleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
+
+DoubleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
 
 #%% load Train data
 # Do not load data if preprocessed data is available already
@@ -67,7 +73,6 @@ preprocessing_type = "basic"
 train_file_names = X_train_files
 
 X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
-
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
