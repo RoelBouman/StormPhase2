@@ -184,26 +184,26 @@ class IsolationForest:
         #y_dfs needs at least "label" column
 
         y_scores_dfs = []
-        no_nan_X_dfs = []
+        no_nan_diffs = []
         
         for i, X_df in enumerate(X_dfs):
             # remove all NaN in X, y and label_filters data
-            no_nan_X_df = X_df['diff_original'].dropna().values.reshape(-1,1)
+            no_nan_diff = X_df['diff_original'].dropna().values.reshape(-1,1)
             y_dfs[i] = y_dfs[i][X_df['diff_original'].notna()]
             
             for key in label_filters_for_all_cutoffs[i].keys():
                 label_filters_for_all_cutoffs[i][key] = label_filters_for_all_cutoffs[i][key][X_df['diff_original'].notna()]
                 
-            no_nan_X_dfs.append(no_nan_X_df)
+            no_nan_diffs.append(no_nan_diff)
             
         if fit:
             #flatten helper and fit model on that
-            flat_no_nan_X_dfs = [i for sl in no_nan_X_dfs for i in sl]
-            self.model.fit(flat_no_nan_X_dfs)
+            flat_no_nan_diffs = [i for sl in no_nan_diffs for i in sl]
+            self.model.fit(flat_no_nan_diffs)
         
-        for X_df in no_nan_X_dfs:
+        for diff in no_nan_diffs:
             # calculate and scale the scores
-            score = self.model.decision_function(X_df)
+            score = self.model.decision_function(diff)
             scaled_score = np.max(score) - (score - 1)
             y_scores_dfs.append(pd.DataFrame(scaled_score))
 
@@ -235,29 +235,27 @@ class BinarySegmentation:
 
         y_scores_dfs = []
         
-        no_nan_X_dfs = []
+        no_nan_diffs = []
         
         for i, X_df in enumerate(X_dfs):
             # remove all NaN in X, y and label_filters data
-            no_nan_X_df = X_df['diff_original'].dropna().values.reshape(-1,1)
+            no_nan_diff = X_df['diff_original'].dropna().values.reshape(-1,1)
             y_dfs[i] = y_dfs[i][X_df['diff_original'].notna()]
             
             for key in label_filters_for_all_cutoffs[i].keys():
                 label_filters_for_all_cutoffs[i][key] = label_filters_for_all_cutoffs[i][key][X_df['diff_original'].notna()]
                 
-            no_nan_X_dfs.append(no_nan_X_df)
+            no_nan_diffs.append(no_nan_diff)
         
-        for i, X_df in enumerate(no_nan_X_dfs):
-            signal = X_df['diff_original']
-            
+        for i, diff in enumerate(no_nan_diffs):           
             # defining the penalty
-            n = len(signal) # nr of samples
-            sigma = np.std(signal) * 3 # noise standard deviation
-            penalty = np.log(n) * sigma**2
+            n = len(diff) # nr of samples
+            sigma = np.std(diff)
+            penalty = np.log(n) * sigma**2 # https://arxiv.org/pdf/1801.00718.pdf
             
-            bkps = self.model.fit_predict(signal, pen = penalty)
+            bkps = self.model.fit_predict(diff, pen = penalty)
             
-            y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
+            y_scores_dfs.append(pd.DataFrame(self.data_to_score(diff, bkps)))
 
         if fit:
             self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
@@ -270,20 +268,18 @@ class BinarySegmentation:
         
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
     
-    def data_to_score(df, bkps):
+    def data_to_score(self, df, bkps):
         y_score = np.zeros(len(df))
         total_mean = np.mean(df) # calculate mean of all values in timeseries
         
         prev_bkp = 0
-        
-        bkps.append(len(df)) # add the end of the df as breakpoint
-        
+                
         for bkp in bkps:
-            segment = df[prev_bkp, bkp] # define a segment between two breakpoints
+            segment = df[prev_bkp:bkp] # define a segment between two breakpoints
             segment_mean = np.mean(segment)
             
             # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
-            y_score[prev_bkp, bkp] = total_mean - segment_mean   
+            y_score[prev_bkp:bkp] = total_mean - segment_mean   
             
             prev_bkp = bkp
         

@@ -9,6 +9,9 @@ from src.methods import SingleThresholdStatisticalProfiling
 from src.methods import DoubleThresholdStatisticalProfiling
 from src.methods import SingleThresholdIsolationForest
 
+from src.methods import SingleThresholdBinarySegmentation
+from src.methods import DoubleThresholdBinarySegmentation
+
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
@@ -39,9 +42,9 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False
-testing_overwrite = False
-validation_overwrite = False
+training_overwrite = True
+testing_overwrite = True
+validation_overwrite = True
 
 #%% define hyperparemeters for preprocessing
 
@@ -84,8 +87,8 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)

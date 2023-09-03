@@ -81,6 +81,24 @@ def test_preprocess(df: pd.DataFrame) -> pd.DataFrame:
                'S', 'BU', 'diff', 
                'missing']]
 
+
+def data_to_score(df, bkps):
+    y_score = np.zeros(len(df))
+    total_mean = np.mean(df) # calculate mean of all values in timeseries
+    
+    prev_bkp = 0
+        
+    for bkp in bkps:
+        segment = df[prev_bkp:bkp] # define a segment between two breakpoints
+        segment_mean = np.mean(segment)
+        
+        # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
+        y_score[prev_bkp:bkp] = total_mean - segment_mean   
+        
+        prev_bkp = bkp
+    
+    return y_score   
+
 #%% 
 
 """
@@ -91,26 +109,26 @@ for i, df in enumerate(X_train_dfs):
         print(X_train_files[i])
 """
 
-for i in range (78):
-    df = X_train_dfs[i]
-    signal = np.array(df['S_original']-df['BU_original'])
-    
-    n = len(signal) # nr of samples
-    sigma = np.std(signal) * 3 #noise standard deviation
-    
-    # hyperparameters
-    model = "l1"
-    min_size = 100
-    jump = 10
-    penalty = np.log(n) * sigma**2
-    
-    # detection
-    algo = rpt.Binseg(model=model, min_size=min_size, jump=jump)
-    result = algo.fit_predict(signal, pen = penalty)
-    
-    # display
-    rpt.display(signal, result)
-    plt.show()
+
+df = X_train_dfs[48]
+signal = np.array(df['S_original']-df['BU_original'])
+
+n = len(signal) # nr of samples
+sigma = np.std(signal) * 3 #noise standard deviation
+
+# hyperparameters
+model = "l1"
+min_size = 100
+jump = 10
+penalty = np.log(n) * sigma**2
+
+# detection
+algo = rpt.Binseg(model=model, min_size=min_size, jump=jump)
+result = algo.fit_predict(signal, pen = penalty)
+
+# display
+rpt.display(signal, result)
+plt.show()
 
 
 
