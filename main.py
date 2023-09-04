@@ -75,7 +75,7 @@ X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 train_file_names = X_train_files
 
-X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
@@ -87,8 +87,8 @@ X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_tra
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
-hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -110,10 +110,10 @@ for method_name in methods:
             
             model = methods[method_name](**hyperparameters, score_function=score_function)
             
-            y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs, label_filters_for_all_cutoffs_train)
+            y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train)
             optimal_threshold = model.optimal_threshold_
             
-            train_metric = cutoff_averaged_f_beta(y_train_dfs, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+            train_metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
             save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
             save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
@@ -147,7 +147,7 @@ X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 test_file_names = X_test_files
 
-X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Test evaluation:
     
@@ -175,9 +175,9 @@ for method_name in methods:
             
             model = load_model(model_path, hyperparameter_string)
             
-            y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs, label_filters_for_all_cutoffs_test)
+            y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test)
             
-            test_metric = cutoff_averaged_f_beta(y_test_dfs, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+            test_metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
             
             save_dataframe_list(y_test_scores_dfs, X_test_files, scores_path, overwrite=testing_overwrite)
             save_dataframe_list(y_test_predictions_dfs, X_test_files, predictions_path, overwrite=testing_overwrite)
@@ -208,7 +208,7 @@ X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 val_file_names = X_val_files
 
-X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Validation evaluation:
 
@@ -232,9 +232,9 @@ for method_name in methods:
         
         model = load_model(model_path, hyperparameter_string)
         
-        y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs, label_filters_for_all_cutoffs_val)
+        y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val)
         
-        val_metric = cutoff_averaged_f_beta(y_val_dfs, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        val_metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
         
         save_dataframe_list(y_val_scores_dfs, X_val_files, scores_path, overwrite=validation_overwrite)
         save_dataframe_list(y_val_predictions_dfs, X_val_files, predictions_path, overwrite=validation_overwrite)
