@@ -64,3 +64,11 @@ def load_metric(metric_path, hyperparameter_string):
     metric = metric_df.iloc[0,0]
     
     return metric
+
+def print_count_nan(df, column=None):
+    if column == None:
+        total_nan = df.isna().sum()
+    else:
+        total_nan = df[column].isna().sum()
+        
+    print(total_nan)

@@ -18,7 +18,7 @@ def f_beta(precision, recall, beta=1, eps=np.finfo(float).eps):
 
 def cutoff_averaged_f_beta(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, beta):
     all_cutoffs = label_filters_for_all_cutoffs[0].keys()
-    
+
     f_betas = 0
     for cutoffs in all_cutoffs:
         filtered_y, filtered_y_preds = filter_label_and_predictions_to_array(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, cutoffs)

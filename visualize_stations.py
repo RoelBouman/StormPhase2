@@ -9,7 +9,6 @@ import seaborn as sns
 from src.plot_functions import *
 
 
-
 #%% define environment variables
 data_folder = "data"
 result_folder = "results"
@@ -103,4 +102,5 @@ for station_ID in plot_station_IDs:
     plt.legend(fontsize=20, loc="lower left")
     
     fig.tight_layout()
+    #plt.savefig("station_plots/station_" + station_dataset_dict[station_ID] + "_" + station_ID)
     plt.show()

@@ -6,10 +6,18 @@ from sklearn.model_selection import ParameterGrid
 #import pandas as pd
 
 from src.methods import SingleThresholdStatisticalProfiling
+from src.methods import DoubleThresholdStatisticalProfiling
+from src.methods import SingleThresholdIsolationForest
+
+from src.methods import SingleThresholdBinarySegmentation
+from src.methods import DoubleThresholdBinarySegmentation
+
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
+from src.io_functions import print_count_nan
 from src.evaluation import f_beta, cutoff_averaged_f_beta
+
 
 #%% set process variables
 
@@ -34,11 +42,25 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False
-testing_overwrite = False
-validation_overwrite = False
+training_overwrite = True
+testing_overwrite = True
+validation_overwrite = True
+
+#%% define hyperparemeters for preprocessing
+
+preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
+
 #%% define hyperparameters per method:
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
+
+DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
+
+SingleThresholdIF_hyperparameters = {"n_estimators": [1000]}
+
+SingleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
+
+DoubleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
+
 #%% load Train data
 # Do not load data if preprocessed data is available already
 which_split = "Train"
@@ -53,16 +75,20 @@ X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 train_file_names = X_train_files
 
-X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, remove_missing)
-
+X_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
 
 #%% Training
 
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
+#methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
+#           "SingleThresholdIF":SingleThresholdIsolationForest}
+#hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
+#                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
+
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -71,6 +97,7 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
+        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
@@ -120,10 +147,10 @@ X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 test_file_names = X_test_files
 
-X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, remove_missing)
+X_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Test evaluation:
-
+    
 best_hyperparameters = {}
 
 for method_name in methods:
@@ -135,6 +162,7 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
+        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
@@ -180,7 +208,7 @@ X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 preprocessing_type = "basic"
 val_file_names = X_val_files
 
-X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, remove_missing)
+X_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Validation evaluation:
 
@@ -191,6 +219,7 @@ for method_name in methods:
     hyperparameters = best_hyperparameters[method_name]
     
     hyperparameter_string = str(hyperparameters)
+    hyperparameter_string = hyperparameter_string.replace(':', '')
     print(hyperparameter_string)
     
     scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)

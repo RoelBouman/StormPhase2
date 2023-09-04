@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+ #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 @author: rbouman
@@ -29,3 +29,4 @@ def filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_
     filtered_y_scores = filter_dfs_to_array(y_scores_dfs, df_filters).squeeze()
     
     return filtered_y_labels, filtered_y_scores
+    

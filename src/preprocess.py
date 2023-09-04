@@ -24,7 +24,7 @@ def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missi
         
         #labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
         
-        #labels_for_all_cutoffs[str(cutoffs)] = (((event_lengths["lengths"] > low_cutoff) & (event_lengths["lengths"] <= high_cutoff)) | event_lengths["lengths"] == 0)
+        #labels_for_all_cutoffs[str(cutoffs)] = (np.logical_or(np.logical_and(event_lengths["lengths"] > low_cutoff), (event_lengths["lengths"] <= high_cutoff)), event_lengths["lengths"] == 0)
     
     full_filters = {}
     for cutoffs in all_cutoffs:
@@ -79,24 +79,17 @@ def get_event_lengths(y_df):
             lengths[event_start_index:event_end_index] = event_end_index-event_start_index
         return pd.DataFrame({"lengths":lengths})
 
-def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
+def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
     Args:
         df (pd.DataFrame): Dataframe with at least the columns M_TIMESTAMP, S_original, BU_original and Flag.
+        subsequent_nr (int): Integer that represents the number of subsequent equal measurements
+        line_fit_quantiles (tuple): A tuple containing the lower and upper quantiles for the linear fit model
 
     Returns:
         pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
-    """
-    #Adjust timestamp that suffer from wrong data due to the clock moving when the time period exists in the data.
-    try:
-        df.loc[(df['M_TIMESTAMP']>='2020-03-29 03:00:00')
-              &(df['M_TIMESTAMP']< '2020-03-29 04:00:00'),'Flag'] = "5"
-        df.loc[(df['M_TIMESTAMP']>='2020-03-29 03:00:00')
-              &(df['M_TIMESTAMP']< '2020-03-29 04:00:00'),'S_original'] = list(df[df['M_TIMESTAMP']<'2020-03-29 00:03:00']['S_original'])[-1]
-    except:
-        pass
-    
+    """ 
     # Calculate difference and add label column.
     df['diff_original'] = df['S_original']-df['BU_original']
         
@@ -104,21 +97,39 @@ def preprocess_data(df: pd.DataFrame) -> pd.DataFrame:
     # 0 okay
     # 1 measurement missing
     # 2 bottom up missing
-    # Flag measurement as missing when 5 times after each other the same value expect 0
+    
     df['S'] = df['S_original'].copy()
     df['missing'] = 0
     df.loc[df['BU_original'].isnull(),'missing'] = 2
-    df.loc[(((df['S']==df['S'].shift(1)) & (df['S']==df['S'].shift(2))&(df['S']==df['S'].shift(3))&(df['S']==df['S'].shift(4)))|
-           ((df['S']==df['S'].shift(-1)) & (df['S']==df['S'].shift(1))&(df['S']==df['S'].shift(2))&(df['S']==df['S'].shift(3)))|
-           ((df['S']==df['S'].shift(-2)) & (df['S']==df['S'].shift(-1))&(df['S']==df['S'].shift(1))&(df['S']==df['S'].shift(2)))|
-           ((df['S']==df['S'].shift(-3)) & (df['S']==df['S'].shift(-2))&(df['S']==df['S'].shift(-1))&(df['S']==df['S'].shift(1)))|
-           ((df['S']==df['S'].shift(-4)) & (df['S']==df['S'].shift(-3))&(df['S']==df['S'].shift(-2))&(df['S']==df['S'].shift(-1))))&
-           df['S']!=0
-           ,'missing'] = 1
+    
+    prev_v = 0
+    prev_i = 0
+    count = subsequent_nr
+    
+    # Flag measurement as missing when # of times after each other the same value
+    for i, v in enumerate(df['S']):
+        # if value is same as previous, decrease count by 1
+        if v == prev_v:
+            count -= 1
+            continue
+            
+        # if not, check if previous count below zero, if so, set all missing values to 1
+        elif count <= 0:
+            df.loc[prev_i:i - 1, 'missing'] = 1
+            
+        # reset vars
+        prev_v = v
+        prev_i = i
+        count = subsequent_nr
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
     arr = df[df['missing']==0]
-    arr = arr[(arr['diff_original'] > np.percentile(arr['diff_original'],10)) & (arr['diff_original'] < np.percentile(arr['diff_original'],90))]
+    
+    low_quant, up_quant = lin_fit_quantiles
+    low_quant_value = np.percentile(arr['diff_original'],low_quant)
+    up_quant_value = np.percentile(arr['diff_original'],up_quant)
+    
+    arr = arr[np.logical_and(arr['diff_original'] > low_quant_value, arr['diff_original'] < up_quant_value)]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     df['BU'] = a*df['BU_original']+b
@@ -158,7 +169,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, remove_missing=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, remove_missing=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -173,10 +184,10 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     #preprocessing_type = "basic"
     
     preprocessed_file_name = os.path.join(preprocessed_pickles_folder, preprocessing_type + ".pickle")
-
+    
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing X data")
-        X_dfs_preprocessed = [preprocess_data(df) for df in X_dfs]
+        X_dfs_preprocessed = [preprocess_data(df, **hyperparameters) for df in X_dfs]
         
         os.makedirs(preprocessed_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
