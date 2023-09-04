@@ -79,7 +79,7 @@ def get_event_lengths(y_df):
             lengths[event_start_index:event_end_index] = event_end_index-event_start_index
         return pd.DataFrame({"lengths":lengths})
 
-def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
+def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
     Args:
@@ -91,23 +91,23 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
         pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
     """ 
     # Calculate difference and add label column.
-    df['diff_original'] = df['S_original']-df['BU_original']
+    X_df['diff_original'] = X_df['S_original']-X_df['BU_original']
         
     # Flag measurement mistakes BU and SO
     # 0 okay
     # 1 measurement missing
     # 2 bottom up missing
     
-    df['S'] = df['S_original'].copy()
-    df['missing'] = 0
-    df.loc[df['BU_original'].isnull(),'missing'] = 2
+    X_df['S'] = X_df['S_original'].copy()
+    X_df['missing'] = 0
+    X_df.loc[X_df['BU_original'].isnull(),'missing'] = 2
     
     prev_v = 0
     prev_i = 0
     count = subsequent_nr
     
     # Flag measurement as missing when # of times after each other the same value
-    for i, v in enumerate(df['S']):
+    for i, v in enumerate(X_df['S']):
         # if value is same as previous, decrease count by 1
         if v == prev_v:
             count -= 1
@@ -115,7 +115,7 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
             
         # if not, check if previous count below zero, if so, set all missing values to 1
         elif count <= 0:
-            df.loc[prev_i:i - 1, 'missing'] = 1
+            X_df.loc[prev_i:i - 1, 'missing'] = 1
             
         # reset vars
         prev_v = v
@@ -123,7 +123,7 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
         count = subsequent_nr
     
     # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
-    arr = df[df['missing']==0]
+    arr = X_df[X_df['missing']==0]
     
     low_quant, up_quant = lin_fit_quantiles
     low_quant_value = np.percentile(arr['diff_original'],low_quant)
@@ -132,16 +132,23 @@ def preprocess_data(df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tup
     arr = arr[np.logical_and(arr['diff_original'] > low_quant_value, arr['diff_original'] < up_quant_value)]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
-    df['BU'] = a*df['BU_original']+b
-    if df['S_original'].min()>0:
-        df['S'] = np.sign(df['BU'])*df['S']
-    df['diff'] = df['S']-df['BU']
+    X_df['BU'] = a*X_df['BU_original']+b
+    if X_df['S_original'].min()>0:
+        X_df['S'] = np.sign(X_df['BU'])*X_df['S']
+    X_df['diff'] = X_df['S']-X_df['BU']
+        
+    # remove all diff NaN in X and y
+    y_df = y_df[X_df['diff'].notna()]
+    X_df = X_df[X_df['diff'].notna()]
     
+    # reset index of dfs
+    y_df = y_df.reset_index()
+    X_df = X_df.reset_index()
     
-    return df[['M_TIMESTAMP', 
+    return X_df[['M_TIMESTAMP', 
                'S_original', 'BU_original', 'diff_original', 
                'S', 'BU', 'diff', 
-               'missing']]
+               'missing']], y_df
 
 
 def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurements: Union[pd.Series, np.ndarray]) -> Tuple[int]:
@@ -183,20 +190,30 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     #TODO: Name needs to change based on settings (NYI)
     #preprocessing_type = "basic"
     
-    preprocessed_file_name = os.path.join(preprocessed_pickles_folder, preprocessing_type + ".pickle")
+    preprocessed_file_name_X = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_X.pickle")
+    preprocessed_file_name_y = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_y.pickle")
     
-    if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
-        print("Preprocessing X data")
-        X_dfs_preprocessed = [preprocess_data(df, **hyperparameters) for df in X_dfs]
+    if preprocessing_overwrite or not os.path.exists(preprocessed_file_name_X):
+        print("Preprocessing X and y data")
+        dfs_preprocessed = [preprocess_data(X_df, y_df, **hyperparameters) for (X_df, y_df) in zip(X_dfs, y_dfs)]
+        
+        X_dfs_preprocessed = [X_df for (X_df, y_df) in dfs_preprocessed]
+        y_dfs_preprocessed = [y_df for (X_df, y_df) in dfs_preprocessed]
         
         os.makedirs(preprocessed_pickles_folder, exist_ok = True)
-        with open(preprocessed_file_name, 'wb') as handle:
+        with open(preprocessed_file_name_X, 'wb') as handle:
             pickle.dump(X_dfs_preprocessed, handle)
+        with open(preprocessed_file_name_y, 'wb') as handle:
+            pickle.dump(y_dfs_preprocessed, handle)
     else:
         print("Loading preprocessed X data")
-        with open(preprocessed_file_name, 'rb') as handle:
+        with open(preprocessed_file_name_X, 'rb') as handle:
             X_dfs_preprocessed = pickle.load(handle)
+        print("Loading preprocessed y data")
+        with open(preprocessed_file_name_y, 'rb') as handle:
+            y_dfs_preprocessed = pickle.load(handle)
 
+    # only happens for X, not for y
     if write_csv_intermediates:
         print("Writing CSV intermediates: X data")
         type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
@@ -209,7 +226,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(event_lengths_pickles_folder, str(all_cutoffs) + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing event lengths")
-        event_lengths = [get_event_lengths(df) for df in y_dfs]
+        event_lengths = [get_event_lengths(df) for df in y_dfs_preprocessed]
         
         os.makedirs(event_lengths_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
@@ -232,7 +249,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs, event_lengths, X_dfs_preprocessed)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
         
         os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
@@ -249,4 +266,4 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         save_dataframe_list(label_filters_for_all_cutoffs_dfs, file_names, type_label_filters_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
         
     
-    return X_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths
+    return X_dfs_preprocessed, y_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths
