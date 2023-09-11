@@ -32,7 +32,7 @@ metric_folder = os.path.join(result_folder, "metrics")
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
-beta = 10
+beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
