@@ -32,7 +32,7 @@ metric_folder = os.path.join(result_folder, "metrics")
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
-beta = 10
+beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
@@ -57,9 +57,9 @@ DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20
 
 SingleThresholdIF_hyperparameters = {"n_estimators": [1000]}
 
-SingleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
+SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 
-DoubleThresholdBS_hyperparameters = {"model": ['l1'], 'min_size': [100], "jump": [10]}
+SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 
 #%% load Train data
 # Do not load data if preprocessed data is available already
@@ -87,8 +87,8 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)

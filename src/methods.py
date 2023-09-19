@@ -186,7 +186,7 @@ class IsolationForest:
         y_scores_dfs = []
             
         if fit:
-            #flatten  and fit model on that
+            #flatten and fit model on that
             flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
             self.model.fit(flat_X_dfs_diff)
         
@@ -210,12 +210,16 @@ class IsolationForest:
     
 class BinarySegmentation:
     
-    def __init__(self, score_function=f_beta, **params):
+    def __init__(self, beta, quantiles, penalty, scaling=True, score_function=f_beta, **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
+        self.beta = beta
+        self.quantiles = quantiles
+        self.scaling = scaling
+        self.penalty = penalty        
         
-        # define IsolationForest model
+        # define Binseg model
         self.model = rpt.Binseg(**params)
         
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
@@ -224,14 +228,25 @@ class BinarySegmentation:
 
         y_scores_dfs = []
         
+        if self.scaling:
+            scaler = RobustScaler(quantile_range=self.quantiles)
+        
         for i, X_df in enumerate(X_dfs): 
             signal = X_df['diff'].values.reshape(-1,1)
             
-            # defining the penalty
-            n = len(signal) # nr of samples
-            sigma = np.std(signal)
-            penalty = np.log(n) * sigma**2 # https://arxiv.org/pdf/1801.00718.pdf
+            if self.scaling:
+                signal = scaler.fit_transform(signal)
             
+            # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
+            if self.penalty == 'lin':
+                n = len(signal)
+                penalty = n * self.beta
+            elif self.penalty == 'fused_lasso':
+                penalty = self.fused_lasso_penalty(signal, self.beta)
+            else:
+                # if no correct penalty selected, raise exception
+                raise Exception("Incorrect penalty")
+                
             bkps = self.model.fit_predict(signal, pen = penalty)
             
             y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
@@ -246,6 +261,14 @@ class BinarySegmentation:
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
         
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+    
+    def fused_lasso_penalty(self, signal, beta):
+        tot_sum = 0
+        mean = np.mean(signal)
+        for i in signal:
+            tot_sum += np.abs(i - mean)
+        
+        return beta * tot_sum
     
     def data_to_score(self, df, bkps):
         y_score = np.zeros(len(df))
@@ -285,7 +308,7 @@ class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMetho
     def __init__(self, **params):
         super().__init__(**params)
         
-class DoubleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod):
+class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod):
     
     def __init__(self, **params):
         super().__init__(**params)
