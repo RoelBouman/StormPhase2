@@ -16,7 +16,7 @@ from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
 from src.io_functions import print_count_nan
-from src.evaluation import f_beta, cutoff_averaged_f_beta
+from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats
 
 
 #%% set process variables
@@ -124,14 +124,29 @@ for method_name in methods:
             train_metric = load_metric(metric_path, hyperparameter_string)
             model = load_model(model_path, hyperparameter_string)
             
-
-            
+        absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
+        
+        average_min_difference = np.mean(absolute_min_differences)
+        average_max_difference = np.mean(absolute_max_differences)
+        
+        max_min_difference = np.max(absolute_min_differences)
+        max_max_difference = np.max(absolute_max_differences)
+        
+        
         print("Optimal threshold:" )
         print(model.optimal_threshold_)
         print("Train metric:" )
         print(train_metric)
-
-
+        print("Average differences:")
+        print("Min:")
+        print(average_min_difference)
+        print("Max:")
+        print(average_max_difference)
+        print("Max differences:")
+        print("Min:")
+        print(max_min_difference)
+        print("Max:")
+        print(max_max_difference)
 
 #%% Test
 #%% load Test data
