@@ -131,6 +131,7 @@ predictions/
 thresholds/
 <<<<<<< HEAD
 station_plots/
+binseg_plots/
 =======
 *.pickle
 >>>>>>> bdbe9b26a1c0ae046b5289245e79cdf7ac9b5caf
