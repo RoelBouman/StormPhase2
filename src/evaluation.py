@@ -46,11 +46,11 @@ def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
 def calculate_unsigned_absolute_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
     X_mins, X_maxs, X_pred_mins, X_pred_maxs = calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column)
     
-    absolute_min_differences = [X_min - X_pred_min for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
-    absolute_max_differences = [X_max - X_pred_max for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
+    absolute_min_differences = [np.abs(X_min - X_pred_min) for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
+    absolute_max_differences = [np.abs(X_max - X_pred_max) for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
     
-    relative_min_differences = [(absolute_min_difference+X_min)/X_min for X_min, absolute_min_difference in zip(X_mins, absolute_min_differences)]
-    relative_max_differences = [(absolute_max_difference-X_max)/X_max for X_max, absolute_max_difference in zip(X_maxs, absolute_max_differences)]
+    relative_min_differences = [(absolute_min_difference)/(X_max-X_min) for X_min, X_max, absolute_min_difference in zip(X_mins, X_maxs, absolute_min_differences)]
+    relative_max_differences = [(absolute_max_difference)/(X_max-X_min) for X_min, X_max, absolute_max_difference in zip(X_mins, X_maxs, absolute_max_differences)]
 
     return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
 
