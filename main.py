@@ -87,8 +87,11 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
-hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
+#methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+#hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+
+methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
+hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -205,8 +208,29 @@ for method_name in methods:
             highest_test_metric = test_metric
             best_hyperparameters[method_name] = hyperparameters
             
+        
+        absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
+        
+        average_min_difference = np.mean(absolute_min_differences)
+        average_max_difference = np.mean(absolute_max_differences)
+        
+        max_min_difference = np.max(absolute_min_differences)
+        max_max_difference = np.max(absolute_max_differences)
+        
+        
+
         print("Test metric:" )
         print(test_metric)
+        print("Average differences:")
+        print("Min:")
+        print(average_min_difference)
+        print("Max:")
+        print(average_max_difference)
+        print("Max differences:")
+        print("Min:")
+        print(max_min_difference)
+        print("Max:")
+        print(max_max_difference)
     
 
 #%% Validation
@@ -258,6 +282,24 @@ for method_name in methods:
     else:
         val_metric = load_metric(metric_path, hyperparameter_string)
             
-    print("Validation metric:" )
-    print(val_metric)
+        absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
+        
+        average_min_difference = np.mean(absolute_min_differences)
+        average_max_difference = np.mean(absolute_max_differences)
+        
+        max_min_difference = np.max(absolute_min_differences)
+        max_max_difference = np.max(absolute_max_differences)
+        
+        print("Val metric:" )
+        print(val_metric)
+        print("Average differences:")
+        print("Min:")
+        print(average_min_difference)
+        print("Max:")
+        print(average_max_difference)
+        print("Max differences:")
+        print("Min:")
+        print(max_min_difference)
+        print("Max:")
+        print(max_max_difference)
     
