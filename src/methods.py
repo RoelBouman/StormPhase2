@@ -189,11 +189,17 @@ class IsolationForest:
             #flatten and fit model on that
             flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
             self.model.fit(flat_X_dfs_diff)
-        
+            
+        scores = []
+        station_maxs = []
         for X_df in X_dfs:
+            scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
+            station_maxs.append(np.max(scores[-1]))
+        max_score = max(station_maxs)
+            
+        for score in scores:
             # calculate and scale the scores
-            score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
-            scaled_score = np.max(score) - (score - 1)
+            scaled_score = max_score - (score - 1)
             y_scores_dfs.append(pd.DataFrame(scaled_score))
 
         if fit:
