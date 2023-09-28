@@ -77,7 +77,7 @@ class DoubleThresholdMethod:
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
             pred[np.logical_or(np.squeeze(score) <= lower_threshold, np.squeeze(score) >= upper_threshold)] = 1
-            y_prediction_dfs.append(pd.Series(pred).to_frame())
+            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
             
         return y_prediction_dfs
 
@@ -134,7 +134,7 @@ class SingleThresholdMethod:
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
             pred[np.abs(np.squeeze(score)) >= threshold] = 1
-            y_prediction_dfs.append(pd.Series(pred).to_frame())
+            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
             
         return y_prediction_dfs
 

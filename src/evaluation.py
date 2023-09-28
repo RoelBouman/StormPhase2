@@ -25,3 +25,32 @@ def cutoff_averaged_f_beta(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, be
         f_betas += fbeta_score(filtered_y, filtered_y_preds, beta=beta)
         
     return f_betas/len(all_cutoffs)
+
+def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
+    
+    X_mins, X_pred_mins = [], []
+    X_maxs, X_pred_maxs = [], []
+    
+    for X_df, y_df, y_pred_df in zip(X_dfs, y_dfs, y_pred_dfs):
+        X_normal = X_df[y_df["label"]==0][load_column]
+        X_pred_normal = X_df[y_pred_df["label"]==0][load_column]
+
+        X_mins.append(X_normal.min())
+        X_maxs.append(X_normal.max())
+
+        X_pred_mins.append(X_pred_normal.min())
+        X_pred_maxs.append(X_pred_normal.max())
+        
+    return X_mins, X_maxs, X_pred_mins, X_pred_maxs
+
+def calculate_unsigned_absolute_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
+    X_mins, X_maxs, X_pred_mins, X_pred_maxs = calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column)
+    
+    absolute_min_differences = [np.abs(X_min - X_pred_min) for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
+    absolute_max_differences = [np.abs(X_max - X_pred_max) for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
+    
+    relative_min_differences = [(absolute_min_difference)/(X_max-X_min) for X_min, X_max, absolute_min_difference in zip(X_mins, X_maxs, absolute_min_differences)]
+    relative_max_differences = [(absolute_max_difference)/(X_max-X_min) for X_min, X_max, absolute_max_difference in zip(X_mins, X_maxs, absolute_max_differences)]
+
+    return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
+
