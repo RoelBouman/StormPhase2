@@ -16,7 +16,7 @@ from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric
 from src.io_functions import load_batch, load_model, load_metric
 from src.io_functions import print_count_nan
-from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats
+from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRF_table
 
 
 #%% set process variables
@@ -90,6 +90,7 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
 #hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
+SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)]}
 methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
 hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
 
@@ -135,11 +136,14 @@ for method_name in methods:
         max_min_difference = np.max(absolute_min_differences)
         max_max_difference = np.max(absolute_max_differences)
         
+        PRF_table = calculate_PRF_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
         
         print("Optimal threshold:" )
         print(model.optimal_threshold_)
         print("Train metric:" )
         print(train_metric)
+        print("PRF table:")
+        print(PRF_table)
         print("Average differences:")
         print("Min:")
         print(average_min_difference)
@@ -217,10 +221,12 @@ for method_name in methods:
         max_min_difference = np.max(absolute_min_differences)
         max_max_difference = np.max(absolute_max_differences)
         
-        
+        PRF_table = calculate_PRF_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
 
         print("Test metric:" )
         print(test_metric)
+        print("PRF table:")
+        print(PRF_table)
         print("Average differences:")
         print("Min:")
         print(average_min_difference)
@@ -290,8 +296,12 @@ for method_name in methods:
         max_min_difference = np.max(absolute_min_differences)
         max_max_difference = np.max(absolute_max_differences)
         
+        PRF_table = calculate_PRF_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        
         print("Val metric:" )
         print(val_metric)
+        print("PRF table:")
+        print(PRF_table)
         print("Average differences:")
         print("Min:")
         print(average_min_difference)
