@@ -8,7 +8,7 @@ Created on Thu Jun 29 14:02:32 2023
 import numpy as np
 import pandas as pd
 
-from sklearn.metrics import fbeta_score, precision_score, recall_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score, roc_auc_score
 
 from .helper_functions import filter_label_and_predictions_to_array
 
@@ -28,26 +28,29 @@ def cutoff_averaged_f_beta(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, be
         
     return f_betas/len(all_cutoffs)
 
-def calculate_PRF_table(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, beta):
+def calculate_PRFAUC_table(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, beta):
     all_cutoffs = label_filters_for_all_cutoffs[0].keys()
 
     precisions = []
     recalls = []
     fbetas = []
+    AUCs =[]
     
     for cutoffs in all_cutoffs:
         filtered_y, filtered_y_preds = filter_label_and_predictions_to_array(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, cutoffs)
         precisions.append(precision_score(filtered_y, filtered_y_preds))
         recalls.append(recall_score(filtered_y, filtered_y_preds))
         fbetas.append(fbeta_score(filtered_y, filtered_y_preds, beta=beta))
+        AUCs.append(roc_auc_score(filtered_y, filtered_y_preds))
         
-    PRF_table = pd.DataFrame(index=all_cutoffs)
+    PRFAUC_table = pd.DataFrame(index=all_cutoffs)
     
-    PRF_table["precision"] = precisions
-    PRF_table["recall"] = recalls
-    PRF_table["F"+str(beta)] = fbetas
+    PRFAUC_table["precision"] = precisions
+    PRFAUC_table["recall"] = recalls
+    PRFAUC_table["F"+str(beta)] = fbetas
+    PRFAUC_table["ROC/AUC"] = AUCs
     
-    return PRF_table
+    return PRFAUC_table
 
 def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
     
