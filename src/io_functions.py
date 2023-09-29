@@ -39,7 +39,7 @@ def load_batch(data_folder, which_split):
         
     return X_dfs, y_dfs, file_names
 
-def save_model(model, model_path, hyperparameter_string, overwrite=False):
+def save_model(model, model_path, hyperparameter_string):
     os.makedirs(model_path, exist_ok=True)
     full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
     with open(full_file_name, 'wb') as handle:
@@ -51,19 +51,43 @@ def load_model(model_path, hyperparameter_string):
         model = pickle.load(handle)
     return model
     
-def save_metric(metric, metric_path, hyperparameter_string, overwrite=False):
+def save_metric(metric, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)
     metric_df = pd.DataFrame([metric])
     
     metric_df.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=False, header=False)
-    
-    
+
 def load_metric(metric_path, hyperparameter_string):
     metric_df = pd.read_csv(os.path.join(metric_path, hyperparameter_string+".csv"), header=None)
     
     metric = metric_df.iloc[0,0]
     
     return metric
+
+def save_PRFAUC_table(PRFAUC_table, metric_path, hyperparameter_string):
+    os.makedirs(metric_path, exist_ok=True)
+    
+    PRFAUC_table.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=True, header=True)
+
+def load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string):
+    PRFAUC_table = pd.read_csv(os.path.join(PRFAUC_table_path, hyperparameter_string+".csv"))
+    PRFAUC_table.set_index("Cutoffs", inplace=True)
+
+    return PRFAUC_table
+
+def save_minmax_stats(minmax_stats, metric_path, hyperparameter_string):
+    os.makedirs(metric_path, exist_ok=True)    
+    stats_df = pd.DataFrame(minmax_stats).T
+    
+    stats_df.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=False, header=False)
+    
+def load_minmax_stats(minmax_stats_path, hyperparameter_string):
+    stats_df = pd.read_csv(os.path.join(minmax_stats_path, hyperparameter_string+".csv"), header=None)
+
+    absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = stats_df.iloc[:,0].tolist(), stats_df.iloc[:,1].tolist(), stats_df.iloc[:,2].tolist(), stats_df.iloc[:,3].tolist()
+    
+    return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
+
 
 def print_count_nan(df, column=None):
     if column == None:

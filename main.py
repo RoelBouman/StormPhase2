@@ -13,12 +13,12 @@ from src.methods import SingleThresholdBinarySegmentation
 from src.methods import DoubleThresholdBinarySegmentation
 
 from src.preprocess import preprocess_per_batch_and_write
-from src.io_functions import save_dataframe_list, save_model, save_metric
-from src.io_functions import load_batch, load_model, load_metric
+from src.io_functions import save_dataframe_list, save_model, save_metric, save_PRFAUC_table, save_minmax_stats
+from src.io_functions import load_batch, load_model, load_metric, load_PRFAUC_table, load_minmax_stats
 from src.io_functions import print_count_nan
 from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
-
+from src.reporting_functions import print_metrics_and_stats
 #%% set process variables
 
 data_folder = "data"
@@ -36,13 +36,15 @@ beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
+report_metrics_and_stats = True
+
 remove_missing = True
 
 write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True
+training_overwrite = True #if
 testing_overwrite = True
 validation_overwrite = True
 
@@ -62,7 +64,6 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model
 DoubleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 
 #%% load Train data
-# Do not load data if preprocessed data is available already
 which_split = "Train"
 
 print("Split: Train")
@@ -106,7 +107,9 @@ for method_name in methods:
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
         predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
-        metric_path = os.path.join(metric_folder, which_split, method_name)
+        fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, method_name)
+        PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name)
+        minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name)
         model_path = os.path.join(model_folder, method_name)
         
         full_model_path = os.path.join(model_path, hyperparameter_string+".pickle")
@@ -117,47 +120,36 @@ for method_name in methods:
             y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train)
             optimal_threshold = model.optimal_threshold_
             
-            train_metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+            metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+            
+            minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
+            absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+            PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
             save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
             save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
             
-            save_metric(train_metric, metric_path, hyperparameter_string, overwrite=training_overwrite)
-            save_model(model, model_path, hyperparameter_string, overwrite=training_overwrite)
+            save_metric(metric, fscore_path, hyperparameter_string)
+            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_string)
+            save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_string)
+            
+            save_model(model, model_path, hyperparameter_string)
         else:
-            train_metric = load_metric(metric_path, hyperparameter_string)
+            print("Model already evaluated, loading results instead:")
+            metric = load_metric(fscore_path, hyperparameter_string)
+            PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string)
+            minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_string)
+            
             model = load_model(model_path, hyperparameter_string)
             
-        absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
-        
-        average_min_difference = np.mean(absolute_min_differences)
-        average_max_difference = np.mean(absolute_max_differences)
-        
-        max_min_difference = np.max(absolute_min_differences)
-        max_max_difference = np.max(absolute_max_differences)
-        
-        PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
-        
         print("Optimal threshold:" )
         print(model.optimal_threshold_)
-        print("Train metric:" )
-        print(train_metric)
-        print("PRF table:")
-        print(PRFAUC_table)
-        print("Average differences:")
-        print("Min:")
-        print(average_min_difference)
-        print("Max:")
-        print(average_max_difference)
-        print("Max differences:")
-        print("Min:")
-        print(max_min_difference)
-        print("Max:")
-        print(max_max_difference)
+            
+        if report_metrics_and_stats:
+            print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
 #%% Test
 #%% load Test data
-# Do not load data if preprocessed data is available already
 which_split = "Test"
 print("Split: Test")
 X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
@@ -189,10 +181,12 @@ for method_name in methods:
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
         predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
-        metric_path = os.path.join(metric_folder, which_split, method_name)
+        fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, method_name)
+        PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name)
+        minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name)
         model_path = os.path.join(model_folder, method_name)
         
-        full_metric_path = os.path.join(metric_path, hyperparameter_string+".csv")
+        full_metric_path = os.path.join(fscore_path, hyperparameter_string+".csv")
         if testing_overwrite or not os.path.exists(full_metric_path):
             
             model = load_model(model_path, hyperparameter_string)
@@ -201,47 +195,32 @@ for method_name in methods:
             
             test_metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
             
+            minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
+            absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+            PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+
             save_dataframe_list(y_test_scores_dfs, X_test_files, scores_path, overwrite=testing_overwrite)
             save_dataframe_list(y_test_predictions_dfs, X_test_files, predictions_path, overwrite=testing_overwrite)
             
-            save_metric(test_metric, metric_path, hyperparameter_string, overwrite=testing_overwrite)
+            save_metric(test_metric, fscore_path, hyperparameter_string)
+            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_string)
+            save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_string)
         else:
-            test_metric = load_metric(metric_path, hyperparameter_string)
+            print("Model already evaluated, loading results instead:")
+            test_metric = load_metric(fscore_path, hyperparameter_string)
+            PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string)
+            minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_string)
             
         if test_metric > highest_test_metric:
             highest_test_metric = test_metric
             best_hyperparameters[method_name] = hyperparameters
             
-        
-        absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
-        
-        average_min_difference = np.mean(absolute_min_differences)
-        average_max_difference = np.mean(absolute_max_differences)
-        
-        max_min_difference = np.max(absolute_min_differences)
-        max_max_difference = np.max(absolute_max_differences)
-        
-        PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
-
-        print("Test metric:" )
-        print(test_metric)
-        print("PRF table:")
-        print(PRFAUC_table)
-        print("Average differences:")
-        print("Min:")
-        print(average_min_difference)
-        print("Max:")
-        print(average_max_difference)
-        print("Max differences:")
-        print("Min:")
-        print(max_min_difference)
-        print("Max:")
-        print(max_max_difference)
+        if report_metrics_and_stats:
+            print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
     
 
 #%% Validation
 #%% load Validation data
-# Do not load data if preprocessed data is available already
 which_split = "Validation"
 print("Split: Validation")
 X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
@@ -269,10 +248,12 @@ for method_name in methods:
     
     scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
     predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
-    metric_path = os.path.join(metric_folder, which_split, method_name)
+    fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, method_name)
+    PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name)
+    minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name)
     model_path = os.path.join(model_folder, method_name)
     
-    full_metric_path = os.path.join(metric_path, hyperparameter_string+".csv")
+    full_metric_path = os.path.join(fscore_path, hyperparameter_string+".csv")
     if validation_overwrite or not os.path.exists(full_metric_path):
         
         model = load_model(model_path, hyperparameter_string)
@@ -281,35 +262,22 @@ for method_name in methods:
         
         val_metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
         
+        minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
+        absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+        PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        
         save_dataframe_list(y_val_scores_dfs, X_val_files, scores_path, overwrite=validation_overwrite)
         save_dataframe_list(y_val_predictions_dfs, X_val_files, predictions_path, overwrite=validation_overwrite)
         
-        save_metric(val_metric, metric_path, hyperparameter_string, overwrite=validation_overwrite)
+        save_metric(val_metric, fscore_path, hyperparameter_string)
+        save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_string)
+        save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_string)
     else:
-        val_metric = load_metric(metric_path, hyperparameter_string)
+        print("Model already evaluated, loading results instead:")
+        val_metric = load_metric(fscore_path, hyperparameter_string)
+        PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string)
+        minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_string)
             
-    absolute_min_differences, absolute_max_differences, _, _ = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
-    
-    average_min_difference = np.mean(absolute_min_differences)
-    average_max_difference = np.mean(absolute_max_differences)
-    
-    max_min_difference = np.max(absolute_min_differences)
-    max_max_difference = np.max(absolute_max_differences)
-    
-    PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
-    
-    print("Val metric:" )
-    print(val_metric)
-    print("PRF table:")
-    print(PRFAUC_table)
-    print("Average differences:")
-    print("Min:")
-    print(average_min_difference)
-    print("Max:")
-    print(average_max_difference)
-    print("Max differences:")
-    print("Min:")
-    print(max_min_difference)
-    print("Max:")
-    print(max_max_difference)
+    if report_metrics_and_stats:
+        print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
     

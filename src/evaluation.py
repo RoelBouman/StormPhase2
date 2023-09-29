@@ -44,6 +44,7 @@ def calculate_PRFAUC_table(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, be
         AUCs.append(roc_auc_score(filtered_y, filtered_y_preds))
         
     PRFAUC_table = pd.DataFrame(index=all_cutoffs)
+    PRFAUC_table.index.name = "Cutoffs"
     
     PRFAUC_table["precision"] = precisions
     PRFAUC_table["recall"] = recalls
