@@ -176,14 +176,10 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, remove_missing=False):
-    # ensures preprocessing with different hyperparameters is saved in different folders
-    hyperparameter_string = str(hyperparameters)
-    hyperparameter_string = hyperparameter_string.replace(':', '')
-    
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, remove_missing=False):
     #Set preprocessing settings here:
-    preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split, hyperparameter_string)
-    preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split, hyperparameter_string)
+    preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
+    preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
 
     #TODO: preprocess_data needs rework
     # - The following need to be toggles/settings:
@@ -193,6 +189,10 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
 
     #TODO: Name needs to change based on settings (NYI)
     #preprocessing_type = "basic"
+    
+    # ensures preprocessing with different hyperparameters is saved in different folders
+    hyperparameter_string = str(hyperparameters)
+    preprocessing_type = hyperparameter_string.replace(':', '')
     
     preprocessed_file_name_X = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_X.pickle")
     preprocessed_file_name_y = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_y.pickle")

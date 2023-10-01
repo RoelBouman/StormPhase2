@@ -79,10 +79,10 @@ X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
-preprocessing_type = "basic"
+#preprocessing_type = "basic"
 train_file_names = X_train_files
 
-X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% Detect anomalies/switch events
 # Save results, make saving of scores optional, as writing this many results is fairly costly
@@ -167,10 +167,10 @@ X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
-preprocessing_type = "basic"
+#preprocessing_type = "basic"
 test_file_names = X_test_files
 
-X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Test evaluation:
     
@@ -238,10 +238,10 @@ X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
-preprocessing_type = "basic"
+#preprocessing_type = "basic"
 val_file_names = X_val_files
 
-X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_type, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
+X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val, = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 
 #%% run Validation evaluation:
 
