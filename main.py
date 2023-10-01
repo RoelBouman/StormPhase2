@@ -45,13 +45,13 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
 
 training_overwrite = True
 testing_overwrite = True
 validation_overwrite = True
 
-visualize_predictions = True # if true, plot several stations and their predictions
+visualize_predictions = False # if true, plot several stations and their predictions
 which_stations = None # if None, plot random stations (otherwise use indexes of stations)
 
 #%% define hyperparemeters for preprocessing
