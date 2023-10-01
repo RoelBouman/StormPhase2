@@ -16,6 +16,9 @@ from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric, save_PRFAUC_table, save_minmax_stats
 from src.io_functions import load_batch, load_model, load_metric, load_PRFAUC_table, load_minmax_stats
 from src.io_functions import print_count_nan
+
+from src.plot_functions import plot_predictions
+
 from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
 from src.reporting_functions import print_metrics_and_stats
@@ -44,9 +47,12 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True #if
+training_overwrite = True
 testing_overwrite = True
 validation_overwrite = True
+
+visualize_predictions = True # if true, plot several stations and their predictions
+which_stations = None # if None, plot random stations (otherwise use indexes of stations)
 
 #%% define hyperparemeters for preprocessing
 
@@ -134,6 +140,9 @@ for method_name in methods:
             save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_string)
             
             save_model(model, model_path, hyperparameter_string)
+            
+            if visualize_predictions:
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, method_name, hyperparameter_string, which_stations)
         else:
             print("Model already evaluated, loading results instead:")
             metric = load_metric(fscore_path, hyperparameter_string)
