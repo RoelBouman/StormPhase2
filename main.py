@@ -45,13 +45,13 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 training_overwrite = True
 testing_overwrite = True
 validation_overwrite = True
 
-visualize_predictions = False # if true, plot several stations and their predictions
+visualize_predictions = True # if true, plot several stations and their predictions
 which_stations = None # if None, plot random stations (otherwise use indexes of stations)
 
 #%% define hyperparemeters for preprocessing
@@ -142,7 +142,7 @@ for method_name in methods:
             save_model(model, model_path, hyperparameter_string)
             
             if visualize_predictions:
-                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, method_name, hyperparameter_string, which_stations)
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, optimal_threshold, X_train_files, method_name, hyperparameter_string, which_stations)
         else:
             print("Model already evaluated, loading results instead:")
             metric = load_metric(fscore_path, hyperparameter_string)
