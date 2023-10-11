@@ -294,6 +294,7 @@ class BinarySegmentation:
         return y_score            
         
         
+        
 class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod):
     
     def __init__(self, **params):
@@ -318,3 +319,46 @@ class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMetho
     
     def __init__(self, **params):
         super().__init__(**params)
+        
+    
+class StackEnsemble:
+    
+    def __init__(self, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
+        
+        self.__is_ensemble = True
+        
+        self.method_classes = method_classes
+        self.method_hyperparameter_dicts = method_hyperparameter_dict_list
+        self.cutoffs_per_method = cutoffs_per_method
+        self.score_function = f_beta
+        
+        self.models = [method(**hyperparameters) for method, hyperparameters in zip(method_classes, method_hyperparameter_dict_list)]
+        
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+        self._scores = []
+        self._predictions = []
+        for model in self.models:
+            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit)
+            self._scores.append(scores)
+            self._predictions.append(predictions)
+            
+        return(self._combine_predictions(self._predictions))
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+        self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        
+    def _combine_predictions(self, prediction_list):
+        combined_predictions = []
+        n_stations = len(prediction_list[0])
+        for i in range(n_stations):
+            station_i_prediction_dfs = []
+            for prediction_dfs in prediction_list:
+                station_i_prediction_dfs.append(prediction_dfs[i])
+            combined_predictions.append(pd.DataFrame(np.logical_or.reduce(station_i_prediction_dfs), columns=["label"]))
+        return combined_predictions
+    
+class NaiveStackEnsemble(StackEnsemble):
+    def __init__(self, method_classes, method_hyperparameter_dicts, all_cutoffs, score_function=f_beta):
+        cutoffs_per_method = [all_cutoffs]*len(method_classes)
+        
+        super().__init__(method_classes, method_hyperparameter_dicts, cutoffs_per_method, score_function=f_beta)
