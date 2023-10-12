@@ -14,7 +14,11 @@ from .evaluation import f_beta
 class DoubleThresholdMethod:
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
+        all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        if not all([used_cutoff in self.all_cutoffs for used_cutoff in self.used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(self.used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(all_cutoffs))
+                
         
         self.evaluation_score_ = {}
         self.precision_ = {}
@@ -31,9 +35,9 @@ class DoubleThresholdMethod:
         max_threshold = 0
         
         #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate pr curve for each cutoffs in all_cutoffs
+        #calculate pr curve for each cutoffs in used_cutoffs
         #combine pr curves according to score function and objective to find optimum
-        for cutoffs in self.all_cutoffs_:
+        for cutoffs in self.used_cutoffs:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
             # use only negative values if searching for the lower threshold, only positive if searching for the upper threshold 
@@ -59,11 +63,11 @@ class DoubleThresholdMethod:
         self.interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
         
         self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
-        for cutoffs in self.all_cutoffs_:
+        for cutoffs in self.used_cutoffs:
              
              self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
         
-        self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
+        self.mean_score_over_cutoffs_ /= len(self.used_cutoffs)
         
         max_score_index = np.argmax(self.mean_score_over_cutoffs_)
         
@@ -86,7 +90,11 @@ class SingleThresholdMethod:
     #score function must accept precision and recall as input
     #score function should be maximized
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
+        all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        if not all([used_cutoff in self.all_cutoffs for used_cutoff in self.used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(self.used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(all_cutoffs))
+                
         
         self.evaluation_score_ = {}
         self.precision_ = {}
@@ -97,9 +105,9 @@ class SingleThresholdMethod:
         min_threshold = 0
         max_threshold = 0
         #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate pr curve for each cutoffs in all_cutoffs
+        #calculate pr curve for each cutoffs in used_cutoffs
         #combine pr curves according to score function and objective to find optimum
-        for cutoffs in self.all_cutoffs_:
+        for cutoffs in self.used_cutoffs:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
             filtered_y_scores = np.abs(filtered_y_scores)
@@ -119,11 +127,11 @@ class SingleThresholdMethod:
         self.interpolation_range_ = np.linspace(min_threshold, max_threshold, interpolation_range_length)
         
         self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
-        for cutoffs in self.all_cutoffs_:
+        for cutoffs in self.used_cutoffs:
              
              self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
         
-        self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
+        self.mean_score_over_cutoffs_ /= len(self.used_cutoffs)
         
         max_score_index = np.argmax(self.mean_score_over_cutoffs_)
         
@@ -141,11 +149,12 @@ class SingleThresholdMethod:
 
 class StatisticalProfiling:
     
-    def __init__(self, score_function=f_beta, quantiles=(10,90)):
+    def __init__(self, score_function=f_beta, quantiles=(10,90), used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)]):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
-        self.quantiles=quantiles
-        self.score_function=score_function
+        self.quantiles = quantiles
+        self.score_function = score_function
+        self.used_cutoffs = used_cutoffs
     
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         #X_dfs needs at least "diff" column
@@ -171,10 +180,11 @@ class StatisticalProfiling:
 
 class IsolationForest:
     
-    def __init__(self, score_function=f_beta, **params):
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
+        self.used_cutoffs = used_cutoffs
         
         # define IsolationForest model
         self.model = IF(**params)
@@ -216,7 +226,7 @@ class IsolationForest:
     
 class BinarySegmentation:
     
-    def __init__(self, beta, quantiles, penalty, scaling=True, score_function=f_beta, **params):
+    def __init__(self, beta, quantiles, penalty, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], scaling=True, score_function=f_beta, **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
@@ -224,6 +234,7 @@ class BinarySegmentation:
         self.quantiles = quantiles
         self.scaling = scaling
         self.penalty = penalty        
+        self.used_cutoffs = used_cutoffs
         
         # define Binseg model
         self.model = rpt.Binseg(**params)
