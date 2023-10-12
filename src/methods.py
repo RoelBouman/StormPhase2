@@ -7,17 +7,18 @@ from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
 from sklearn.ensemble import IsolationForest as IF
 
-from .helper_functions import filter_label_and_scores_to_array
+from .helper_functions import filter_label_and_scores_to_array, find_max_score_index_for_cutoffs
 from .evaluation import f_beta
+
 
 
 class DoubleThresholdMethod:
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
         if not all([used_cutoff in self.all_cutoffs for used_cutoff in self.used_cutoffs]):
-            raise ValueError("Not all used cutoffs: " +str(self.used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(all_cutoffs))
+            raise ValueError("Not all used cutoffs: " +str(self.used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
                 
         
         self.evaluation_score_ = {}
@@ -35,9 +36,9 @@ class DoubleThresholdMethod:
         max_threshold = 0
         
         #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate pr curve for each cutoffs in used_cutoffs
+        #calculate pr curve for each cutoffs in all_cutoffs
         #combine pr curves according to score function and objective to find optimum
-        for cutoffs in self.used_cutoffs:
+        for cutoffs in self.all_cutoffs:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
             # use only negative values if searching for the lower threshold, only positive if searching for the upper threshold 
@@ -62,15 +63,19 @@ class DoubleThresholdMethod:
         
         self.interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
         
-        self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
-        for cutoffs in self.used_cutoffs:
+        #self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
+        self.scores_over_cutoffs_ = np.zeros((len(self.interpolation_range_), len(self.all_cutoffs)))
+        for i, cutoffs in enumerate(self.all_cutoffs):
              
-             self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
+             self.scores_over_cutoffs_[:,i] = np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
         
-        self.mean_score_over_cutoffs_ /= len(self.used_cutoffs)
+        self.scores_over_cutoffs_ = pd.DataFrame(self.scores_over_cutoffs_, columns=[str(cutoffs) for cutoffs in self.all_cutoffs])
         
-        max_score_index = np.argmax(self.mean_score_over_cutoffs_)
+        #self.mean_score_over_cutoffs_ = np.mean(self.scores_over_cutoffs_, axis=1)
         
+        #max_score_index = np.argmax(self.mean_score_over_cutoffs_)
+        
+        max_score_index = find_max_score_index_for_cutoffs(self.used_cutoffs)
         return self.interpolation_range_[max_score_index]
 
     def predict_from_scores_dfs(self, y_scores_dfs, thresholds):

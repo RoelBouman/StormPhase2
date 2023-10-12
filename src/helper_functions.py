@@ -29,4 +29,12 @@ def filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_
     filtered_y_scores = filter_dfs_to_array(y_scores_dfs, df_filters).squeeze()
     
     return filtered_y_labels, filtered_y_scores
+
+def find_max_score_index_for_cutoffs(scores_over_cutoffs, used_cutoffs):
+
+    column_labels = [str(cutoff) for cutoff in used_cutoffs]
+    mean_score_over_cutoffs = np.mean(scores_over_cutoffs[column_labels], axis=1)
     
+    max_score_index = np.argmax(mean_score_over_cutoffs)
+
+    return max_score_index
