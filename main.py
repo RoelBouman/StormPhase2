@@ -12,6 +12,9 @@ from src.methods import SingleThresholdIsolationForest
 from src.methods import SingleThresholdBinarySegmentation
 from src.methods import DoubleThresholdBinarySegmentation
 
+from src.methods import StackEnsemble
+from src.methods import NaiveStackEnsemble
+
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_model, save_metric, save_PRFAUC_table, save_minmax_stats
 from src.io_functions import load_batch, load_model, load_metric, load_PRFAUC_table, load_minmax_stats
@@ -53,6 +56,7 @@ validation_overwrite = True
 preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
 
 #%% define hyperparameters per method:
+
 SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 
 DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
@@ -63,6 +67,7 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model
 
 DoubleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 
+NaiveStackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":[all_cutoffs]}
 #%% load Train data
 which_split = "Train"
 
@@ -91,9 +96,14 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
 #hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
-methods = {"DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
-hyperparameter_dict = {"DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
+#DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+#SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+#methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
+#hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
+
+methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
+hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
+
 
 for method_name in methods:
     print("Now training: " + method_name)

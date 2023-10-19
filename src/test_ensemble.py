@@ -7,7 +7,7 @@ Created on Tue Oct 10 18:09:06 2023
 """
 
 from src.methods import NaiveStackEnsemble
-
+import numpy as np
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
@@ -36,7 +36,7 @@ cutoffs_per_method = [[(288, 4032), (4032, np.inf)], [(0, 24), (24, 288)]]
 
 method_hyperparameter_dict_list = [{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]
 
-ensemble = NaiveStackEnsemble([SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling], method_hyperparameter_dict_list, cutoffs_per_method)
+ensemble = StackEnsemble([SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling], method_hyperparameter_dict_list, cutoffs_per_method)
 
 y_train_predictions_dfs = ensemble.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, fit=True)
 
