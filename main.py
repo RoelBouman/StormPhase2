@@ -91,9 +91,9 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
 #hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)]}
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
+DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+methods = {"DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
+hyperparameter_dict = {"DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -118,7 +118,6 @@ for method_name in methods:
             model = methods[method_name](**hyperparameters, score_function=score_function)
             
             y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train)
-            optimal_threshold = model.optimal_threshold_
             
             metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
@@ -142,8 +141,13 @@ for method_name in methods:
             
             model = load_model(model_path, hyperparameter_string)
             
-        print("Optimal threshold:" )
-        print(model.optimal_threshold_)
+        if model.is_single_threshold_method: 
+            
+            print("Optimal threshold:" )
+            print(model.optimal_threshold)
+        else: 
+            print("Optimal thresholds:")
+            print((model.optimal_negative_threshold, model.optimal_positive_threshold))
             
         if report_metrics_and_stats:
             print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
@@ -216,7 +220,7 @@ for method_name in methods:
             best_hyperparameters[method_name] = hyperparameters
             
         if report_metrics_and_stats:
-            print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+            print_metrics_and_stats(test_metric, minmax_stats, PRFAUC_table)
     
 
 #%% Validation
@@ -279,5 +283,5 @@ for method_name in methods:
         minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_string)
             
     if report_metrics_and_stats:
-        print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+        print_metrics_and_stats(val_metric, minmax_stats, PRFAUC_table)
     
