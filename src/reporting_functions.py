@@ -16,7 +16,7 @@ def print_metrics_and_stats(metric, minmax_stats, PRFAUC_table):
         max_min_difference = np.max(absolute_min_differences)
         max_max_difference = np.max(absolute_max_differences)
         
-        print("Train metric:" )
+        print("metric:" )
         print(metric)
         print("PRF table:")
         print(PRFAUC_table)
