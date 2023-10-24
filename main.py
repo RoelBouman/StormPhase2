@@ -1,5 +1,6 @@
 #%% Load packages
 import os
+import sqlite3
 
 import numpy as np
 from sklearn.model_selection import ParameterGrid
@@ -51,6 +52,16 @@ training_overwrite = True #if
 testing_overwrite = True
 validation_overwrite = True
 
+#%% set up database
+
+DBFILE = "hyperparameter_to_hash.db"
+database_exists = os.path.exists(DBFILE)
+
+db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
+db_cursor = db_connection.cursor()
+if not database_exists:
+    db_cursor.execute("CREATE TABLE hyperparameter_filenames(filename PRIMARY KEY, parameters)")
+    
 #%% define hyperparemeters for preprocessing
 
 preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
@@ -93,16 +104,16 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-#methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-#hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
 #DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
 #SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
 #methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
 
-methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
-hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
+#methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
+#hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
 
 for method_name in methods:
@@ -112,23 +123,27 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
-        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
-        scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
-        predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_string)
+        ### NEW
+        model = methods[method_name](model_folder, **hyperparameters, score_function=score_function)
+        
+        hyperparameter_hash = model.get_hyperparameter_hash()
+        hyperparameter_hash_filename = model.get_filename()
+        
+        scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_hash)
+        predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_hash)
         fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, method_name)
         PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name)
         minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name)
-        model_path = os.path.join(model_folder, method_name)
         
-        full_model_path = os.path.join(model_path, hyperparameter_string+".pickle")
+        full_model_path = os.path.join(model_folder, hyperparameter_hash_filename)
+        
+    
         if training_overwrite or not os.path.exists(full_model_path):
             
-            model = methods[method_name](**hyperparameters, score_function=score_function)
-            
             y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train)
-            
+
             metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
             minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
@@ -138,18 +153,20 @@ for method_name in methods:
             save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
             save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
             
-            save_metric(metric, fscore_path, hyperparameter_string)
-            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_string)
-            save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_string)
+            save_metric(metric, fscore_path, hyperparameter_hash)
+            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+            save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
             
-            save_model(model, model_path, hyperparameter_string)
+            #save_model(model, model_path, hyperparameter_string)
+            model.save_model()
         else:
             print("Model already evaluated, loading results instead:")
-            metric = load_metric(fscore_path, hyperparameter_string)
-            PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string)
-            minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_string)
+            metric = load_metric(fscore_path, hyperparameter_hash)
+            PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+            minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
             
-            model = load_model(model_path, hyperparameter_string)
+            #Model is instead loaded at model inititiation 
+            #model.load_model(model_path, hyperparameter_string)
             
         if model.is_single_threshold_method: 
             
@@ -190,7 +207,6 @@ for method_name in methods:
     
     for hyperparameters in hyperparameter_list:
         hyperparameter_string = str(hyperparameters)
-        hyperparameter_string = hyperparameter_string.replace(':', '')
         print(hyperparameter_string)
         
         scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
@@ -257,7 +273,6 @@ for method_name in methods:
     hyperparameters = best_hyperparameters[method_name]
     
     hyperparameter_string = str(hyperparameters)
-    hyperparameter_string = hyperparameter_string.replace(':', '')
     print(hyperparameter_string)
     
     scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_string)
