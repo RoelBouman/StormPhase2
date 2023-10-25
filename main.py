@@ -107,16 +107,21 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
 #hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-#DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
-#SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
-#methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
-#hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
+# DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+# SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+# methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
+# hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
 
 # SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 # DoubleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 # methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "DoubleThresholdBS":DoubleThresholdBinarySegmentation}
 # hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "DoubleThresholdBS":DoubleThresholdBS_hyperparameters}
 
+import time
+
+start_time = time.time()
+
+NaiveStackEnsemble_hyperparameters = {"method_classes":[[DoubleThresholdStatisticalProfiling, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'quantiles': (5, 94)},{'quantiles': (5, 94)}]], "all_cutoffs":[all_cutoffs]}
 methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
 hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
@@ -136,18 +141,19 @@ for method_name in methods:
         hyperparameter_hash = model.get_hyperparameter_hash()
         hyperparameter_hash_filename = model.get_filename()
         
-        scores_path = os.path.join(score_folder, which_split, model_name, hyperparameter_hash)
-        predictions_path = os.path.join(predictions_folder, which_split, model_name, hyperparameter_hash)
+        base_scores_path = os.path.join(score_folder, which_split)
+        base_predictions_path = predictions_path = os.path.join(predictions_folder, which_split)
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
         fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name)
         PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name)
         minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name)
         
         full_model_path = os.path.join(model_folder, model_name, hyperparameter_hash_filename)
         
-    
         if training_overwrite or not os.path.exists(full_model_path):
             
-            y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train)
+            y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=training_overwrite)
 
             metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
@@ -155,8 +161,8 @@ for method_name in methods:
             absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
             PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
             
-            save_dataframe_list(y_train_scores_dfs, X_train_files, scores_path, overwrite=training_overwrite)
-            save_dataframe_list(y_train_predictions_dfs, X_train_files, predictions_path, overwrite=training_overwrite)
+            save_dataframe_list(y_train_scores_dfs, X_train_files, os.path.join(scores_path, "stations"), overwrite=training_overwrite)
+            save_dataframe_list(y_train_predictions_dfs, X_train_files, os.path.join(predictions_path, "stations"), overwrite=training_overwrite)
             
             save_metric(metric, fscore_path, hyperparameter_hash)
             save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
@@ -174,27 +180,21 @@ for method_name in methods:
             
             #Model is instead loaded at model inititiation 
             #model.load_model(model_path, hyperparameter_string)
-            
-        if hasattr(model, "is_single_threshold_method"):
-            if model.is_single_threshold_method: 
-            
-                print("Optimal threshold:" )
-                print(model.optimal_threshold)
-            else: 
-                print("Optimal thresholds:")
-                print((model.optimal_negative_threshold, model.optimal_positive_threshold))
-        elif hasattr(model, "is_ensemble"):
-            print("optimal_thresholds per method in ensemble:")
-            for submodel in model.models:
-                print(submodel.method_name)
-                if submodel.is_single_threshold_method: 
+        
+            #check if loaded model has saved thresholds for correct optimization cutoff set:
+            #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
+            if not hasattr(model, "is_ensemble"):
+                if not model.check_cutoffs(all_cutoffs):
+                    print("Loaded model has wrong cutoffs, recalculating thresholds...")
+                    model.calculate_thresholds(all_cutoffs, score_function)
                 
-                    print(submodel.optimal_threshold)
-                else: 
-                    print((submodel.optimal_negative_threshold, model.optimal_positive_threshold))
+        model.report_thresholds()
+                    
         if report_metrics_and_stats:
             print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
+end_time = time.time()
+print("Elapsed time: " + str(end_time-start_time))
 #%% Test
 #%% load Test data
 which_split = "Test"
