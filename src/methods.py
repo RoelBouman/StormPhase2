@@ -161,61 +161,6 @@ class SingleThresholdMethod(ThresholdMethod):
         return y_prediction_dfs
     
     
-class SaveableModel(ABC):
-    
-    def __init__(self, base_models_path):
-        self.base_models_path = base_models_path
-        self.filename = self.get_filename()
-        
-        method_path = os.path.join(self.base_models_path, self.method_name)
-        full_path = os.path.join(method_path, self.filename)
-        
-        if os.path.exists(full_path):
-            self.load_model()
-    
-    @abstractmethod
-    def get_model_string(self):
-        pass
-    
-    # @property
-    # @abstractmethod
-    # def method_name(self):
-    #     pass
-
-    def get_hyperparameter_hash(self):
-        model_string = self.get_model_string()
-        
-        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
-        hyperparameter_hash = sha256(model_string).hexdigest()
-        
-        return hyperparameter_hash
-
-    def get_filename(self):
-        
-        filename = self.get_hyperparameter_hash() + ".pickle"
-            
-        return filename
-    
-    def save_model(self, overwrite=True):
-        method_path = os.path.join(self.base_models_path, self.method_name)
-        os.makedirs(method_path, exist_ok=True)
-        full_path = os.path.join(method_path, self.filename)
-        
-        if not os.path.exists(full_path) or overwrite:
-            f = open(full_path, 'wb')
-            pickle.dump(self.__dict__, f, 2)
-            f.close()
-        
-    def load_model(self):
-        method_path = os.path.join(self.base_models_path, self.method_name)
-        full_path = os.path.join(method_path, self.filename)
-        f = open(full_path, 'rb')
-        tmp_dict = pickle.load(f)
-        f.close()          
-        
-        self.__dict__.update(tmp_dict) 
-
-
 class StatisticalProfiling:
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
@@ -395,6 +340,61 @@ class BinarySegmentation:
         
         return model_string
         
+class SaveableModel(ABC):
+    
+    def __init__(self, base_models_path):
+        self.base_models_path = base_models_path
+        self.filename = self.get_filename()
+        
+        method_path = os.path.join(self.base_models_path, self.method_name)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if os.path.exists(full_path):
+            self.load_model()
+    
+    @abstractmethod
+    def get_model_string(self):
+        pass
+    
+    # @property
+    # @abstractmethod
+    # def method_name(self):
+    #     pass
+
+    def get_hyperparameter_hash(self):
+        model_string = self.get_model_string()
+        
+        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
+        hyperparameter_hash = sha256(model_string).hexdigest()
+        
+        return hyperparameter_hash
+
+    def get_filename(self):
+        
+        filename = self.get_hyperparameter_hash() + ".pickle"
+            
+        return filename
+    
+    def save_model(self, overwrite=True):
+        method_path = os.path.join(self.base_models_path, self.method_name)
+        os.makedirs(method_path, exist_ok=True)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if not os.path.exists(full_path) or overwrite:
+            f = open(full_path, 'wb')
+            pickle.dump(self.__dict__, f, 2)
+            f.close()
+        
+    def load_model(self):
+        method_path = os.path.join(self.base_models_path, self.method_name)
+        full_path = os.path.join(method_path, self.filename)
+        f = open(full_path, 'rb')
+        tmp_dict = pickle.load(f)
+        f.close()          
+        
+        self.__dict__.update(tmp_dict) 
+        
+        
 class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, **params):
@@ -438,30 +438,37 @@ class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMetho
         DoubleThresholdMethod.__init__(self)
         self.method_name = "DoubleThresholdBS"
         SaveableModel.__init__(self, base_models_path)
+        
+    
+class StackEnsemble(SaveableModel):
+    
+    def __init__(self, base_models_path, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
 
-        
-    
-class StackEnsemble:
-    
-    def __init__(self, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
-        
-        self.__is_ensemble = True
+        self.is_ensemble = True
         
         self.method_classes = method_classes
         self.method_hyperparameter_dicts = method_hyperparameter_dict_list
         self.cutoffs_per_method = cutoffs_per_method
         self.score_function = f_beta
         
-        self.models = [method(**hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        self.models = [method(base_models_path, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        
+        self.method_name = " + ".join([model.method_name for model in self.models])
+        #self.method_name = "StackEnsemble"
+        
+        super().__init__(base_models_path)
+
         
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
         self._scores = []
+        temp_scores = []
         self._predictions = []
         for model in self.models:
             scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit)
-            self._scores.append(scores)
+            temp_scores.append(scores)
             self._predictions.append(predictions)
-            
+        
+        self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
         return(self._scores, self._combine_predictions(self._predictions))
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
@@ -477,8 +484,32 @@ class StackEnsemble:
             combined_predictions.append(pd.DataFrame(np.logical_or.reduce(station_i_prediction_dfs), columns=["label"]))
         return combined_predictions
     
+    def get_model_string(self):
+        
+        model_string = str(self.method_hyperparameter_dicts).encode("utf-8")
+        
+        return model_string
+    
+    def save_model(self, overwrite=True):
+        for model in self.models:
+            model.save_model(overwrite)
+        
+        method_path = os.path.join(self.base_models_path, self.method_name)
+        os.makedirs(method_path, exist_ok=True)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if not os.path.exists(full_path) or overwrite:
+            f = open(full_path, 'wb')
+            pickle.dump(self.__dict__, f, 2)
+            f.close()
+        
+    # def load_model(self):
+    #     for model in self.models:
+    #         model.load_model()
+    #     super().load_model()
+    
 class NaiveStackEnsemble(StackEnsemble):
-    def __init__(self, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
+    def __init__(self, base_models_path, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
         cutoffs_per_method = [all_cutoffs]*len(method_classes)
         
-        super().__init__(method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
+        super().__init__(base_models_path, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)

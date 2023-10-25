@@ -17,9 +17,9 @@ from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
 
 from src.preprocess import preprocess_per_batch_and_write
-from src.io_functions import save_dataframe_list, save_model, save_metric, save_PRFAUC_table, save_minmax_stats
-from src.io_functions import load_batch, load_model, load_metric, load_PRFAUC_table, load_minmax_stats
-from src.io_functions import print_count_nan
+from src.io_functions import save_dataframe_list, save_metric, save_PRFAUC_table, save_minmax_stats
+from src.io_functions import load_batch, load_metric, load_PRFAUC_table, load_minmax_stats
+#from src.io_functions import print_count_nan
 from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
 from src.reporting_functions import print_metrics_and_stats
@@ -48,7 +48,7 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True #if
+training_overwrite = False #if
 testing_overwrite = True
 validation_overwrite = True
 
@@ -60,7 +60,7 @@ database_exists = os.path.exists(DBFILE)
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
 db_cursor = db_connection.cursor()
 if not database_exists:
-    db_cursor.execute("CREATE TABLE hyperparameter_filenames(filename PRIMARY KEY, parameters)")
+    db_cursor.execute("CREATE TABLE hyperparameter_filenames(filename PRIMARY KEY, parameters, method)")
     
 #%% define hyperparemeters for preprocessing
 
@@ -104,16 +104,21 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+#methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+#hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
 #DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
 #SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
 #methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP":DoubleThresholdStatisticalProfiling}
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters}
 
-#methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
-#hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
+# SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
+# DoubleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
+# methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "DoubleThresholdBS":DoubleThresholdBinarySegmentation}
+# hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "DoubleThresholdBS":DoubleThresholdBS_hyperparameters}
+
+methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
+hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
 
 for method_name in methods:
@@ -127,17 +132,17 @@ for method_name in methods:
         
         ### NEW
         model = methods[method_name](model_folder, **hyperparameters, score_function=score_function)
-        
+        model_name = model.method_name
         hyperparameter_hash = model.get_hyperparameter_hash()
         hyperparameter_hash_filename = model.get_filename()
         
-        scores_path = os.path.join(score_folder, which_split, method_name, hyperparameter_hash)
-        predictions_path = os.path.join(predictions_folder, which_split, method_name, hyperparameter_hash)
-        fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, method_name)
-        PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name)
-        minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name)
+        scores_path = os.path.join(score_folder, which_split, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(predictions_folder, which_split, model_name, hyperparameter_hash)
+        fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name)
+        PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name)
+        minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name)
         
-        full_model_path = os.path.join(model_folder, hyperparameter_hash_filename)
+        full_model_path = os.path.join(model_folder, model_name, hyperparameter_hash_filename)
         
     
         if training_overwrite or not os.path.exists(full_model_path):
@@ -159,6 +164,8 @@ for method_name in methods:
             
             #save_model(model, model_path, hyperparameter_string)
             model.save_model()
+            db_cursor.execute("INSERT OR REPLACE INTO hyperparameter_filenames VALUES (?, ?, ?)", (hyperparameter_hash, hyperparameter_string, method_name))
+            db_connection.commit()
         else:
             print("Model already evaluated, loading results instead:")
             metric = load_metric(fscore_path, hyperparameter_hash)
@@ -168,14 +175,23 @@ for method_name in methods:
             #Model is instead loaded at model inititiation 
             #model.load_model(model_path, hyperparameter_string)
             
-        if model.is_single_threshold_method: 
+        if hasattr(model, "is_single_threshold_method"):
+            if model.is_single_threshold_method: 
             
-            print("Optimal threshold:" )
-            print(model.optimal_threshold)
-        else: 
-            print("Optimal thresholds:")
-            print((model.optimal_negative_threshold, model.optimal_positive_threshold))
-            
+                print("Optimal threshold:" )
+                print(model.optimal_threshold)
+            else: 
+                print("Optimal thresholds:")
+                print((model.optimal_negative_threshold, model.optimal_positive_threshold))
+        elif hasattr(model, "is_ensemble"):
+            print("optimal_thresholds per method in ensemble:")
+            for submodel in model.models:
+                print(submodel.method_name)
+                if submodel.is_single_threshold_method: 
+                
+                    print(submodel.optimal_threshold)
+                else: 
+                    print((submodel.optimal_negative_threshold, model.optimal_positive_threshold))
         if report_metrics_and_stats:
             print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
