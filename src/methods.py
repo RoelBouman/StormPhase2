@@ -104,9 +104,9 @@ class DoubleThresholdMethod(ThresholdMethod):
             
             self.scores_calculated = True
 
-        self.calculate_thresholds(used_cutoffs, score_function)
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
-    def calculate_thresholds(self, used_cutoffs, score_function):
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
         self.negative_scores = self._calculate_interpolated_scores(self.negative_threshold_recall, self.negative_threshold_precision, used_cutoffs, score_function)
         self.positive_scores = self._calculate_interpolated_scores(self.positive_threshold_recall, self.positive_threshold_precision, used_cutoffs, score_function)
         
@@ -149,9 +149,9 @@ class SingleThresholdMethod(ThresholdMethod):
             
             self.score_calculated = True
         
-        self.calculate_thresholds(used_cutoffs, score_function)
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
-    def calculate_thresholds(self, used_cutoffs, score_function):
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
         self.scores = self._calculate_interpolated_scores(self.recall, self.precision, used_cutoffs, score_function)
         
         max_score_index = self._find_max_score_index_for_cutoffs(self.scores, used_cutoffs)
@@ -175,6 +175,7 @@ class SingleThresholdMethod(ThresholdMethod):
 class ScoreCalculator:
     def __init__(self):
         pass
+    
     def check_cutoffs(self, cutoffs):
         return cutoffs == self.used_cutoffs
         
@@ -251,33 +252,54 @@ class IsolationForest(ScoreCalculator):
         # define IsolationForest model
         self.model = IF(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-
-        y_scores_dfs = []
+        
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
+        
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        os.makedirs(scores_path, exist_ok=True)
+        os.makedirs(predictions_path, exist_ok=True)
+        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
+        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+            with open(scores_path, 'rb') as handle:
+                y_scores_dfs = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+        else:
+            y_scores_dfs = []
+                
+            if fit:
+                #flatten and fit model on that
+                flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
+                self.model.fit(flat_X_dfs_diff)
+                
+            scores = []
+            station_maxs = []
+            for X_df in X_dfs:
+                scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
+                station_maxs.append(np.max(scores[-1]))
+            max_score = max(station_maxs)
+                
+            for score in scores:
+                # calculate and scale the scores
+                scaled_score = max_score - (score - 1)
+                y_scores_dfs.append(pd.DataFrame(scaled_score))
+    
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+            y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-        if fit:
-            #flatten and fit model on that
-            flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
-            self.model.fit(flat_X_dfs_diff)
-            
-        scores = []
-        station_maxs = []
-        for X_df in X_dfs:
-            scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
-            station_maxs.append(np.max(scores[-1]))
-        max_score = max(station_maxs)
-            
-        for score in scores:
-            # calculate and scale the scores
-            scaled_score = max_score - (score - 1)
-            y_scores_dfs.append(pd.DataFrame(scaled_score))
-
-        if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
-            
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
+            with open(scores_path, 'wb') as handle:
+                pickle.dump(y_scores_dfs, handle)
+            with open(predictions_path, 'wb') as handle:
+                pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
@@ -306,39 +328,60 @@ class BinarySegmentation(ScoreCalculator):
         # define Binseg model
         self.model = rpt.Binseg(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-
-        y_scores_dfs = []
         
-        if self.scaling:
-            scaler = RobustScaler(quantile_range=self.quantiles)
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
         
-        for i, X_df in enumerate(X_dfs): 
-            signal = X_df['diff'].values.reshape(-1,1)
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        os.makedirs(scores_path, exist_ok=True)
+        os.makedirs(predictions_path, exist_ok=True)
+        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
+        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+            with open(scores_path, 'rb') as handle:
+                y_scores_dfs = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+        else:
+            y_scores_dfs = []
             
             if self.scaling:
-                signal = scaler.fit_transform(signal)
+                scaler = RobustScaler(quantile_range=self.quantiles)
             
-            # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
-            if self.penalty == 'lin':
-                n = len(signal)
-                penalty = n * self.beta
-            elif self.penalty == 'fused_lasso':
-                penalty = self.fused_lasso_penalty(signal, self.beta)
-            else:
-                # if no correct penalty selected, raise exception
-                raise Exception("Incorrect penalty")
+            for i, X_df in enumerate(X_dfs): 
+                signal = X_df['diff'].values.reshape(-1,1)
                 
-            bkps = self.model.fit_predict(signal, pen = penalty)
+                if self.scaling:
+                    signal = scaler.fit_transform(signal)
+                
+                # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
+                if self.penalty == 'lin':
+                    n = len(signal)
+                    penalty = n * self.beta
+                elif self.penalty == 'fused_lasso':
+                    penalty = self.fused_lasso_penalty(signal, self.beta)
+                else:
+                    # if no correct penalty selected, raise exception
+                    raise Exception("Incorrect penalty")
+                    
+                bkps = self.model.fit_predict(signal, pen = penalty)
+                
+                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
+    
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+            y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-            y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
-
-        if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
-            
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
+            with open(scores_path, 'wb') as handle:
+                pickle.dump(y_scores_dfs, handle)
+            with open(predictions_path, 'wb') as handle:
+                pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
@@ -426,10 +469,6 @@ class SaveableModel(ABC):
             f = open(full_path, 'wb')
             pickle.dump(self.__dict__, f, 2)
             f.close()
-        
-  
-        
-
         
     def load_model(self):
         

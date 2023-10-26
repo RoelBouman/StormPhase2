@@ -54,13 +54,13 @@ validation_overwrite = True
 
 #%% set up database
 
-DBFILE = "hyperparameter_to_hash.db"
+DBFILE = "experiment_results.db"
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
 db_cursor = db_connection.cursor()
 if not database_exists:
-    db_cursor.execute("CREATE TABLE hyperparameter_filenames(filename PRIMARY KEY, parameters, method)")
+    db_cursor.execute("CREATE TABLE experiment_results(filename PRIMARY KEY, parameters, method, metric)")
     
 #%% define hyperparemeters for preprocessing
 
@@ -79,6 +79,9 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model
 DoubleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 
 NaiveStackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":[all_cutoffs]}
+
+StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
+
 #%% load Train data
 which_split = "Train"
 
@@ -117,14 +120,18 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 # methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "DoubleThresholdBS":DoubleThresholdBinarySegmentation}
 # hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "DoubleThresholdBS":DoubleThresholdBS_hyperparameters}
 
-import time
+# NaiveStackEnsemble_hyperparameters = {"method_classes":[[DoubleThresholdStatisticalProfiling, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'quantiles': (5, 94)},{'quantiles': (5, 94)}]], "all_cutoffs":[all_cutoffs]}
+# methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
+# hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
-start_time = time.time()
 
-NaiveStackEnsemble_hyperparameters = {"method_classes":[[DoubleThresholdStatisticalProfiling, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'quantiles': (5, 94)},{'quantiles': (5, 94)}]], "all_cutoffs":[all_cutoffs]}
-methods = {"NaiveStackEnsemble":NaiveStackEnsemble}
-hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
+SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_cutoffs]}
+SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
+StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
+
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSP":SingleThresholdStatisticalProfiling, "StackEnsemble":StackEnsemble}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSP":SingleThresholdSP_hyperparameters, "StackEnsemble":StackEnsemble_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -170,7 +177,9 @@ for method_name in methods:
             
             #save_model(model, model_path, hyperparameter_string)
             model.save_model()
-            db_cursor.execute("INSERT OR REPLACE INTO hyperparameter_filenames VALUES (?, ?, ?)", (hyperparameter_hash, hyperparameter_string, method_name))
+            
+            #save metric to database for easy querying:
+            db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?)", (hyperparameter_hash, hyperparameter_string, method_name, metric))
             db_connection.commit()
         else:
             print("Model already evaluated, loading results instead:")
@@ -186,6 +195,7 @@ for method_name in methods:
             if not hasattr(model, "is_ensemble"):
                 if not model.check_cutoffs(all_cutoffs):
                     print("Loaded model has wrong cutoffs, recalculating thresholds...")
+                    model.used_cutoffs = all_cutoffs
                     model.calculate_thresholds(all_cutoffs, score_function)
                 
         model.report_thresholds()
@@ -193,8 +203,6 @@ for method_name in methods:
         if report_metrics_and_stats:
             print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
-end_time = time.time()
-print("Elapsed time: " + str(end_time-start_time))
 #%% Test
 #%% load Test data
 which_split = "Test"
