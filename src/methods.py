@@ -427,11 +427,12 @@ class BinarySegmentation(ScoreCalculator):
         
 class SaveableModel(ABC):
     
-    def __init__(self, base_models_path):
+    def __init__(self, base_models_path, preprocessing_hash):
         self.base_models_path = base_models_path
+        self.preprocessing_hash = preprocessing_hash
         self.filename = self.get_filename()
         
-        method_path = os.path.join(self.base_models_path, self.method_name)
+        method_path = os.path.join(self.base_models_path, self.method_name, preprocessing_hash)
         full_path = os.path.join(method_path, self.filename)
         
         if os.path.exists(full_path):
@@ -461,7 +462,7 @@ class SaveableModel(ABC):
         return filename
     
     def save_model(self, overwrite=True):
-        method_path = os.path.join(self.base_models_path, self.method_name)
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         os.makedirs(method_path, exist_ok=True)
         full_path = os.path.join(method_path, self.filename)
         
@@ -475,7 +476,7 @@ class SaveableModel(ABC):
         #manually ensure that used_cutoffs is not overwritten:
         used_cutoffs = self.used_cutoffs
         
-        method_path = os.path.join(self.base_models_path, self.method_name)
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         full_path = os.path.join(method_path, self.filename)
         f = open(full_path, 'rb')
         tmp_dict = pickle.load(f)
@@ -485,63 +486,65 @@ class SaveableModel(ABC):
         
         self.used_cutoffs = used_cutoffs
         
+
+
+class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdSP"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DoubleThresholdSP"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdIF"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+
+class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdBS"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DoubleThresholdBS"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+        
+    
 class SaveableEnsemble(SaveableModel):
     def load_model(self):
-        method_path = os.path.join(self.base_models_path, self.method_name)
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         full_path = os.path.join(method_path, self.filename)
         f = open(full_path, 'rb')
         tmp_dict = pickle.load(f)
         f.close()      
         self.__dict__.update(tmp_dict) 
-
-class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
-    
-    def __init__(self, base_models_path, **params):
-        super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
-        self.method_name = "SingleThresholdSP"
-        SaveableModel.__init__(self, base_models_path)
-
         
-class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod, SaveableModel):
-    
-    def __init__(self, base_models_path, **params):
-        super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
-        self.method_name = "DoubleThresholdSP"
-        SaveableModel.__init__(self, base_models_path)
-
-        
-class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
-    
-    def __init__(self, base_models_path, **params):
-        super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
-        self.method_name = "SingleThresholdIF"
-        SaveableModel.__init__(self, base_models_path)
-
-
-class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod, SaveableModel):
-    
-    def __init__(self, base_models_path, **params):
-        super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
-        self.method_name = "SingleThresholdBS"
-        SaveableModel.__init__(self, base_models_path)
-
-        
-class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
-    
-    def __init__(self, base_models_path, **params):
-        super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
-        self.method_name = "DoubleThresholdBS"
-        SaveableModel.__init__(self, base_models_path)
-        
-    
 class StackEnsemble(SaveableEnsemble):
     
-    def __init__(self, base_models_path, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
+    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
 
         self.is_ensemble = True
         
@@ -549,13 +552,14 @@ class StackEnsemble(SaveableEnsemble):
         self.method_hyperparameter_dicts = method_hyperparameter_dict_list
         self.cutoffs_per_method = cutoffs_per_method
         self.score_function = f_beta
+        self.preprocessing_hash = preprocessing_hash
         
-        self.models = [method(base_models_path, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
         
         self.method_name = " + ".join([model.method_name for model in self.models])
         #self.method_name = "StackEnsemble"
         
-        super().__init__(base_models_path)
+        super().__init__(base_models_path, preprocessing_hash)
 
         
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
@@ -594,7 +598,7 @@ class StackEnsemble(SaveableEnsemble):
         for model in self.models:
             model.save_model(overwrite)
         
-        method_path = os.path.join(self.base_models_path, self.method_name)
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         os.makedirs(method_path, exist_ok=True)
         full_path = os.path.join(method_path, self.filename)
         
