@@ -229,9 +229,9 @@ class StatisticalProfiling(ScoreCalculator):
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def get_model_string(self):
         model_string = str({"quantiles":self.quantiles}).encode("utf-8")
@@ -303,9 +303,9 @@ class IsolationForest(ScoreCalculator):
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def get_model_string(self):
         model_string = str(self.params).encode("utf-8")
@@ -385,9 +385,9 @@ class BinarySegmentation(ScoreCalculator):
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def fused_lasso_penalty(self, signal, beta):
         tot_sum = 0
@@ -570,8 +570,9 @@ class StackEnsemble(SaveableEnsemble):
         self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
         return(self._scores, self._combine_predictions(self._predictions))
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
-        self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+        
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
         
     def _combine_predictions(self, prediction_list):
         combined_predictions = []

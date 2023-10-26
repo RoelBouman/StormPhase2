@@ -5,6 +5,7 @@ import sqlite3
 import numpy as np
 from sklearn.model_selection import ParameterGrid
 #import pandas as pd
+from hashlib import sha256
 
 from src.methods import SingleThresholdStatisticalProfiling
 from src.methods import DoubleThresholdStatisticalProfiling
@@ -46,13 +47,11 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
-
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False #if
-testing_overwrite = True
-validation_overwrite = True
+training_overwrite = False 
+testing_overwrite = False
+validation_overwrite = False
 
 #%% set up database
 
@@ -62,11 +61,11 @@ database_exists = os.path.exists(DBFILE)
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
 db_cursor = db_connection.cursor()
 if not database_exists:
-    db_cursor.execute("CREATE TABLE experiment_results(filename PRIMARY KEY, parameters, method, metric)")
+    db_cursor.execute("CREATE TABLE experiment_results(preprocessing_hash, hyperparameter_hash, method, which_split, preprocesing_hyperparameters, method_hyperparameters, metric, PRIMARY KEY (preprocessing_hash, hyperparameter_hash, method, which_split))")
     
 #%% define hyperparemeters for preprocessing
 
-preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
+all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)]}
 
 #%% define hyperparameters per method:
 
@@ -89,20 +88,9 @@ which_split = "Train"
 
 print("Split: Train")
 X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
-    
-#%% Preprocess Train data
-# Peprocess entire batch
-# Save preprocessed data for later recalculations
 
-#preprocessing_type = "basic"
 train_file_names = X_train_files
-
-X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train= preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
-
-#%% Detect anomalies/switch events
-# Save results, make saving of scores optional, as writing this many results is fairly costly
-
-#%% Training
+#%% testrun define methods:
 
 #methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling, "DoubleThresholdSP": DoubleThresholdStatisticalProfiling,
 #           "SingleThresholdIF":SingleThresholdIsolationForest}
@@ -132,91 +120,174 @@ SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)], "used_cutoffs":[all_c
 SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
+
 methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSP":SingleThresholdStatisticalProfiling, "StackEnsemble":StackEnsemble}
 hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSP":SingleThresholdSP_hyperparameters, "StackEnsemble":StackEnsemble_hyperparameters}
+#%% Preprocess Train data and run algorithms:
+# Peprocess entire batch
+# Save preprocessed data for later recalculations
 
-for method_name in methods:
-    print("Now training: " + method_name)
-    all_hyperparameters = hyperparameter_dict[method_name]
-    hyperparameter_list = list(ParameterGrid(all_hyperparameters))
+preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
+for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
     
-    for hyperparameters in hyperparameter_list:
-        hyperparameter_string = str(hyperparameters)
-        print(hyperparameter_string)
+    print("Now preprocessing: ")
+    print(preprocessing_hyperparameter_string)
+    X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing)
+    
+    for method_name in methods:
+        print("Now training: " + method_name)
+        all_hyperparameters = hyperparameter_dict[method_name]
+        hyperparameter_list = list(ParameterGrid(all_hyperparameters))
         
-        ### NEW
-        model = methods[method_name](model_folder, **hyperparameters, score_function=score_function)
-        model_name = model.method_name
-        hyperparameter_hash = model.get_hyperparameter_hash()
-        hyperparameter_hash_filename = model.get_filename()
-        
-        base_scores_path = os.path.join(score_folder, which_split)
-        base_predictions_path = predictions_path = os.path.join(predictions_folder, which_split)
-        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
-        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
-        fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name)
-        PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name)
-        minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name)
-        
-        full_model_path = os.path.join(model_folder, model_name, hyperparameter_hash_filename)
-        
-        if training_overwrite or not os.path.exists(full_model_path):
+        for hyperparameters in hyperparameter_list:
+            hyperparameter_string = str(hyperparameters)
+            print(hyperparameter_string)
             
-            y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=training_overwrite)
-
-            metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+            ### NEW
+            model = methods[method_name](model_folder, **hyperparameters, score_function=score_function)
+            model_name = model.method_name
+            hyperparameter_hash = model.get_hyperparameter_hash()
+            hyperparameter_hash_filename = model.get_filename()
             
-            minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
-            absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
-            PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+            base_scores_path = os.path.join(score_folder, which_split)
+            base_predictions_path = os.path.join(predictions_folder, which_split)
+            scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
+            predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
+            fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
+            PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
+            minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
             
-            save_dataframe_list(y_train_scores_dfs, X_train_files, os.path.join(scores_path, "stations"), overwrite=training_overwrite)
-            save_dataframe_list(y_train_predictions_dfs, X_train_files, os.path.join(predictions_path, "stations"), overwrite=training_overwrite)
+            full_model_path = os.path.join(model_folder, model_name, preprocessing_hash, hyperparameter_hash_filename)
             
-            save_metric(metric, fscore_path, hyperparameter_hash)
-            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
-            save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
-            
-            #save_model(model, model_path, hyperparameter_string)
-            model.save_model()
-            
-            #save metric to database for easy querying:
-            db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?)", (hyperparameter_hash, hyperparameter_string, method_name, metric))
-            db_connection.commit()
-        else:
-            print("Model already evaluated, loading results instead:")
-            metric = load_metric(fscore_path, hyperparameter_hash)
-            PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
-            minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
-            
-            #Model is instead loaded at model inititiation 
-            #model.load_model(model_path, hyperparameter_string)
-        
-            #check if loaded model has saved thresholds for correct optimization cutoff set:
-            #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
-            if not hasattr(model, "is_ensemble"):
-                if not model.check_cutoffs(all_cutoffs):
-                    print("Loaded model has wrong cutoffs, recalculating thresholds...")
-                    model.used_cutoffs = all_cutoffs
-                    model.calculate_thresholds(all_cutoffs, score_function)
+            if training_overwrite or not os.path.exists(full_model_path):
                 
-        model.report_thresholds()
+                y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=training_overwrite)
+    
+                metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+                
+                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
+                absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+                PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+                
+                save_dataframe_list(y_train_scores_dfs, train_file_names, os.path.join(scores_path, "stations"), overwrite=training_overwrite)
+                save_dataframe_list(y_train_predictions_dfs, train_file_names, os.path.join(predictions_path, "stations"), overwrite=training_overwrite)
+                
+                save_metric(metric, fscore_path, hyperparameter_hash)
+                save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+                save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
+                
+                #save_model(model, model_path, hyperparameter_string)
+                model.save_model()
+                
+                #save metric to database for easy querying:
+                db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, preprocessing_hyperparameter_string, hyperparameter_string, metric))
+                db_connection.commit()
+            else:
+                print("Model already evaluated, loading results instead:")
+                metric = load_metric(fscore_path, hyperparameter_hash)
+                PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+                minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
+                
+                #Model is instead loaded at model inititiation 
+                #model.load_model(model_path, hyperparameter_string)
+            
+                #check if loaded model has saved thresholds for correct optimization cutoff set:
+                #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
+                if not hasattr(model, "is_ensemble"):
+                    if not model.check_cutoffs(all_cutoffs):
+                        print("Loaded model has wrong cutoffs, recalculating thresholds...")
+                        model.used_cutoffs = all_cutoffs
+                        model.calculate_thresholds(all_cutoffs, score_function)
                     
-        if report_metrics_and_stats:
-            print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+            model.report_thresholds()
+                        
+            if report_metrics_and_stats:
+                print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
 #%% Test
 #%% load Test data
 which_split = "Test"
 print("Split: Test")
 X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
+
+test_file_names = X_test_files
     
+#%% Preprocess Test data and run algorithms:
+# Peprocess entire batch
+# Save preprocessed data for later recalculations
+
+preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
+for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+    
+    print("Now preprocessing: ")
+    print(preprocessing_hyperparameter_string)
+    X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing)
+    
+    for method_name in methods:
+        print("Now testing: " + method_name)
+        all_hyperparameters = hyperparameter_dict[method_name]
+        hyperparameter_list = list(ParameterGrid(all_hyperparameters))
+        
+        for hyperparameters in hyperparameter_list:
+            hyperparameter_string = str(hyperparameters)
+            print(hyperparameter_string)
+            
+            ### NEW
+            model = methods[method_name](model_folder, **hyperparameters, score_function=score_function)
+            model_name = model.method_name
+            hyperparameter_hash = model.get_hyperparameter_hash()
+            hyperparameter_hash_filename = model.get_filename()
+            
+            base_scores_path = os.path.join(score_folder, which_split)
+            base_predictions_path = os.path.join(predictions_folder, which_split)
+            scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
+            predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
+            fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
+            PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
+            minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
+            
+            full_model_path = os.path.join(model_folder, model_name, preprocessing_hash, hyperparameter_hash_filename)
+            
+            if testing_overwrite or not os.path.exists(full_model_path):
+                
+                y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=testing_overwrite)
+    
+                metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+                
+                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
+                absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+                PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+                
+                save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
+                save_dataframe_list(y_test_predictions_dfs, test_file_names, os.path.join(predictions_path, "stations"), overwrite=testing_overwrite)
+                
+                save_metric(metric, fscore_path, hyperparameter_hash)
+                save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+                save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
+                
+                #save metric to database for easy querying:
+                db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, preprocessing_hyperparameter_string, hyperparameter_string, metric))
+                db_connection.commit()
+            else:
+                print("Model already evaluated, loading results instead:")
+                metric = load_metric(fscore_path, hyperparameter_hash)
+                PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+                minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
+                
+                #Model is instead loaded at model inititiation 
+                #model.load_model(model_path, hyperparameter_string)
+                        
+            if report_metrics_and_stats:
+                print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 #%% Preprocess Test data
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
 #preprocessing_type = "basic"
-test_file_names = X_test_files
 
 X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, remove_missing)
 

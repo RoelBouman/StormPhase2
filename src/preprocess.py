@@ -176,26 +176,15 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, remove_missing=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
-
-    #TODO: preprocess_data needs rework
-    # - The following need to be toggles/settings:
-    #   - Whether to filter 'Missing' values when they are identical for N subsequent measurements
-    #   - Percentiles for sign correction need to be adjustable
-    # - The function needs only return a subset of columns (this will save substantially in memory/loading overhead)
-
-    #TODO: Name needs to change based on settings (NYI)
-    #preprocessing_type = "basic"
     
     # ensures preprocessing with different hyperparameters is saved in different folders
-    hyperparameter_string = str(hyperparameters)
-    preprocessing_type = hyperparameter_string.replace(':', '')
     
-    preprocessed_file_name_X = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_X.pickle")
-    preprocessed_file_name_y = os.path.join(preprocessed_pickles_folder, preprocessing_type + "_y.pickle")
+    preprocessed_file_name_X = os.path.join(preprocessed_pickles_folder, hyperparameter_hash + "_X.pickle")
+    preprocessed_file_name_y = os.path.join(preprocessed_pickles_folder, hyperparameter_hash + "_y.pickle")
     
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name_X):
         print("Preprocessing X and y data")
@@ -220,14 +209,14 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     # only happens for X, not for y
     if write_csv_intermediates:
         print("Writing CSV intermediates: X data")
-        type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, preprocessing_type)
+        type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, hyperparameter_hash)
         save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
 
     #Preprocess Y_data AKA get the lengths of each event
     event_lengths_pickles_folder = os.path.join(intermediates_folder, "event_length_pickles", which_split)
     event_lengths_csvs_folder = os.path.join(intermediates_folder, "event_length_csvs", which_split)
 
-    preprocessed_file_name = os.path.join(event_lengths_pickles_folder, str(all_cutoffs) + ".pickle")
+    preprocessed_file_name = os.path.join(event_lengths_pickles_folder, hyperparameter_hash + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing event lengths")
         event_lengths = [get_event_lengths(df) for df in y_dfs_preprocessed]
@@ -242,7 +231,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
 
     if write_csv_intermediates:
         print("Writing CSV intermediates: event lengths")
-        type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, preprocessing_type)
+        type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, hyperparameter_hash)
         save_dataframe_list(event_lengths, file_names, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
 
 
@@ -250,7 +239,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     label_filters_per_cutoff_pickles_folder = os.path.join(intermediates_folder, "label_filters_per_cutoff_pickles", which_split)
     label_filters_per_cutoff_csvs_folder = os.path.join(intermediates_folder, "label_filters_per_cutoff_csvs", which_split)
 
-    preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, str(all_cutoffs) + ".pickle")
+    preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, hyperparameter_hash + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
         label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
@@ -265,7 +254,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
 
     if write_csv_intermediates:
         print("Writing CSV intermediates: label filters per cutoff")
-        type_label_filters_per_cutoff_csvs_folder = os.path.join(label_filters_per_cutoff_csvs_folder, preprocessing_type)
+        type_label_filters_per_cutoff_csvs_folder = os.path.join(label_filters_per_cutoff_csvs_folder, hyperparameter_hash)
         label_filters_for_all_cutoffs_dfs = [pd.DataFrame(l) for l in label_filters_for_all_cutoffs]
         save_dataframe_list(label_filters_for_all_cutoffs_dfs, file_names, type_label_filters_per_cutoff_csvs_folder, overwrite = preprocessing_overwrite)
         
