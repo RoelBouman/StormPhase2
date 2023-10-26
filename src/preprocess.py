@@ -122,7 +122,7 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
         prev_i = i
         count = subsequent_nr
     
-    # Match bottom up with substation measurements for the middle 80% of the values and apply sign to substation measurements
+    # Match bottom up with substation measurements for the middle N% of the values and apply sign to substation measurements
     arr = X_df[X_df['missing']==0]
     
     low_quant, up_quant = lin_fit_quantiles
