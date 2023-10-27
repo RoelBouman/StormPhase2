@@ -39,17 +39,17 @@ def load_batch(data_folder, which_split):
         
     return X_dfs, y_dfs, file_names
 
-def save_model(model, model_path, hyperparameter_string):
-    os.makedirs(model_path, exist_ok=True)
-    full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
-    with open(full_file_name, 'wb') as handle:
-        pickle.dump(model, handle)
+# def save_model(model, model_path, hyperparameter_string):
+#     os.makedirs(model_path, exist_ok=True)
+#     full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
+#     with open(full_file_name, 'wb') as handle:
+#         pickle.dump(model, handle)
 
-def load_model(model_path, hyperparameter_string):
-    full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
-    with open(full_file_name, 'rb') as handle:
-        model = pickle.load(handle)
-    return model
+# def load_model(model_path, hyperparameter_string):
+#     full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
+#     with open(full_file_name, 'rb') as handle:
+#         model = pickle.load(handle)
+#     return model
     
 def save_metric(metric, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)

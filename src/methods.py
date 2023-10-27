@@ -1,7 +1,12 @@
+from abc import ABC, abstractmethod
 
 import pandas as pd
 import numpy as np
 import ruptures as rpt
+
+import os
+import pickle
+from hashlib import sha256
 
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
@@ -10,263 +15,379 @@ from sklearn.ensemble import IsolationForest as IF
 from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta
 
-
-class DoubleThresholdMethod:
-    
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
+class ThresholdMethod:
+    def _calculate_interpolated_recall_precision(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=10000):
         
-        self.evaluation_score_ = {}
-        self.precision_ = {}
-        self.recall_ = {}
-        self.thresholds_ = {}
+        precision_ = {}
+        recall_ = {}
+        thresholds_ = {}
         
-        #safe the two thresholds in a tuple
-        self.optimal_threshold_ = (self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = True),
-                                   self.optimize_single_threshold(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper = False))
+        all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
-    def optimize_single_threshold(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, upper, interpolation_range_length=10000):
-        #min and max thresholds are tracked for interpolation across all cutoff categories
         min_threshold = 0
         max_threshold = 0
         
-        #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate pr curve for each cutoffs in all_cutoffs
-        #combine pr curves according to score function and objective to find optimum
-        for cutoffs in self.all_cutoffs_:
+        for cutoffs in all_cutoffs:
             filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
             
-            # use only negative values if searching for the lower threshold, only positive if searching for the upper threshold 
-            if upper:
+            # use only negative values if searching for the lower (negative) threshold, only positive if searching for the upper (positive) threshold 
+            if which_threshold == "positive":
                 filtered_y = filtered_y[filtered_y_scores >= 0]
                 filtered_y_scores = filtered_y_scores[filtered_y_scores >= 0]
-            else:
+            elif which_threshold == "negative":
                 filtered_y = filtered_y[filtered_y_scores < 0]
                 filtered_y_scores = np.abs(filtered_y_scores[filtered_y_scores < 0])
+            elif which_threshold == "symmetrical":
+                #No additional filtering is needed, but y_scores need to be made absolute
+                filtered_y_scores = np.abs(filtered_y_scores)
+            else:
+                raise ValueError("which_threshold is set incorrectly. Valid options are: {\"positive\", \"negative\", \"symmetrical\"}.")
                                             
-            self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
+            precision_[str(cutoffs)], recall_[str(cutoffs)], thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
             
-            self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
-            
-            current_min_threshold = np.min(np.min(self.thresholds_[str(cutoffs)]))
+            current_min_threshold = np.min(np.min(thresholds_[str(cutoffs)]))
             if current_min_threshold < min_threshold:
                 min_threshold = current_min_threshold
                 
-            current_max_threshold = np.max(np.max(self.thresholds_[str(cutoffs)]))
+            current_max_threshold = np.max(np.max(thresholds_[str(cutoffs)]))
             if current_max_threshold > max_threshold:
                 max_threshold = current_max_threshold
         
-        self.interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
+        interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
         
-        self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
-        for cutoffs in self.all_cutoffs_:
+        interpolated_recall = np.zeros((len(interpolation_range_), len(all_cutoffs)))
+        interpolated_precision = np.zeros((len(interpolation_range_), len(all_cutoffs)))
+        for i, cutoffs in enumerate(all_cutoffs):
              
-             self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
+             interpolated_recall[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], recall_[str(cutoffs)][:-1])
+             interpolated_precision[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], precision_[str(cutoffs)][:-1])
         
-        self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
+        interpolated_recall = pd.DataFrame(interpolated_recall, columns=[str(cutoffs) for cutoffs in all_cutoffs])
+        interpolated_precision = pd.DataFrame(interpolated_precision, columns=[str(cutoffs) for cutoffs in all_cutoffs])
         
-        max_score_index = np.argmax(self.mean_score_over_cutoffs_)
+        return interpolated_recall, interpolated_precision, interpolation_range_
+    
+    def _calculate_interpolated_scores(self, interpolated_recall, interpolated_precision, used_cutoffs, score_function):
         
-        return self.interpolation_range_[max_score_index]
+        interpolated_scores = np.zeros((len(interpolated_recall), len(used_cutoffs)))
+        for i, cutoffs in enumerate(used_cutoffs):
+            interpolated_scores[:,i] = score_function(interpolated_precision[str(cutoffs)], interpolated_recall[str(cutoffs)])
+            
+        interpolated_scores = pd.DataFrame(interpolated_scores, columns=[str(cutoffs) for cutoffs in used_cutoffs])
+        return interpolated_scores
+        
+    
+    def _find_max_score_index_for_cutoffs(self, scores_over_cutoffs, used_cutoffs):
+    
+        column_labels = [str(cutoff) for cutoff in used_cutoffs]
+        mean_score_over_cutoffs = np.mean(scores_over_cutoffs[column_labels], axis=1)
+        
+        max_score_index = np.argmax(mean_score_over_cutoffs)
+    
+        return max_score_index
 
-    def predict_from_scores_dfs(self, y_scores_dfs, thresholds):
-        lower_threshold = thresholds[0]
-        upper_threshold = thresholds[1]
+class DoubleThresholdMethod(ThresholdMethod):
+    
+    def __init__(self):
+        self.scores_calculated = False
+        #self.is_single_threshold_method = False
+    
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
+        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+                
+        if not self.scores_calculated or recalculate_scores:
+            self.negative_threshold_recall, self.negative_threshold_precision, self.negative_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative")
+            self.positive_threshold_recall, self.positive_threshold_precision, self.positive_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive")
+            
+            self.scores_calculated = True
+
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
+        
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
+        self.negative_scores = self._calculate_interpolated_scores(self.negative_threshold_recall, self.negative_threshold_precision, used_cutoffs, score_function)
+        self.positive_scores = self._calculate_interpolated_scores(self.positive_threshold_recall, self.positive_threshold_precision, used_cutoffs, score_function)
+        
+        negative_max_score_index = self._find_max_score_index_for_cutoffs(self.negative_scores, used_cutoffs)
+        positive_max_score_index = self._find_max_score_index_for_cutoffs(self.positive_scores, used_cutoffs)
+        
+        #calculate optimal thresholds (negative threshold needs to be set to be negative)
+        self.optimal_negative_threshold = -self.negative_thresholds[negative_max_score_index]
+        self.optimal_positive_threshold = self.positive_thresholds[positive_max_score_index]
+            
+    def predict_from_scores_dfs(self, y_scores_dfs):
         
         y_prediction_dfs = []
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
-            pred[np.logical_or(np.squeeze(score) <= lower_threshold, np.squeeze(score) >= upper_threshold)] = 1
+            pred[np.logical_or(np.squeeze(score) < self.optimal_negative_threshold, np.squeeze(score) >= self.optimal_positive_threshold)] = 1
             y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
             
         return y_prediction_dfs
+    
+    def report_thresholds(self):
+        print("Optimal thresholds:")
+        print((self.optimal_negative_threshold, self.optimal_positive_threshold))
 
-
-class SingleThresholdMethod:
+class SingleThresholdMethod(ThresholdMethod):
     #score function must accept precision and recall as input
     #score function should be maximized
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, interpolation_range_length=10000):
-        self.all_cutoffs_ = list(label_filters_for_all_cutoffs[0].keys())
+    def __init__(self):
+        self.scores_calculated = False
+        #self.is_single_threshold_method = True
         
-        self.evaluation_score_ = {}
-        self.precision_ = {}
-        self.recall_ = {}
-        self.thresholds_ = {}
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
+        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
-        #min and max thresholds are tracked for interpolation across all cutoff categories
-        min_threshold = 0
-        max_threshold = 0
-        #for all cutoffs, calculate concatenated labels and scores, filtered
-        #calculate pr curve for each cutoffs in all_cutoffs
-        #combine pr curves according to score function and objective to find optimum
-        for cutoffs in self.all_cutoffs_:
-            filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
-            
-            filtered_y_scores = np.abs(filtered_y_scores)
-             
-            self.precision_[str(cutoffs)], self.recall_[str(cutoffs)], self.thresholds_[str(cutoffs)] = precision_recall_curve(filtered_y, filtered_y_scores)
-            
-            self.evaluation_score_[str(cutoffs)] = score_function(self.precision_[str(cutoffs)], self.recall_[str(cutoffs)])
-            
-            current_min_threshold = np.min(np.min(self.thresholds_[str(cutoffs)]))
-            if current_min_threshold < min_threshold:
-                min_threshold = current_min_threshold
+        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
                 
-            current_max_threshold = np.max(np.max(self.thresholds_[str(cutoffs)]))
-            if current_max_threshold > max_threshold:
-                max_threshold = current_max_threshold
+        if not self.scores_calculated or recalculate_scores:
+            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical")
+            
+            self.score_calculated = True
         
-        self.interpolation_range_ = np.linspace(min_threshold, max_threshold, interpolation_range_length)
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
-        self.mean_score_over_cutoffs_ = np.zeros(self.interpolation_range_.shape)
-        for cutoffs in self.all_cutoffs_:
-             
-             self.mean_score_over_cutoffs_ += np.interp(self.interpolation_range_, self.thresholds_[str(cutoffs)], self.evaluation_score_[str(cutoffs)][:-1])
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
+        self.scores = self._calculate_interpolated_scores(self.recall, self.precision, used_cutoffs, score_function)
         
-        self.mean_score_over_cutoffs_ /= len(self.all_cutoffs_)
+        max_score_index = self._find_max_score_index_for_cutoffs(self.scores, used_cutoffs)
         
-        max_score_index = np.argmax(self.mean_score_over_cutoffs_)
+        #calculate optimal thresholds (negative threshold needs to be set to be negative)
+        self.optimal_threshold = self.thresholds[max_score_index]
         
-        self.optimal_threshold_ = self.interpolation_range_[max_score_index]
-        
-    def predict_from_scores_dfs(self, y_scores_dfs, threshold):
+    def predict_from_scores_dfs(self, y_scores_dfs):
         y_prediction_dfs = []
         for score in y_scores_dfs:
             pred = np.zeros((score.shape[0],))
-            pred[np.abs(np.squeeze(score)) >= threshold] = 1
+            pred[np.abs(np.squeeze(score)) >= self.optimal_threshold] = 1
             y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
             
         return y_prediction_dfs
-
-
-class StatisticalProfiling:
     
-    def __init__(self, score_function=f_beta, quantiles=(10,90)):
+    def report_thresholds(self):
+        print("Optimal threshold:")
+        print((self.optimal_threshold))
+
+class ScoreCalculator:
+    def __init__(self):
+        pass
+    
+    def check_cutoffs(self, cutoffs):
+        return cutoffs == self.used_cutoffs
+        
+class StatisticalProfiling(ScoreCalculator):
+    
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
+        super().__init__()
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
-        self.quantiles=quantiles
-        self.score_function=score_function
+        self.quantiles = quantiles
+        self.score_function = score_function
+        self.used_cutoffs = used_cutoffs
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
-        y_scores_dfs = []
+        #         pickle.dump(model, handle)
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
         
-        for X_df in X_dfs:
-            scaler = RobustScaler(quantile_range=self.quantiles)
-            y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        os.makedirs(scores_path, exist_ok=True)
+        os.makedirs(predictions_path, exist_ok=True)
+        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
+        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+            with open(scores_path, 'rb') as handle:
+                y_scores_dfs = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+        else:
             
-        if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
+            y_scores_dfs = []
             
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+            for X_df in X_dfs:
+                scaler = RobustScaler(quantile_range=self.quantiles)
+                y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+                
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+            y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
+            
+            with open(scores_path, 'wb') as handle:
+                pickle.dump(y_scores_dfs, handle)
+            with open(predictions_path, 'wb') as handle:
+                pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+    
+    def get_model_string(self):
+        model_string = str({"quantiles":self.quantiles}).encode("utf-8")
+        
+        return model_string
     
 
-class IsolationForest:
+class IsolationForest(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, **params):
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], **params):
+        super().__init__()
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
+        self.used_cutoffs = used_cutoffs
+        self.params = params
         
         # define IsolationForest model
         self.model = IF(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-
-        y_scores_dfs = []
+        
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
+        
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        os.makedirs(scores_path, exist_ok=True)
+        os.makedirs(predictions_path, exist_ok=True)
+        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
+        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+            with open(scores_path, 'rb') as handle:
+                y_scores_dfs = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+        else:
+            y_scores_dfs = []
+                
+            if fit:
+                #flatten and fit model on that
+                flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
+                self.model.fit(flat_X_dfs_diff)
+                
+            scores = []
+            station_maxs = []
+            for X_df in X_dfs:
+                scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
+                station_maxs.append(np.max(scores[-1]))
+            max_score = max(station_maxs)
+                
+            for score in scores:
+                # calculate and scale the scores
+                scaled_score = max_score - (score - 1)
+                y_scores_dfs.append(pd.DataFrame(scaled_score))
+    
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+            y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-        if fit:
-            #flatten and fit model on that
-            flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
-            self.model.fit(flat_X_dfs_diff)
-            
-        scores = []
-        station_maxs = []
-        for X_df in X_dfs:
-            scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
-            station_maxs.append(np.max(scores[-1]))
-        max_score = max(station_maxs)
-            
-        for score in scores:
-            # calculate and scale the scores
-            scaled_score = max_score - (score - 1)
-            y_scores_dfs.append(pd.DataFrame(scaled_score))
-
-        if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
-            
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+            with open(scores_path, 'wb') as handle:
+                pickle.dump(y_scores_dfs, handle)
+            with open(predictions_path, 'wb') as handle:
+                pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
-
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
-class BinarySegmentation:
+    def get_model_string(self):
+        model_string = str(self.params).encode("utf-8")
+        
+        return model_string
     
-    def __init__(self, beta, quantiles, penalty, scaling=True, score_function=f_beta, **params):
+class BinarySegmentation(ScoreCalculator):
+    
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
-        
+        super().__init__()
         self.score_function = score_function
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
         self.penalty = penalty        
+        self.used_cutoffs = used_cutoffs
+        self.params = params
         
         # define Binseg model
         self.model = rpt.Binseg(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
-
-        y_scores_dfs = []
         
-        if self.scaling:
-            scaler = RobustScaler(quantile_range=self.quantiles)
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
         
-        for i, X_df in enumerate(X_dfs): 
-            signal = X_df['diff'].values.reshape(-1,1)
+        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        os.makedirs(scores_path, exist_ok=True)
+        os.makedirs(predictions_path, exist_ok=True)
+        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
+        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+            with open(scores_path, 'rb') as handle:
+                y_scores_dfs = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+        else:
+            y_scores_dfs = []
             
             if self.scaling:
-                signal = scaler.fit_transform(signal)
+                scaler = RobustScaler(quantile_range=self.quantiles)
             
-            # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
-            if self.penalty == 'lin':
-                n = len(signal)
-                penalty = n * self.beta
-            elif self.penalty == 'fused_lasso':
-                penalty = self.fused_lasso_penalty(signal, self.beta)
-            else:
-                # if no correct penalty selected, raise exception
-                raise Exception("Incorrect penalty")
+            for i, X_df in enumerate(X_dfs): 
+                signal = X_df['diff'].values.reshape(-1,1)
                 
-            bkps = self.model.fit_predict(signal, pen = penalty)
+                if self.scaling:
+                    signal = scaler.fit_transform(signal)
+                
+                # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
+                if self.penalty == 'lin':
+                    n = len(signal)
+                    penalty = n * self.beta
+                elif self.penalty == 'fused_lasso':
+                    penalty = self.fused_lasso_penalty(signal, self.beta)
+                else:
+                    # if no correct penalty selected, raise exception
+                    raise Exception("Incorrect penalty")
+                    
+                bkps = self.model.fit_predict(signal, pen = penalty)
+                
+                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
+    
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+            y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-            y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
-
-        if fit:
-            self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function)
-            
-        y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs, self.optimal_threshold_)
+            with open(scores_path, 'wb') as handle:
+                pickle.dump(y_scores_dfs, handle)
+            with open(predictions_path, 'wb') as handle:
+                pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def fused_lasso_penalty(self, signal, beta):
         tot_sum = 0
@@ -293,28 +414,206 @@ class BinarySegmentation:
         
         return y_score            
         
+    def get_model_string(self):
+        hyperparam_dict = {}
+        hyperparam_dict["beta"] = self.beta
+        hyperparam_dict["quantiles"] = self.quantiles
+        hyperparam_dict["scaling"] = self.scaling
+        hyperparam_dict["penalty"] = self.penalty
+        hyperparam_dict["params"] = self.params
+        model_string = str(hyperparam_dict).encode("utf-8")
         
-class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod):
-    
-    def __init__(self, **params):
-        super().__init__(**params)
+        return model_string
         
-class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod):
+class SaveableModel(ABC):
     
-    def __init__(self, **params):
-        super().__init__(**params)
+    def __init__(self, base_models_path, preprocessing_hash):
+        self.base_models_path = base_models_path
+        self.preprocessing_hash = preprocessing_hash
+        self.filename = self.get_filename()
         
-class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod):
+        method_path = os.path.join(self.base_models_path, self.method_name, preprocessing_hash)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if os.path.exists(full_path):
+            self.load_model()
     
-    def __init__(self, **params):
-        super().__init__(**params)
+    @abstractmethod
+    def get_model_string(self):
+        pass
+    
+    # @property
+    # @abstractmethod
+    # def method_name(self):
+    #     pass
 
-class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod):
-    
-    def __init__(self, **params):
-        super().__init__(**params)
+    def get_hyperparameter_hash(self):
+        model_string = self.get_model_string()
         
-class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod):
+        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
+        hyperparameter_hash = sha256(model_string).hexdigest()
+        
+        return hyperparameter_hash
+
+    def get_filename(self):
+        
+        filename = self.get_hyperparameter_hash() + ".pickle"
+            
+        return filename
     
-    def __init__(self, **params):
+    def save_model(self, overwrite=True):
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        os.makedirs(method_path, exist_ok=True)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if not os.path.exists(full_path) or overwrite:
+            f = open(full_path, 'wb')
+            pickle.dump(self.__dict__, f, 2)
+            f.close()
+        
+    def load_model(self):
+        
+        #manually ensure that used_cutoffs is not overwritten:
+        used_cutoffs = self.used_cutoffs
+        
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        full_path = os.path.join(method_path, self.filename)
+        f = open(full_path, 'rb')
+        tmp_dict = pickle.load(f)
+        f.close()          
+        
+        self.__dict__.update(tmp_dict) 
+        
+        self.used_cutoffs = used_cutoffs
+        
+
+
+class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
         super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdSP"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DoubleThresholdSP"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdIF"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+
+class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        SingleThresholdMethod.__init__(self)
+        self.method_name = "SingleThresholdBS"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+
+        
+class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DoubleThresholdBS"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+        
+    
+class SaveableEnsemble(SaveableModel):
+    def load_model(self):
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        full_path = os.path.join(method_path, self.filename)
+        f = open(full_path, 'rb')
+        tmp_dict = pickle.load(f)
+        f.close()      
+        self.__dict__.update(tmp_dict) 
+        
+class StackEnsemble(SaveableEnsemble):
+    
+    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
+
+        self.is_ensemble = True
+        
+        self.method_classes = method_classes
+        self.method_hyperparameter_dicts = method_hyperparameter_dict_list
+        self.cutoffs_per_method = cutoffs_per_method
+        self.score_function = f_beta
+        self.preprocessing_hash = preprocessing_hash
+        
+        self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        
+        self.method_name = " + ".join([model.method_name for model in self.models])
+        #self.method_name = "StackEnsemble"
+        
+        super().__init__(base_models_path, preprocessing_hash)
+
+        
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
+        self._scores = []
+        temp_scores = []
+        self._predictions = []
+        for model in self.models:
+            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit)
+            temp_scores.append(scores)
+            self._predictions.append(predictions)
+        
+        self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
+        return(self._scores, self._combine_predictions(self._predictions))
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+        
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+        
+    def _combine_predictions(self, prediction_list):
+        combined_predictions = []
+        n_stations = len(prediction_list[0])
+        for i in range(n_stations):
+            station_i_prediction_dfs = []
+            for prediction_dfs in prediction_list:
+                station_i_prediction_dfs.append(prediction_dfs[i])
+            combined_predictions.append(pd.DataFrame(np.logical_or.reduce(station_i_prediction_dfs), columns=["label"]))
+        return combined_predictions
+    
+    def get_model_string(self):
+        
+        model_string = str(self.method_hyperparameter_dicts).encode("utf-8")
+        
+        return model_string
+    
+    def save_model(self, overwrite=True):
+        for model in self.models:
+            model.save_model(overwrite)
+        
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        os.makedirs(method_path, exist_ok=True)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if not os.path.exists(full_path) or overwrite:
+            f = open(full_path, 'wb')
+            pickle.dump(self.__dict__, f, 2)
+            f.close()
+        
+    def report_thresholds(self):
+        for model in self.models:
+            print(model.method_name)
+            model.report_thresholds()
+    
+class NaiveStackEnsemble(StackEnsemble):
+    def __init__(self, base_models_path, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
+        cutoffs_per_method = [all_cutoffs]*len(method_classes)
+        
+        super().__init__(base_models_path, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
