@@ -133,7 +133,7 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
     X_df['BU'] = a*X_df['BU_original']+b
-    if X_df['S_original'].min()>0:
+    if X_df['S_original'].min()>=0 and X_df['BU_original'].iloc[X_df['S_original'].argmin()] < 0:
         X_df['S'] = np.sign(X_df['BU'])*X_df['S']
     X_df['diff'] = X_df['S']-X_df['BU']
         
