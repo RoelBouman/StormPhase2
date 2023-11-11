@@ -223,7 +223,10 @@ class BinarySegmentation:
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
-        self.penalty = penalty        
+        self.penalty = penalty
+        
+        # keep track of breakpoints for plotting
+        self.breakpoints = []
         
         # define Binseg model
         self.model = rpt.Binseg(**params)
@@ -254,6 +257,7 @@ class BinarySegmentation:
                 raise Exception("Incorrect penalty")
                 
             bkps = self.model.fit_predict(signal, pen = penalty)
+            self.breakpoints.append(bkps)
             
             y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
 

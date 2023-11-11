@@ -94,12 +94,13 @@ X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoff
 #hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP":DoubleThresholdSP_hyperparameters,
 #                       "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 
-#methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-#hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters}
+#SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)]}
+#methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
+#hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
 
-SingleThresholdSP_hyperparameters = {"quantiles":[(5,95)]}
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdSP":SingleThresholdSP_hyperparameters}
+SingleThresholdBS_hyperparameters = {"beta": [0.008], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters}
 
 for method_name in methods:
     print("Now training: " + method_name)
@@ -142,7 +143,7 @@ for method_name in methods:
             save_model(model, model_path, hyperparameter_string)
             
             if visualize_predictions:
-                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, optimal_threshold, X_train_files, method_name, hyperparameter_string, which_stations)
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, optimal_threshold, X_train_files, method_name, model, hyperparameter_string, which_stations)
         else:
             print("Model already evaluated, loading results instead:")
             metric = load_metric(fscore_path, hyperparameter_string)
