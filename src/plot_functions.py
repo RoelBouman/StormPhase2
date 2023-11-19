@@ -36,7 +36,7 @@ def plot_labels(df, **kwargs):
     plt.plot(df["label"], **kwargs)
 
 
-def plot_SP(X_df, preds, threshold, file, hyperparameter_string):
+def plot_SP(X_df, preds, threshold, file, model_string):
     """
     Plot the predictions and original plot for the statistical profiling method,
     overlay with thresholds and colour appropriately
@@ -51,8 +51,8 @@ def plot_SP(X_df, preds, threshold, file, hyperparameter_string):
         threshold that decides which values are classified as outliers
     file : string
         filename of the dataframe
-    hyperparameter_string : string
-        current hyperparemeters
+    model_string : string
+        current model
 
     """
     
@@ -63,7 +63,7 @@ def plot_SP(X_df, preds, threshold, file, hyperparameter_string):
         lower_threshold, upper_threshold = -threshold, threshold
      
     fig = plt.figure(figsize=(30,16))  
-    plt.title("SP, " + hyperparameter_string + ", Predictions station: " + file, fontsize=60)
+    plt.title("SP, " + model_string + ", Predictions station: " + file, fontsize=60)
     gs = GridSpec(5, 1, figure=fig)
     
     #Diff plot:       
@@ -110,7 +110,7 @@ def plot_SP(X_df, preds, threshold, file, hyperparameter_string):
     fig.tight_layout()
     plt.show()
     
-def plot_BS(X_df, preds, threshold, file, bkps, hyperparameter_string):
+def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -125,8 +125,8 @@ def plot_BS(X_df, preds, threshold, file, bkps, hyperparameter_string):
         threshold that decides which values are classified as outliers
     file : string
         filename of the dataframe
-    hyperparameter_string : string
-        current hyperparemeters
+    model_string : string
+        current model
 
     """
     
@@ -137,7 +137,7 @@ def plot_BS(X_df, preds, threshold, file, bkps, hyperparameter_string):
         lower_threshold, upper_threshold = -threshold, threshold
      
     fig = plt.figure(figsize=(30,16))  
-    plt.title("SP, " + hyperparameter_string + ", Predictions station: " + file, fontsize=60)
+    plt.title("SP, " + model_string + ", Predictions station: " + file, fontsize=60)
     gs = GridSpec(5, 1, figure=fig)
     
     #Diff plot:       
@@ -173,7 +173,7 @@ def plot_BS(X_df, preds, threshold, file, bkps, hyperparameter_string):
     fig.tight_layout()
     plt.show()
     
-def plot_predictions(X_dfs, predictions, threshold, dfs_files, current_method, model, hyperparameter_string, which_stations = None):
+def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None):
     # select random stations if no stations selected
     if which_stations == None:
         which_stations = np.random.randint(0, len(X_dfs), 5)
@@ -183,8 +183,25 @@ def plot_predictions(X_dfs, predictions, threshold, dfs_files, current_method, m
         preds = predictions[station]
         file = dfs_files[station]
         
-        if current_method == "SingleThresholdSP" or current_method == "DoubleThresholdSP":
-            plot_SP(X_df, preds, threshold, file, hyperparameter_string)
-        if current_method == "SingleThresholdBS" or current_method == "DoubleThresholdBS":
-            bkps = model.breakpoints[station]
-            plot_BS(X_df, preds, threshold, file, bkps, hyperparameter_string)
+        match model.method_name:
+            
+            case "SingleThresholdSP" :
+                threshold = model.scaled_optimal_threshold
+                plot_SP(X_df, preds, threshold, file, str(model.get_model_string()))
+            
+            case "DoubleThresholdSP" :
+                threshold = model.scaled_optimal_threshold
+                plot_SP(X_df, preds, threshold, file, str(model.get_model_string()))
+        
+            case "SingleThresholdBS" :
+                threshold = model.scaled_optimal_threshold[0]
+                bkps = model.breakpoints[station]
+                plot_BS(X_df, preds, file, bkps, str(model.get_model_string()))
+            
+            case "DoubleThresholdBS" :
+                threshold = model.scaled_optimal_threshold
+                bkps = model.breakpoints[station]
+                plot_BS(X_df, preds, file, bkps, str(model.get_model_string()))
+            
+            case "SingleThresholdIF" :
+                pass

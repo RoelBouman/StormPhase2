@@ -25,6 +25,8 @@ from src.io_functions import load_batch, load_metric, load_PRFAUC_table, load_mi
 from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
 from src.reporting_functions import print_metrics_and_stats
+
+from src.plot_functions import plot_predictions
 #%% set process variables
 
 data_folder = "data"
@@ -50,7 +52,7 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False 
+training_overwrite = True 
 testing_overwrite = False
 validation_overwrite = False
 
@@ -187,6 +189,12 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 
                 #save_model(model, model_path, hyperparameter_string)
                 model.save_model()
+                
+                #=========================================================================================================
+                # test plotting
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, model)
+                #=========================================================================================================
+                
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)

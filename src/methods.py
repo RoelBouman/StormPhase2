@@ -130,6 +130,11 @@ class DoubleThresholdMethod(ThresholdMethod):
     def report_thresholds(self):
         print("Optimal thresholds:")
         print((self.optimal_negative_threshold, self.optimal_positive_threshold))
+        
+    def scale_thresholds(self, scaler):
+        scaled_optimal_negative_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
+        scaled_optimal_positive_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
+        self.scaled_optimal_threshold = (scaled_optimal_negative_threshold, scaled_optimal_positive_threshold)
 
 class SingleThresholdMethod(ThresholdMethod):
     #score function must accept precision and recall as input
@@ -171,6 +176,9 @@ class SingleThresholdMethod(ThresholdMethod):
     def report_thresholds(self):
         print("Optimal threshold:")
         print((self.optimal_threshold))
+        
+    def scale_thresholds(self, scaler):
+        self.scaled_optimal_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
 
 class ScoreCalculator:
     def __init__(self):
@@ -214,11 +222,14 @@ class StatisticalProfiling(ScoreCalculator):
             y_scores_dfs = []
             
             for X_df in X_dfs:
-                scaler = RobustScaler(quantile_range=self.quantiles)
-                y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
+                scaler = RobustScaler(quantile_range=self.quantiles).fit(X_df["diff"].values.reshape(-1,1))
+                y_scores_dfs.append(pd.DataFrame(scaler.transform(X_df["diff"].values.reshape(-1,1))))
                 
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+                # scale thresholds for visualization (currently not useful as scaler is fit on different data)
+                self.scale_thresholds(scaler)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
@@ -325,6 +336,9 @@ class BinarySegmentation(ScoreCalculator):
         self.used_cutoffs = used_cutoffs
         self.params = params
         
+        # keep track of breakpoints for visualization
+        self.breakpoints_list = []
+        
         # define Binseg model
         self.model = rpt.Binseg(**params)
         
@@ -370,11 +384,16 @@ class BinarySegmentation(ScoreCalculator):
                     raise Exception("Incorrect penalty")
                     
                 bkps = self.model.fit_predict(signal, pen = penalty)
+                self.breakpoints_list.append(bkps)
                 
                 y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
     
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
+                
+                # scale thresholds for visualization
+                if self.scaling:
+                    self.scale_thresholds(scaler)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
