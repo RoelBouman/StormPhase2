@@ -194,7 +194,7 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None
                 plot_SP(X_df, preds, threshold, file, str(model.get_model_string()))
         
             case "SingleThresholdBS" :
-                threshold = model.scaled_optimal_threshold[0]
+                threshold = model.scaled_optimal_threshold
                 bkps = model.breakpoints[station]
                 plot_BS(X_df, preds, file, bkps, str(model.get_model_string()))
             

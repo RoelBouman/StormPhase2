@@ -132,8 +132,8 @@ class DoubleThresholdMethod(ThresholdMethod):
         print((self.optimal_negative_threshold, self.optimal_positive_threshold))
         
     def scale_thresholds(self, scaler):
-        scaled_optimal_negative_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
-        scaled_optimal_positive_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
+        scaled_optimal_negative_threshold = scaler.inverse_transform(np.array([self.optimal_negative_threshold]).reshape(-1,1))[0][0]
+        scaled_optimal_positive_threshold = scaler.inverse_transform(np.array([self.optimal_positive_threshold]).reshape(-1,1))[0][0]
         self.scaled_optimal_threshold = (scaled_optimal_negative_threshold, scaled_optimal_positive_threshold)
 
 class SingleThresholdMethod(ThresholdMethod):

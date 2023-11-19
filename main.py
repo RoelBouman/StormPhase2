@@ -113,13 +113,13 @@ StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegment
 
 
 
-SingleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90)], "used_cutoffs":[all_cutoffs]}
+DoubleThresholdSP_hyperparameters = {"quantiles":[(5,95), (10,90)], "used_cutoffs":[all_cutoffs]}
 SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
 StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSP":SingleThresholdStatisticalProfiling, "StackEnsemble":StackEnsemble}
-methods = {"SingleThresholdSP":SingleThresholdStatisticalProfiling}
-hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSP":SingleThresholdSP_hyperparameters, "StackEnsemble":StackEnsemble_hyperparameters}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP": DoubleThresholdSP_hyperparameters, "StackEnsemble":StackEnsemble_hyperparameters}
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
