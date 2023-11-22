@@ -263,6 +263,9 @@ class IsolationForest(ScoreCalculator):
         # define IsolationForest model
         self.model = IF(**params)
         
+        # track scaled scores for visualization
+        self.y_scores = []
+        
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
@@ -300,6 +303,7 @@ class IsolationForest(ScoreCalculator):
             for score in scores:
                 # calculate and scale the scores
                 scaled_score = max_score - (score - 1)
+                self.y_scores.append(scaled_score)
                 y_scores_dfs.append(pd.DataFrame(scaled_score))
     
             if fit:

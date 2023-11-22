@@ -60,6 +60,9 @@ def plot_bkps(signal, bkps, **kwargs):
             col = "#f44174"
         else:
             col = "#4286f4"
+            
+def plot_IFscores(scores, **kwargs):
+    plt.plot(scores, **kwargs)
     
 
 def plot_SP(X_df, preds, threshold, file, model_string):
@@ -216,6 +219,64 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     fig.tight_layout()
     plt.show()
 
+
+def plot_IF(X_df, preds, y_scores, file, model_string):
+    """
+    Plot the predictions and original plot for the binary segmentation method,
+    overlay with thresholds
+
+    Parameters
+    ----------
+    X_df : dataframe
+        dataframe to be plottedd
+    preds : dataframe
+        dataframe containing the predictions (0 or 1)
+    file : string
+        filename of the dataframe
+    model_string : string
+        current model
+
+    """
+     
+    fig = plt.figure(figsize=(30,16))  
+    plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+    gs = GridSpec(5, 1, figure=fig)
+    
+    # Diff plot:    
+    ax1 = fig.add_subplot(gs[:2,:])
+    plot_diff(X_df, label = "diff")
+    sns.set_theme()
+
+    plt.yticks(fontsize=20)
+    plt.ylabel("S diff", fontsize=25)
+    
+    #plt.legend(fontsize=20, loc="lower left")
+    
+    # Scores plot:    
+    ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
+    plot_IFscores(y_scores)
+    sns.set_theme()
+    
+    ax2.set_ylabel("Scores", fontsize=25)
+    
+    # Predictions plot
+    ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
+    plot_labels(preds, label="label")
+    sns.set_theme()
+    
+    ax3.set_ylabel("Predictions", fontsize=25)
+    
+    ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
+    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    plt.xlim((0, len(X_df)))
+    plt.xlabel("Date", fontsize=25)
+        
+    #ax2.get_xaxis().set_visible(False)
+    #ax2.get_yaxis().set_visible(False)
+    
+    fig.tight_layout()
+    plt.show()
+
     
 def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None):
     # select random stations if no stations selected
@@ -248,4 +309,5 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None
                 plot_BS(X_df, preds, threshold, file, bkps, str(model.get_model_string()))
             
             case "SingleThresholdIF" :
-                pass
+                y_scores = model.y_scores[station]
+                plot_IF(X_df, preds, y_scores, file, str(model.get_model_string()))
