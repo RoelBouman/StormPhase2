@@ -179,7 +179,7 @@ class ScoreCalculator:
     def check_cutoffs(self, cutoffs):
         return cutoffs == self.used_cutoffs
         
-class StatisticalProfiling(ScoreCalculator):
+class StatisticalProcessControl(ScoreCalculator):
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
         super().__init__()
@@ -488,21 +488,21 @@ class SaveableModel(ABC):
         
 
 
-class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
+class SingleThresholdStatisticalProcessControl(StatisticalProcessControl, SingleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, **params):
         super().__init__(**params)
         SingleThresholdMethod.__init__(self)
-        self.method_name = "SingleThresholdSP"
+        self.method_name = "SingleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
 
         
-class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod, SaveableModel):
+class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, **params):
         super().__init__(**params)
         DoubleThresholdMethod.__init__(self)
-        self.method_name = "DoubleThresholdSP"
+        self.method_name = "DoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
 
         
