@@ -10,6 +10,8 @@ Created on Sun Oct 29 17:58:43 2023
 #%% package loading
 import os
 import pickle
+import jsonpickle
+import sqlite3
 
 import pandas as pd
 import numpy as np
@@ -46,6 +48,14 @@ test_name = "Test"
 validation_name = "Validation"
 
 all_dataset_names = [train_name, test_name, validation_name]
+
+#%% connect to database
+
+DBFILE = "experiment_results.db"
+database_exists = os.path.exists(DBFILE)
+
+db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
+db_cursor = db_connection.cursor()
 
 #%% Visualize/tabularize input data and preprocessing
 
@@ -147,4 +157,76 @@ plt.show()
 #%% Visualize threshold optimization strategy
 
 
+#load model:
+preprocessing_hash = "10cab9fc324db7a2fd5d8674c71edb68908b5e572ffa442d201eb0ca0aa288e1"
+hyperparameter_hash = "ecf927381ef6fbb708dcf54fd846cfb856d60791b2ee998ec386c8f17661149a"
+
+db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
+
+hyperparameters = jsonpickle.loads(db_result)
+
+from src.evaluation import f_beta
+from src.methods import SingleThresholdStatisticalProfiling
+beta = 1.5
+def score_function(precision, recall):
+    return f_beta(precision, recall, beta)
+
+
+model = SingleThresholdStatisticalProfiling(model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+
+
+plt.figure()
+
+category_labels = ["1-24", "25-288", "289-4032", "4033 and longer"]
+colors = sns.color_palette()[:3] + [sns.color_palette()[4]]
+thresholds = model.thresholds
+for i, column in enumerate(model.scores.columns):
+    scores = model.scores[column]
+    
+    plt.plot(thresholds, scores, label=category_labels[i], linestyle=":", color=colors[i])
+    
+plt.plot(thresholds, np.mean(model.scores, axis=1), label="average", color=sns.color_palette()[3])
+
+plt.axvline(x = model.optimal_threshold, color = sns.color_palette()[3], linestyle="--", label = 'optimal threshold')
+
+plt.legend()
+plt.xlabel("Threshold")
+plt.ylabel("F1.5")
+plt.xlim((0, 4)) #hardcoded
+plt.savefig(os.path.join(figure_folder, "threshold_optimization.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "threshold_optimization.png"), format="png")
+plt.show()
+
+#%% summarize results on validation set for each method
+#show for each method:
+    # validation average F1.5
+    # validation F1.5 for each cutoff/category
+    # validation average ROC/AUC (optional?)
+    # best preprocessing hyperparameters (optional?)
+    # best hyperparameters (optional?)
+
+
+validation_results = db_cursor.execute("SELECT method, method_hyperparameters, MAX(metric), preprocessing_hash, hyperparameter_hash FROM experiment_results WHERE which_split='Validation' GROUP BY method").fetchall()
+
+validation_results_df = pd.DataFrame(validation_results).iloc[:,:3]
+validation_results_df.columns = ["Method", "Hyperparameters", "Average F1.5"]
+validation_results_df.set_index("Method", inplace=True)
+
+for i in range(validation_results_df.shape[0]):
+    #Treat ensembles differently:
+    if validation_results_df.index[i] in ["NaiveEnsemble", "StackEnsemble", "SequentialEnsemble"]:
+        method_dict = jsonpickle.loads(validation_results_df["Hyperparameters"].iloc[i])
+        hyperparameter_strings = []
+        for method, hyperparameters in zip(method_dict["method_classes"], method_dict["method_hyperparameter_dict_list"]):
+            method_name = method("temp","temp").method_name
+            hyperparameter_strings.append(method_name + ":" + str(hyperparameters))
+        validation_results_df["Hyperparameters"].iloc[i] = "\n".join(hyperparameter_strings)
+    else:
+        hyperparameters = jsonpickle.loads(validation_results_df["Hyperparameters"].iloc[i])
+        hyperparameters.pop("used_cutoffs", None)
+        validation_results_df["Hyperparameters"].iloc[i] = str(hyperparameters)
+        
+validation_results_df.to_latex(buf=os.path.join(table_folder, "validation_results_df.tex"))
+        
 #%% Visualize/tabularize segmentation results of different methods
+
