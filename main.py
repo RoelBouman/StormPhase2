@@ -62,7 +62,7 @@ database_exists = os.path.exists(DBFILE)
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
 db_cursor = db_connection.cursor()
 if not database_exists:
-    db_cursor.execute("CREATE TABLE experiment_results(preprocessing_hash, hyperparameter_hash, method, which_split, preprocesing_hyperparameters, method_hyperparameters, metric, PRIMARY KEY (preprocessing_hash, hyperparameter_hash, method, which_split))")
+    db_cursor.execute("CREATE TABLE experiment_results(preprocessing_hash, hyperparameter_hash, method, which_split, preprocessing_hyperparameters, method_hyperparameters, metric, PRIMARY KEY (preprocessing_hash, hyperparameter_hash, method, which_split))")
     
 #%% define hyperparemeters for preprocessing
 
@@ -117,7 +117,7 @@ SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[Singl
 
 methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble}
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
-hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, "SingleThresholdBS+singleThresholdSPC":SingleThresholdBS_SingleThresholdSPC_hyperparameters}
+hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, "SingleThresholdBS+SingleThresholdSPC":SingleThresholdBS_SingleThresholdSPC_hyperparameters}
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations

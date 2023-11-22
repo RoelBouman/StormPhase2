@@ -21,6 +21,7 @@ import seaborn as sns
 
 
 from src.plot_functions import plot_S_original, plot_BU_original
+from src.io_functions import load_PRFAUC_table
 
 sns.set()
 
@@ -56,6 +57,9 @@ database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
 db_cursor = db_connection.cursor()
+
+#%% replace cutoff by category:
+cutoff_replacement_dict = {"(0, 24)":"1-24", "(24, 288)":"25-288","(288, 4032)":"288-4032", "(4032, inf)":"4033 and longer"}
 
 #%% Visualize/tabularize input data and preprocessing
 
@@ -137,9 +141,10 @@ for unique_length, normalized_length_count, length_count in zip(unique_lengths,n
 normalized_length_count_per_cutoff = {key:[value] for key, value in normalized_length_count_per_cutoff.items()}
 length_count_per_cutoff = {key:[value] for key, value in length_count_per_cutoff.items()}
 
-event_length_stats = pd.concat([pd.DataFrame(normalized_length_count_per_cutoff), pd.DataFrame(length_count_per_cutoff)])
-event_length_stats.index = ["#events per cutoff", "#label $1$ per cutoff"]
-event_length_stats.to_latex(buf=os.path.join(table_folder, "event_length_stats.tex"))
+event_length_stats = pd.concat([pd.DataFrame(normalized_length_count_per_cutoff), pd.DataFrame(length_count_per_cutoff)]).astype(int)
+event_length_stats.index = ["Number of events per category", "Number of label $1$ per category"]
+event_length_stats.rename(columns=cutoff_replacement_dict, inplace=True)
+event_length_stats.to_latex(buf=os.path.join(table_folder, "event_length_stats.tex"), escape=False)
 
 lengths_to_hist = []
 for unique_length, normalized_length_count in zip(unique_lengths, normalized_length_counts):
@@ -166,14 +171,14 @@ db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_res
 hyperparameters = jsonpickle.loads(db_result)
 
 from src.evaluation import f_beta
-from src.methods import SingleThresholdStatisticalProfiling
+from src.methods import SingleThresholdStatisticalProcessControl
 beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
 
-model = SingleThresholdStatisticalProfiling(model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
-
+model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+model.calculate_and_set_thresholds(all_cutoffs, score_function)
 
 plt.figure()
 
@@ -205,28 +210,57 @@ plt.show()
     # best preprocessing hyperparameters (optional?)
     # best hyperparameters (optional?)
 
+#TODO: Technically, we shouldn't select MAX(metric) from Validation, but those hashes where MAX(metric) in Test (if we do 1 run over all hyperparameters, this is moot, but if we keep updating this might spell trouble)
+validation_results = db_cursor.execute("SELECT method, preprocessing_hyperparameters, method_hyperparameters, MAX(metric), preprocessing_hash, hyperparameter_hash FROM experiment_results WHERE which_split='Validation' GROUP BY method").fetchall()
+validation_results_and_metadata_df = pd.DataFrame(validation_results)
+validation_results_and_metadata_df.columns = ["Method", "Preprocessing Hyperparameters", "Method Hyperparameters", "Average F1.5", "preprocessing_hash", "hyperparameter_hash"]
+best_hyperparameter_df = validation_results_and_metadata_df.iloc[:,:3]
+best_hyperparameter_df.set_index("Method", inplace=True)
 
-validation_results = db_cursor.execute("SELECT method, method_hyperparameters, MAX(metric), preprocessing_hash, hyperparameter_hash FROM experiment_results WHERE which_split='Validation' GROUP BY method").fetchall()
-
-validation_results_df = pd.DataFrame(validation_results).iloc[:,:3]
-validation_results_df.columns = ["Method", "Hyperparameters", "Average F1.5"]
-validation_results_df.set_index("Method", inplace=True)
-
-for i in range(validation_results_df.shape[0]):
+for i in range(best_hyperparameter_df.shape[0]):
     #Treat ensembles differently:
-    if validation_results_df.index[i] in ["NaiveEnsemble", "StackEnsemble", "SequentialEnsemble"]:
-        method_dict = jsonpickle.loads(validation_results_df["Hyperparameters"].iloc[i])
+    
+    hyperparameters = jsonpickle.loads(best_hyperparameter_df["Method Hyperparameters"].iloc[i])
+    if "method_classes" in hyperparameters: #if dict has method_classes, the method is an ensemble method
+        method_dict = hyperparameters
         hyperparameter_strings = []
         for method, hyperparameters in zip(method_dict["method_classes"], method_dict["method_hyperparameter_dict_list"]):
             method_name = method("temp","temp").method_name
             hyperparameter_strings.append(method_name + ":" + str(hyperparameters))
-        validation_results_df["Hyperparameters"].iloc[i] = "\n".join(hyperparameter_strings)
+        best_hyperparameter_df["Method Hyperparameters"].iloc[i] = "\n".join(hyperparameter_strings)
     else:
-        hyperparameters = jsonpickle.loads(validation_results_df["Hyperparameters"].iloc[i])
         hyperparameters.pop("used_cutoffs", None)
-        validation_results_df["Hyperparameters"].iloc[i] = str(hyperparameters)
-        
-validation_results_df.to_latex(buf=os.path.join(table_folder, "validation_results_df.tex"))
-        
+        best_hyperparameter_df["Method Hyperparameters"].iloc[i] = str(hyperparameters)
+    preprocessing_hyperparameters = jsonpickle.loads(best_hyperparameter_df["Preprocessing Hyperparameters"].iloc[i])
+    best_hyperparameter_df["Preprocessing Hyperparameters"].iloc[i] = str(preprocessing_hyperparameters)
+    
+with pd.option_context("display.max_colwidth", None):
+    best_hyperparameter_df.to_latex(buf=os.path.join(table_folder, "best_hyperparameters.tex"), multirow=True)
+
+#extended results:
+full_validation_results = []
+for i, row in validation_results_and_metadata_df.iterrows():
+    #load PRFAUC table:
+    method_name = row["Method"]
+    preprocessing_hash = row["preprocessing_hash"]
+    hyperparameter_hash = row["hyperparameter_hash"]
+    PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", "Validation", method_name, preprocessing_hash)
+    PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+    PRFAUC_table.loc["Average", :] = PRFAUC_table.mean()
+    
+    index = [PRFAUC_table.index, [method_name]]
+    index = pd.MultiIndex.from_product([[method_name], PRFAUC_table.index], names=["Method", "Length category"])
+    
+    PRFAUC_table.index = index
+    
+    full_validation_results.append(PRFAUC_table)
+    #df_entry = 
+full_validation_results_df = pd.concat(full_validation_results).round(3)
+full_validation_results_df.rename(cutoff_replacement_dict, inplace=True)
+full_validation_results_df.rename(columns={"precision":"Precision", "recall":"Recall","ROC/AUC":"AUC"}, inplace=True)
+
+
+full_validation_results_df.to_latex(buf=os.path.join(table_folder, "full_validation_results.tex"), multirow=True)
+
 #%% Visualize/tabularize segmentation results of different methods
 

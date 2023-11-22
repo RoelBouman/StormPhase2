@@ -556,7 +556,7 @@ class StackEnsemble(SaveableEnsemble):
         
         self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
         
-        self.method_name = " + ".join([model.method_name for model in self.models])
+        self.method_name = "+".join([model.method_name for model in self.models])
         #self.method_name = "StackEnsemble"
         
         super().__init__(base_models_path, preprocessing_hash)
