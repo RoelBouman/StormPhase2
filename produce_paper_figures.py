@@ -109,42 +109,50 @@ plt.savefig(os.path.join(figure_folder, "measurement_example.png"), format="png"
 plt.show()
 #event_length_distribution.pdf, event_length_stats.tex
 #Show as histogram and stats table
-lengths = []
+lengths = {}
 for split_name in all_dataset_names:
     lengths_path = os.path.join(intermediates_folder, "event_length_pickles", split_name)
     length_pickle_path = os.path.join(lengths_path, os.listdir(lengths_path)[0]) #pick first folder, as it shouldn't matter for event length distribution
 
     with open(length_pickle_path, 'rb') as handle:
-        lengths += pickle.load(handle)
+        lengths[split_name] = pickle.load(handle)
 
-concat_lengths = np.concatenate(lengths)
+lengths["All"] = [df for dfs_list in lengths.values() for df in dfs_list]
 
-unique_lengths, length_counts = np.unique(concat_lengths, return_counts=True)
+normalized_length_count_per_cutoff_list = []
+length_count_per_cutoff_list = []
 
-
-unique_lengths = unique_lengths[1:]
-length_counts = length_counts[1:]
-
-normalized_length_counts = []
-for unique_length, length_count in zip(unique_lengths, length_counts):#skip 0
-    normalized_length_counts.append(length_count/unique_length)
+for split in all_dataset_names+["All"]:
+    concat_lengths = np.concatenate(lengths[split])
     
-normalized_length_count_per_cutoff = {str(cutoff):0 for cutoff in all_cutoffs}
-length_count_per_cutoff = {str(cutoff):0 for cutoff in all_cutoffs}
+    unique_lengths, length_counts = np.unique(concat_lengths, return_counts=True)
+    
+    
+    unique_lengths = unique_lengths[1:]
+    length_counts = length_counts[1:]
+    
+    normalized_length_counts = []
+    for unique_length, length_count in zip(unique_lengths, length_counts):#skip 0
+        normalized_length_counts.append(length_count/unique_length)
+        
+    normalized_length_count_per_cutoff = {str(cutoff):0 for cutoff in all_cutoffs}
+    length_count_per_cutoff = {str(cutoff):0 for cutoff in all_cutoffs}
+    
+    for unique_length, normalized_length_count, length_count in zip(unique_lengths,normalized_length_counts, length_counts):
+        for cutoff in all_cutoffs:
+            if unique_length >= cutoff[0] and unique_length < cutoff[1]: 
+                normalized_length_count_per_cutoff[str(cutoff)] += normalized_length_count
+                length_count_per_cutoff[str(cutoff)] += length_count
+                
+    normalized_length_count_per_cutoff_list.append({key:[value][0] for key, value in normalized_length_count_per_cutoff.items()})
+    length_count_per_cutoff_list.append({key:[value][0] for key, value in length_count_per_cutoff.items()})
 
-for unique_length, normalized_length_count, length_count in zip(unique_lengths,normalized_length_counts, length_counts):
-    for cutoff in all_cutoffs:
-        if unique_length >= cutoff[0] and unique_length < cutoff[1]: 
-            normalized_length_count_per_cutoff[str(cutoff)] += normalized_length_count
-            length_count_per_cutoff[str(cutoff)] += length_count
-            
-normalized_length_count_per_cutoff = {key:[value] for key, value in normalized_length_count_per_cutoff.items()}
-length_count_per_cutoff = {key:[value] for key, value in length_count_per_cutoff.items()}
-
-event_length_stats = pd.concat([pd.DataFrame(normalized_length_count_per_cutoff), pd.DataFrame(length_count_per_cutoff)]).astype(int)
-event_length_stats.index = ["Number of events per category", "Number of label $1$ per category"]
+event_length_stats = pd.concat([pd.DataFrame(normalized_length_count_per_cutoff_list), pd.DataFrame(length_count_per_cutoff_list)]).astype(int)
+event_length_stats.index = pd.MultiIndex.from_product([["Event count", "Label $1$ count"], list(lengths.keys())], names=["", "Dataset"])
+    
+    
 event_length_stats.rename(columns=cutoff_replacement_dict, inplace=True)
-event_length_stats.to_latex(buf=os.path.join(table_folder, "event_length_stats.tex"), escape=False)
+event_length_stats.to_latex(buf=os.path.join(table_folder, "event_length_stats.tex"), escape=False, multirow=True)
 
 lengths_to_hist = []
 for unique_length, normalized_length_count in zip(unique_lengths, normalized_length_counts):
