@@ -241,12 +241,13 @@ class StatisticalProcessControl(ScoreCalculator):
 
 class IsolationForest(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], **params):
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, **params):
         super().__init__()
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.score_function = score_function
         self.used_cutoffs = used_cutoffs
+        self.forest_per_station = forest_per_station
         self.params = params
         
         # define IsolationForest model
@@ -274,22 +275,22 @@ class IsolationForest(ScoreCalculator):
         else:
             y_scores_dfs = []
                 
-            if fit:
-                #flatten and fit model on that
+            if not self.forest_per_station and fit:
+                    
+                #flatten and fit model on that (model is only reused if forest_per_station=False)
                 flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
                 self.model.fit(flat_X_dfs_diff)
                 
-            scores = []
-            station_maxs = []
+            #station_maxs = []
             for X_df in X_dfs:
-                scores.append(self.model.decision_function(X_df['diff'].values.reshape(-1,1)))
-                station_maxs.append(np.max(scores[-1]))
-            max_score = max(station_maxs)
-                
-            for score in scores:
-                # calculate and scale the scores
-                scaled_score = max_score - (score - 1)
+                if self.forest_per_station:
+                    self.model.fit(X_df['diff'].values.reshape(-1,1))
+                score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
+                scaled_score = -score + 1
+                if min(scaled_score) < 0:
+                    raise ValueError("IF scaled_score lower than 0, something went wrong.")
                 y_scores_dfs.append(pd.DataFrame(scaled_score))
+
     
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
@@ -308,7 +309,10 @@ class IsolationForest(ScoreCalculator):
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def get_model_string(self):
-        model_string = str(self.params).encode("utf-8")
+        hyperparam_dict = {}
+        hyperparam_dict["params"] = self.params
+        hyperparam_dict["forest_per_station"] = self.forest_per_station
+        model_string = str(hyperparam_dict).encode("utf-8")
         
         return model_string
     
