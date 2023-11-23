@@ -317,6 +317,5 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None
             
             case "SingleThresholdIF" :
                 threshold = model.optimal_threshold
-                print(threshold)
                 y_scores = model.y_scores[station]
                 plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()))
