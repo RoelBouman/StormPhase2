@@ -220,7 +220,7 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     plt.show()
 
 
-def plot_IF(X_df, preds, y_scores, file, model_string):
+def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -231,6 +231,8 @@ def plot_IF(X_df, preds, y_scores, file, model_string):
         dataframe to be plottedd
     preds : dataframe
         dataframe containing the predictions (0 or 1)
+    threshold : int
+        threshold on the scores that decides which values are classified as outliers
     file : string
         filename of the dataframe
     model_string : string
@@ -257,7 +259,12 @@ def plot_IF(X_df, preds, y_scores, file, model_string):
     plot_IFscores(y_scores)
     sns.set_theme()
     
+    # plot threshold on scores
+    plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
+    
     ax2.set_ylabel("Scores", fontsize=25)
+    
+    plt.legend(fontsize=20, loc="lower left")
     
     # Predictions plot
     ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
@@ -309,5 +316,7 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None
                 plot_BS(X_df, preds, threshold, file, bkps, str(model.get_model_string()))
             
             case "SingleThresholdIF" :
+                threshold = model.optimal_threshold
+                print(threshold)
                 y_scores = model.y_scores[station]
-                plot_IF(X_df, preds, y_scores, file, str(model.get_model_string()))
+                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()))

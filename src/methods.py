@@ -425,7 +425,8 @@ class BinarySegmentation(ScoreCalculator):
         total_mean = np.mean(df) # calculate mean of all values in timeseries
         
         prev_bkp = 0
-                
+        
+        # the final value in the bkps list is always equal to len(df)
         for bkp in bkps:
             segment = df[prev_bkp:bkp] # define a segment between two breakpoints
             segment_mean = np.mean(segment)
