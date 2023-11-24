@@ -187,7 +187,7 @@ class ScoreCalculator:
     def check_cutoffs(self, cutoffs):
         return cutoffs == self.used_cutoffs
         
-class StatisticalProfiling(ScoreCalculator):
+class StatisticalProcessControl(ScoreCalculator):
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
         super().__init__()
@@ -329,7 +329,7 @@ class IsolationForest(ScoreCalculator):
     
 class BinarySegmentation(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, **params):
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         super().__init__()
         self.score_function = score_function
@@ -339,6 +339,7 @@ class BinarySegmentation(ScoreCalculator):
         self.penalty = penalty        
         self.used_cutoffs = used_cutoffs
         self.params = params
+        self.reference_point = reference_point
         
         # keep track of breakpoints for visualization
         self.breakpoints_list = []
@@ -390,7 +391,7 @@ class BinarySegmentation(ScoreCalculator):
                 bkps = self.model.fit_predict(signal, pen = penalty)
                 self.breakpoints_list.append(bkps)
                 
-                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps)))
+                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
     
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
@@ -420,9 +421,30 @@ class BinarySegmentation(ScoreCalculator):
         
         return beta * tot_sum
     
-    def data_to_score(self, df, bkps):
+    def data_to_score(self, df, bkps, reference_point):
         y_score = np.zeros(len(df))
-        total_mean = np.mean(df) # calculate mean of all values in timeseries
+        
+        if reference_point.lower() == "mean":
+            ref_point = np.mean(df) # calculate mean of all values in timeseries
+        elif reference_point.lower() == "median":
+            ref_point = np.median(df)
+        elif reference_point.lower() == "longest_mean" or reference_point.lower() == "longest_median": #compare to longest segment mean
+            prev_bkp = 0
+            longest_segment_length = 0
+            for bkp in bkps:
+                segment_length = bkp-prev_bkp
+                if segment_length > longest_segment_length:
+                    first_bkp_longest_segment = prev_bkp
+                    last_bkp_longest_segment = bkp
+                    longest_segment_length = segment_length
+                prev_bkp = bkp
+            if reference_point.lower() == "longest_mean":
+                ref_point = np.mean(df[first_bkp_longest_segment:last_bkp_longest_segment])
+            elif reference_point.lower() == "longest_median":
+                ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
+                
+        else:
+            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest'}")
         
         prev_bkp = 0
         
@@ -432,7 +454,7 @@ class BinarySegmentation(ScoreCalculator):
             segment_mean = np.mean(segment)
             
             # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
-            y_score[prev_bkp:bkp] = total_mean - segment_mean   
+            y_score[prev_bkp:bkp] = ref_point - segment_mean   
             
             prev_bkp = bkp
         
@@ -445,6 +467,7 @@ class BinarySegmentation(ScoreCalculator):
         hyperparam_dict["scaling"] = self.scaling
         hyperparam_dict["penalty"] = self.penalty
         hyperparam_dict["params"] = self.params
+        hyperparam_dict["reference_point"] = self.reference_point
         model_string = str(hyperparam_dict).encode("utf-8")
         
         return model_string
@@ -512,21 +535,21 @@ class SaveableModel(ABC):
         
 
 
-class SingleThresholdStatisticalProfiling(StatisticalProfiling, SingleThresholdMethod, SaveableModel):
+class SingleThresholdStatisticalProcessControl(StatisticalProcessControl, SingleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, **params):
         super().__init__(**params)
         SingleThresholdMethod.__init__(self)
-        self.method_name = "SingleThresholdSP"
+        self.method_name = "SingleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
 
         
-class DoubleThresholdStatisticalProfiling(StatisticalProfiling, DoubleThresholdMethod, SaveableModel):
+class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, **params):
         super().__init__(**params)
         DoubleThresholdMethod.__init__(self)
-        self.method_name = "DoubleThresholdSP"
+        self.method_name = "DoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
 
         
@@ -580,7 +603,7 @@ class StackEnsemble(SaveableEnsemble):
         
         self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
         
-        self.method_name = " + ".join([model.method_name for model in self.models])
+        self.method_name = "+".join([model.method_name for model in self.models])
         #self.method_name = "StackEnsemble"
         
         super().__init__(base_models_path, preprocessing_hash)
