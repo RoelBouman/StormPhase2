@@ -62,7 +62,7 @@ def plot_bkps(signal, bkps, **kwargs):
             col = "#4286f4"
             
 def plot_IFscores(scores, **kwargs):
-    plt.plot(scores, **kwargs)
+    plt.plot(scores, **kwargs) # add colourmap
     
 
 def plot_SP(X_df, preds, threshold, file, model_string):
