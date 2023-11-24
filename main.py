@@ -118,7 +118,7 @@ SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size'
 StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProfiling]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSP":SingleThresholdStatisticalProfiling, "StackEnsemble":StackEnsemble}
-methods = {"SingleThresholdIF": SingleThresholdIsolationForest}
+methods = {"SingleThresholdSP": SingleThresholdStatisticalProfiling}
 hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdIF": SingleThresholdIF_hyperparameters, "SingleThresholdSP":SingleThresholdSP_hyperparameters, "DoubleThresholdSP": DoubleThresholdSP_hyperparameters, "StackEnsemble":StackEnsemble_hyperparameters}
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch

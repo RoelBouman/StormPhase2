@@ -116,10 +116,10 @@ def plot_SP(X_df, preds, threshold, file, model_string):
     plt.yticks(fontsize=20)
     plt.ylabel("S diff", fontsize=25)
     
-    plt.axhline(y=lower_threshold, color='r', linestyle='-')
-    plt.axhline(y=upper_threshold, color='r', linestyle='-')
+    plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
+    plt.axhline(y=upper_threshold, color='black', linestyle='dashed')
     
-    #plt.legend(fontsize=20, loc="lower left")
+    plt.legend(fontsize=20, loc="lower left")
     
     # Predictions plot
     ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
@@ -180,8 +180,8 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     plt.ylabel("S diff", fontsize=25)
     
     # plot total mean and thresholds
-    total_mean = np.mean(signal)
-    plt.axhline(y=total_mean, color='orange', linestyle='-', linewidth=5, label = "Mean over total")
+    total_mean = np.mean(signal) # only works for reference point = mean
+    plt.axhline(y=total_mean, color='orange', linestyle='-', linewidth=5, label = "Reference Point")
     plt.axhline(y=total_mean + lower_threshold, color='black', linestyle='dashed', label = "threshold")
     plt.axhline(y=total_mean + upper_threshold, color='black', linestyle='dashed')
     
