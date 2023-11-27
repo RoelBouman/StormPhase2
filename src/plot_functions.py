@@ -9,6 +9,8 @@ import pandas as pd
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
+from sklearn.preprocessing import RobustScaler
+
 def plot_BU_original(df, **kwargs):
     plt.plot(df["BU_original"], **kwargs)
     
@@ -65,7 +67,7 @@ def plot_IFscores(scores, **kwargs):
     plt.plot(scores, **kwargs) # add colourmap
     
 
-def plot_SP(X_df, preds, threshold, file, model_string):
+def plot_SP(X_df, preds, threshold, file, model_string, paper_plot):
     """
     Plot the predictions and original plot for the statistical profiling method,
     overlay with thresholds and colour appropriately
@@ -82,6 +84,8 @@ def plot_SP(X_df, preds, threshold, file, model_string):
         filename of the dataframe
     model_string : string
         current model
+    paper_plot : boolean
+        indicates whether to print the plot without title and predictions
 
     """
     
@@ -92,8 +96,13 @@ def plot_SP(X_df, preds, threshold, file, model_string):
         lower_threshold, upper_threshold = -threshold, threshold
      
     fig = plt.figure(figsize=(30,16))  
-    plt.title("SP, " + model_string + "\n Predictions station: " + file, fontsize=60)
-    gs = GridSpec(5, 1, figure=fig)
+    
+    
+    if paper_plot:
+        gs = GridSpec(4, 1, figure=fig)
+    else:
+        plt.title("SPC, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        gs = GridSpec(5, 1, figure=fig)
     
     #Diff plot:       
     ax1 = fig.add_subplot(gs[:4,:])
@@ -114,7 +123,7 @@ def plot_SP(X_df, preds, threshold, file, model_string):
     sns.set_theme()
     
     plt.yticks(fontsize=20)
-    plt.ylabel("S diff", fontsize=25)
+    plt.ylabel("Scaled difference factor", fontsize=25)
     
     plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
     plt.axhline(y=upper_threshold, color='black', linestyle='dashed')
@@ -122,11 +131,12 @@ def plot_SP(X_df, preds, threshold, file, model_string):
     plt.legend(fontsize=20, loc="lower left")
     
     # Predictions plot
-    ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
-    plot_labels(preds, label="label")
-    sns.set_theme()
-    
-    ax2.set_ylabel("Predictions", fontsize=25)
+    if not paper_plot:
+        ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
+        plot_labels(preds, label="label")
+        sns.set_theme()
+        
+        ax2.set_ylabel("Predictions", fontsize=25)
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
     plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
@@ -139,7 +149,7 @@ def plot_SP(X_df, preds, threshold, file, model_string):
     fig.tight_layout()
     plt.show()
     
-def plot_BS(X_df, preds, threshold, file, bkps, model_string):
+def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -156,6 +166,8 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
         filename of the dataframe
     model_string : string
         current model
+    paper_plot : boolean
+        indicates whether to print the plot without title and predictions
 
     """
     
@@ -166,25 +178,32 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
         lower_threshold, upper_threshold = -threshold, threshold
      
     fig = plt.figure(figsize=(30,16))  
-    plt.title("BS, " + model_string + "\n Predictions station: " + file, fontsize=60)
-    gs = GridSpec(5, 1, figure=fig)
     
-    #Diff plot:
-    signal = X_df['diff'].values.reshape(-1,1)
+    if paper_plot:
+        gs = GridSpec(4, 1, figure=fig)
+    else:
+        plt.title("BS, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        gs = GridSpec(5, 1, figure=fig)
+    
+    #Diff plot:    
+    bkps = model.get_breakpoints(X_df["diff"].values.reshape(-1,1))
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(signal, bkps, label="diff")
+    plot_bkps(X_df['diff'], bkps, label="diff")
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("S diff", fontsize=25)
+    plt.ylabel("Scaled difference factor", fontsize=25)
     
     # plot total mean and thresholds
-    total_mean = np.mean(signal) # only works for reference point = mean
-    plt.axhline(y=total_mean, color='orange', linestyle='-', linewidth=5, label = "Reference Point")
-    plt.axhline(y=total_mean + lower_threshold, color='black', linestyle='dashed', label = "threshold")
-    plt.axhline(y=total_mean + upper_threshold, color='black', linestyle='dashed')
-    
+    if model.reference_point == "mean": # only works for reference point = mean
+        total_mean = np.mean(X_df['diff']) 
+        plt.axhline(y=total_mean, color='orange', linestyle='-', linewidth=2, label = "Reference Point")
+        plt.axhline(y=total_mean + lower_threshold, color='black', linestyle='dashed', label = "threshold")
+        plt.axhline(y=total_mean + upper_threshold, color='black', linestyle='dashed')
+    else:
+        raise Exception("Only use this function when plotting on models that use the mean as reference-point") 
+        
     prev_bkp = 0
     
     # plot the means of each segment
@@ -192,7 +211,7 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
         segment = X_df['diff'][prev_bkp:bkp] # define a segment between two breakpoints
         segment_mean = np.mean(segment)
         
-        plt.axhline(y=segment_mean, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='r', linestyle='-', linewidth=5, label = 'Mean over segment')
+        plt.axhline(y=segment_mean, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='r', linestyle='-', linewidth=2, label = 'Mean over segment')
         
         prev_bkp = bkp
     
@@ -202,11 +221,12 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower right")
     
     # Predictions plot
-    ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
-    plot_labels(preds, label="label")
-    sns.set_theme()
-    
-    ax2.set_ylabel("Predictions", fontsize=25)
+    if not paper_plot:
+        ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
+        plot_labels(preds, label="label")
+        sns.set_theme()
+        
+        ax2.set_ylabel("Predictions", fontsize=25)
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
     plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
@@ -220,7 +240,7 @@ def plot_BS(X_df, preds, threshold, file, bkps, model_string):
     plt.show()
 
 
-def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
+def plot_IF(X_df, preds, threshold, y_scores, file, model_string, paper_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -237,12 +257,18 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
         filename of the dataframe
     model_string : string
         current model
+    paper_plot : boolean
+        indicates whether to print the plot without title and predictions
 
     """
      
-    fig = plt.figure(figsize=(30,16))  
-    plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
-    gs = GridSpec(5, 1, figure=fig)
+    fig = plt.figure(figsize=(30,16))
+    
+    if paper_plot:
+        gs = GridSpec(4, 1, figure=fig)
+    else:
+        plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        gs = GridSpec(5, 1, figure=fig)
     
     # Diff plot:    
     ax1 = fig.add_subplot(gs[:2,:])
@@ -250,7 +276,7 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("S diff", fontsize=25)
+    plt.ylabel("Difference factor", fontsize=25)
     
     #plt.legend(fontsize=20, loc="lower left")
     
@@ -267,11 +293,12 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
     plt.legend(fontsize=20, loc="lower left")
     
     # Predictions plot
-    ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
-    plot_labels(preds, label="label")
-    sns.set_theme()
-    
-    ax3.set_ylabel("Predictions", fontsize=25)
+    if not paper_plot:
+        ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
+        plot_labels(preds, label="label")
+        sns.set_theme()
+        
+        ax3.set_ylabel("Predictions", fontsize=25)
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
     plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
@@ -285,7 +312,7 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string):
     plt.show()
 
     
-def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None):
+def plot_predictions(X_dfs, predictions, dfs_files, model, paper_plot = False, which_stations = None):
     # select random stations if no stations selected
     if which_stations == None:
         which_stations = np.random.randint(0, len(X_dfs), 3)
@@ -297,25 +324,36 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, which_stations = None
         
         match model.method_name:
             
-            case "SingleThresholdSP" :
-                threshold = model.scaled_optimal_threshold
-                plot_SP(X_df, preds, threshold, file, str(model.get_model_string()))
+            case "SingleThresholdSPC" :
+                threshold = model.optimal_threshold
+                scaled_df = scale_diff_data(X_df, model.quantiles)
+                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), paper_plot)
             
-            case "DoubleThresholdSP" :
-                threshold = model.scaled_optimal_threshold
-                plot_SP(X_df, preds, threshold, file, str(model.get_model_string()))
+            case "DoubleThresholdSPC" :
+                threshold = model.optimal_threshold
+                scaled_df = scale_diff_data(X_df, model.quantiles)
+                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), paper_plot)
         
             case "SingleThresholdBS" :
-                threshold = model.scaled_optimal_threshold
-                bkps = model.breakpoints_list[station]
-                plot_BS(X_df, preds, threshold, file, bkps, str(model.get_model_string()))
+                threshold = model.optimal_threshold
+                if model.scaling:
+                    X_df = scale_diff_data(X_df, model.quantiles)
+                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), paper_plot)
             
             case "DoubleThresholdBS" :
-                threshold = model.scaled_optimal_threshold
-                bkps = model.breakpoints_list[station]
-                plot_BS(X_df, preds, threshold, file, bkps, str(model.get_model_string()))
+                threshold = model.optimal_threshold
+                if model.scaling:
+                    X_df = scale_diff_data(X_df, model.quantiles)
+                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), paper_plot)
             
             case "SingleThresholdIF" :
                 threshold = model.optimal_threshold
                 y_scores = model.y_scores[station]
-                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()))
+                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()), paper_plot)
+                
+def scale_diff_data(df, quantiles):
+    scaler = RobustScaler(quantile_range=quantiles)
+    scaled_diff = pd.DataFrame(scaler.fit_transform(df["diff"].values.reshape(-1,1)))
+    df["diff"] = scaled_diff
+    return df
+    

@@ -131,10 +131,6 @@ class DoubleThresholdMethod(ThresholdMethod):
         print("Optimal thresholds:")
         print((self.optimal_negative_threshold, self.optimal_positive_threshold))
         
-    def scale_thresholds(self, scaler):
-        scaled_optimal_negative_threshold = scaler.inverse_transform(np.array([self.optimal_negative_threshold]).reshape(-1,1))[0][0]
-        scaled_optimal_positive_threshold = scaler.inverse_transform(np.array([self.optimal_positive_threshold]).reshape(-1,1))[0][0]
-        self.scaled_optimal_threshold = (scaled_optimal_negative_threshold, scaled_optimal_positive_threshold)
 
 class SingleThresholdMethod(ThresholdMethod):
     #score function must accept precision and recall as input
@@ -176,9 +172,7 @@ class SingleThresholdMethod(ThresholdMethod):
     def report_thresholds(self):
         print("Optimal threshold:")
         print((self.optimal_threshold))
-        
-    def scale_thresholds(self, scaler):
-        self.scaled_optimal_threshold = scaler.inverse_transform(np.array([self.optimal_threshold]).reshape(-1,1))[0][0]
+
 
 class ScoreCalculator:
     def __init__(self):
@@ -222,14 +216,11 @@ class StatisticalProcessControl(ScoreCalculator):
             y_scores_dfs = []
             
             for X_df in X_dfs:
-                scaler = RobustScaler(quantile_range=self.quantiles).fit(X_df["diff"].values.reshape(-1,1))
-                y_scores_dfs.append(pd.DataFrame(scaler.transform(X_df["diff"].values.reshape(-1,1))))
+                scaler = RobustScaler(quantile_range=self.quantiles)
+                y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
                 
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
-                
-                # scale thresholds for visualization (currently not useful as scaler is fit on different data)
-                self.scale_thresholds(scaler)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
@@ -372,16 +363,17 @@ class BinarySegmentation(ScoreCalculator):
                 scaler = RobustScaler(quantile_range=self.quantiles)
             
             for i, X_df in enumerate(X_dfs):
-                bkps = self.get_breakpoints(X_df['diff'], scaler)
+                signal = X_df["diff"].values.reshape(-1,1)
                 
-                y_scores_dfs.append(pd.DataFrame(self.data_to_score(X_df['diff'], bkps, self.reference_point)))
+                if scaler is not None:
+                    signal = scaler.fit_transform(signal)
+                
+                bkps = self.get_breakpoints(signal)
+                
+                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
     
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
-                
-                # scale thresholds for visualization
-                if self.scaling:
-                    self.scale_thresholds(scaler)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
@@ -392,7 +384,7 @@ class BinarySegmentation(ScoreCalculator):
         
         return y_scores_dfs, y_prediction_dfs
     
-    def get_breakpoints(self, df, scaler = None):
+    def get_breakpoints(self, signal):
         """
         Find and return the breakpoints in a given dataframe
 
@@ -400,8 +392,6 @@ class BinarySegmentation(ScoreCalculator):
         ----------
         df : dataframe
             the dataframe in which the breakpoints must be found
-        scaler : sklearn Scaler object, optional
-            the scaler is used to scale the signal. If None, the data is not scaled
         
         Returns
         -------
@@ -409,10 +399,6 @@ class BinarySegmentation(ScoreCalculator):
             the integers represent the positions of the breakpoints found, always includes len(df)
 
         """
-        signal = df.values.reshape(-1,1)
-        
-        if scaler is not None:
-            signal = scaler.fit_transform(signal)
         
         # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
         if self.penalty == 'lin':
