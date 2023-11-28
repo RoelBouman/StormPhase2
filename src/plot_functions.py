@@ -3,7 +3,6 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.collections import LineCollection
 import matplotlib.patches as mpatches
 
-import ruptures as rpt
 import seaborn as sns
 
 import pandas as pd
@@ -223,7 +222,10 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("Scaled difference factor", fontsize=25)
+    if model.scaling:
+        plt.ylabel("Scaled difference factor", fontsize=25)
+    else:
+        plt.ylabel("Difference factor", fontsize=25)
     
     # plot total mean and thresholds
     if model.reference_point == "mean": # only works for reference point = mean
@@ -267,7 +269,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
     plt.show()
 
 
-def plot_IF(X_df, preds, threshold, y_scores, file, model_string, pretty_plot):
+def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -303,10 +305,12 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string, pretty_plot):
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("Difference factor", fontsize=25)
-        
+    plt.ylabel("Difference factor", fontsize=25)    
+    
     # scores plot, colouring the predicted outliers red   
     ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
+    # calculate y_scores
+    y_scores = model.get_IF_scores(X_df)
     plot_threshold_colour(y_scores, ax2, threshold)
     sns.set_theme()
     
@@ -331,13 +335,9 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string, pretty_plot):
     plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
     plt.xlim((0, len(X_df)))
     plt.xlabel("Date", fontsize=25)
-        
-    #ax2.get_xaxis().set_visible(False)
-    #ax2.get_yaxis().set_visible(False)
     
     fig.tight_layout()
     plt.show()
-
     
 def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None):
     """
@@ -395,8 +395,9 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, 
             
             case "SingleThresholdIF" :
                 threshold = model.optimal_threshold
-                y_scores = model.y_scores[station]
-                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()), pretty_plot)
+                if model.scaling:
+                    X_df = scale_diff_data(X_df, model.quantiles)
+                plot_IF(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
                 
 def scale_diff_data(df, quantiles):
     """
