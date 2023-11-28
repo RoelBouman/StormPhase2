@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt 
 from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.collections import LineCollection
+import matplotlib.patches as mpatches
 
 import ruptures as rpt
 import seaborn as sns
@@ -38,36 +39,77 @@ def plot_labels(df, **kwargs):
     plt.plot(df["label"], **kwargs)
 
 
-def plot_bkps(signal, bkps, **kwargs):
+def plot_bkps(signal, preds, bkps, ax, **kwargs):
     """
     Adapted from rpt.display for our purposes
     (https://dev.ipol.im/~truong/ruptures-docs/build/html/_modules/ruptures/show/display.html)
 
     """
-    plt.plot(signal, **kwargs)
+    ax.plot(signal, **kwargs)
     
     # color each regime according to breakpoints
     bkps = sorted(bkps)
     alpha = 0.2  # transparency of the colored background
 
     prev_bkp = 0
-    col = "#4286f4"
     
     for bkp in bkps:
-        plt.axvspan(max(0, prev_bkp - 0.5), bkp - 0.5, facecolor=col, alpha=alpha)
-        prev_bkp = bkp
-        
-        # cycle through colours
-        if col == "#4286f4":
+        # select colour to fill section with (red for outlier, blue for normal)
+        if preds["label"][bkp - 1] == 1:
             col = "#f44174"
+            label = "Predicted as outlier"
         else:
             col = "#4286f4"
-            
-def plot_IFscores(scores, **kwargs):
-    plt.plot(scores, **kwargs) # add colourmap
+            label = None
+        
+        # colour section
+        ax.axvspan(max(0, prev_bkp - 0.5), bkp - 0.5, facecolor=col, alpha=alpha, label = label)
+        prev_bkp = bkp
+        
+        # print breakpoint line
+        if bkp != 0 and bkp < len(signal):
+            ax.axvline(x=bkp - 0.5, color="k", linewidth= 3, linestyle= "--", label = "Breakpoint")
+ 
+def plot_threshold_colour(x, ax, upper_threshold, lower_theshold = None, colour1 = 'b', colour2 = 'r'):
+    """
+    Plot a line where the the points outside the thresholds are coloured differently
+
+    Parameters
+    ----------
+    x : array or series
+        the values to be plotted
+    lower_theshold : float
+        threshold below which the plot is coloured differently
+    upper_threshold : float
+        threshold below which the plot is coloured differently
+    ax : Axs object
+        the ax to plot on
+    colour1 : string, optional
+        the colour of the normal line. The default is 'b'.
+    colour2 : string, optional
+        the colour of the line outside the thresholds. The default is 'r'.
+
+    """
+    # preparation for colourmap
+    y_colormap = np.linspace(0, len(x) - 1, len(x))
+    points = np.array([y_colormap, x]).T.reshape(-1, 1, 2)
+    segments = np.concatenate([points[:-1], points[1:]], axis=1)
+    
+    # create a colourmap to paint all points above/below the threshold red
+    if lower_theshold != None:
+        cmap = ListedColormap([colour2, colour1, colour2])
+        norm = BoundaryNorm([-np.inf, lower_theshold, upper_threshold, np.inf], cmap.N)
+    else:
+        cmap = ListedColormap([colour1, colour2])
+        norm = BoundaryNorm([-np.inf, upper_threshold, np.inf], cmap.N)
+    lc = LineCollection(segments, cmap=cmap, norm=norm)
+    lc.set_array(x)
+    lc.set_linewidth(2)
+    
+    ax.add_collection(lc)
     
 
-def plot_SP(X_df, preds, threshold, file, model_string, paper_plot):
+def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     """
     Plot the predictions and original plot for the statistical profiling method,
     overlay with thresholds and colour appropriately
@@ -84,7 +126,7 @@ def plot_SP(X_df, preds, threshold, file, model_string, paper_plot):
         filename of the dataframe
     model_string : string
         current model
-    paper_plot : boolean
+    pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
     """
@@ -98,40 +140,31 @@ def plot_SP(X_df, preds, threshold, file, model_string, paper_plot):
     fig = plt.figure(figsize=(30,16))  
     
     
-    if paper_plot:
+    if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
         plt.title("SPC, " + model_string + "\n Predictions station: " + file, fontsize=60)
         gs = GridSpec(5, 1, figure=fig)
     
-    #Diff plot:       
+    # diff plot coloured correctly:       
     ax1 = fig.add_subplot(gs[:4,:])
-    
-    # preparation for colourmap
-    y_colormap = np.linspace(0, len(X_df['diff']) - 1, len(X_df['diff']))
-    points = np.array([y_colormap, X_df['diff']]).T.reshape(-1, 1, 2)
-    segments = np.concatenate([points[:-1], points[1:]], axis=1)
-    
-    # create a colourmap to paint all points above/below the threshold red
-    cmap = ListedColormap(['r', 'b', 'r'])
-    norm = BoundaryNorm([-np.inf, lower_threshold, upper_threshold, np.inf], cmap.N)
-    lc = LineCollection(segments, cmap=cmap, norm=norm)
-    lc.set_array(X_df["diff"])
-    lc.set_linewidth(2)
-    
-    ax1.add_collection(lc)
+    plot_threshold_colour(X_df["diff"], ax1, upper_threshold=upper_threshold, lower_theshold=lower_threshold)
     sns.set_theme()
     
     plt.yticks(fontsize=20)
     plt.ylabel("Scaled difference factor", fontsize=25)
     
-    plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
+    # plot thresholds
+    threshold_handle = plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
     plt.axhline(y=upper_threshold, color='black', linestyle='dashed')
     
-    plt.legend(fontsize=20, loc="lower left")
+    # helper to add red colour to legend
+    red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
+    
+    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
     
     # Predictions plot
-    if not paper_plot:
+    if not pretty_plot:
         ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
         plot_labels(preds, label="label")
         sns.set_theme()
@@ -143,13 +176,10 @@ def plot_SP(X_df, preds, threshold, file, model_string, paper_plot):
     plt.xlim((0, len(X_df)))
     plt.xlabel("Date", fontsize=25)
     
-    #ax2.get_xaxis().set_visible(False)
-    #ax2.get_yaxis().set_visible(False)
-    
     fig.tight_layout()
     plt.show()
     
-def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
+def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -157,7 +187,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
     Parameters
     ----------
     X_df : dataframe
-        dataframe to be plottedd
+        dataframe to be plotted, contains column named "diff"
     preds : dataframe
         dataframe containing the predictions (0 or 1)
     threshold : int or tuple
@@ -166,7 +196,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
         filename of the dataframe
     model_string : string
         current model
-    paper_plot : boolean
+    pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
     """
@@ -179,7 +209,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
      
     fig = plt.figure(figsize=(30,16))  
     
-    if paper_plot:
+    if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
         plt.title("BS, " + model_string + "\n Predictions station: " + file, fontsize=60)
@@ -189,7 +219,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
     bkps = model.get_breakpoints(X_df["diff"].values.reshape(-1,1))
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(X_df['diff'], bkps, label="diff")
+    plot_bkps(X_df['diff'], preds, bkps, ax1)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
@@ -215,13 +245,13 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
         
         prev_bkp = bkp
     
-    # stop repeating labels
+    # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
     plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower right")
     
     # Predictions plot
-    if not paper_plot:
+    if not pretty_plot:
         ax2 = fig.add_subplot(gs[4,:],sharex=ax1)
         plot_labels(preds, label="label")
         sns.set_theme()
@@ -232,15 +262,12 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, paper_plot):
     plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
     plt.xlim((0, len(X_df)))
     plt.xlabel("Date", fontsize=25)
-        
-    #ax2.get_xaxis().set_visible(False)
-    #ax2.get_yaxis().set_visible(False)
     
     fig.tight_layout()
     plt.show()
 
 
-def plot_IF(X_df, preds, threshold, y_scores, file, model_string, paper_plot):
+def plot_IF(X_df, preds, threshold, y_scores, file, model_string, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -257,14 +284,14 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string, paper_plot):
         filename of the dataframe
     model_string : string
         current model
-    paper_plot : boolean
+    pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
     """
      
     fig = plt.figure(figsize=(30,16))
     
-    if paper_plot:
+    if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
         plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
@@ -272,28 +299,28 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string, paper_plot):
     
     # Diff plot:    
     ax1 = fig.add_subplot(gs[:2,:])
-    plot_diff(X_df, label = "diff")
+    plot_diff(X_df)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
     plt.ylabel("Difference factor", fontsize=25)
-    
-    #plt.legend(fontsize=20, loc="lower left")
-    
-    # Scores plot:    
+        
+    # scores plot, colouring the predicted outliers red   
     ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
-    plot_IFscores(y_scores)
+    plot_threshold_colour(y_scores, ax2, threshold)
     sns.set_theme()
     
     # plot threshold on scores
-    plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
+    threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
     
     ax2.set_ylabel("Scores", fontsize=25)
     
-    plt.legend(fontsize=20, loc="lower left")
+    # helper to add red colour to legend
+    red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
+    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
     
     # Predictions plot
-    if not paper_plot:
+    if not pretty_plot:
         ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
         plot_labels(preds, label="label")
         sns.set_theme()
@@ -312,7 +339,26 @@ def plot_IF(X_df, preds, threshold, y_scores, file, model_string, paper_plot):
     plt.show()
 
     
-def plot_predictions(X_dfs, predictions, dfs_files, model, paper_plot = False, which_stations = None):
+def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None):
+    """
+    Plot the predictions made by a specific model in a way that makes sense for the method
+
+    Parameters
+    ----------
+    X_dfs : list of dataframes
+        the dataframes on which the predictions were made
+    predictions : list of dataframes
+        the dataframes with the predictions (0 and 1s), must be in the same order as X_dfs
+    dfs_files : list of strings
+        the file names of the dataframes, must be in the same order as X_dfs
+    model : a SaveableModel object
+        the model used to predict on the data
+    pretty_plot : boolean, optional
+        decides whether to create plots without excess information. The default is False.
+    which_stations : list of ints, optional
+        the indices of the dataframes to be plotted. If None, select random stations
+
+    """
     # select random stations if no stations selected
     if which_stations == None:
         which_stations = np.random.randint(0, len(X_dfs), 3)
@@ -322,38 +368,59 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, paper_plot = False, w
         preds = predictions[station]
         file = dfs_files[station]
         
+        # find model used
         match model.method_name:
             
             case "SingleThresholdSPC" :
                 threshold = model.optimal_threshold
                 scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), paper_plot)
+                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), pretty_plot)
             
             case "DoubleThresholdSPC" :
                 threshold = model.optimal_threshold
                 scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), paper_plot)
+                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), pretty_plot)
         
             case "SingleThresholdBS" :
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), paper_plot)
+                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
             
             case "DoubleThresholdBS" :
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), paper_plot)
+                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
             
             case "SingleThresholdIF" :
                 threshold = model.optimal_threshold
                 y_scores = model.y_scores[station]
-                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()), paper_plot)
+                plot_IF(X_df, preds, threshold, y_scores, file, str(model.get_model_string()), pretty_plot)
                 
 def scale_diff_data(df, quantiles):
+    """
+    Scale the "diff" column of a dataframe and return a changed copy
+
+    Parameters
+    ----------
+    df : dataframe
+        dataframe to be scaled
+    quantiles : tuple of ints
+        the quantiles used to scale the data
+
+    Returns
+    -------
+    df_copy : dataframe
+        a copy of the original dataframe with the "diff" column scaled
+
+    """
     scaler = RobustScaler(quantile_range=quantiles)
     scaled_diff = pd.DataFrame(scaler.fit_transform(df["diff"].values.reshape(-1,1)))
-    df["diff"] = scaled_diff
-    return df
+    
+    # make copy to not change original df
+    df_copy = df.copy()
+    
+    df_copy["diff"] = scaled_diff
+    return df_copy
     

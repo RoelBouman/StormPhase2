@@ -50,7 +50,7 @@ remove_missing = True
 
 write_csv_intermediates = True
 
-preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
+preprocessing_overwrite = True #if set to True, overwrite previous preprocessed data
 
 training_overwrite = True 
 testing_overwrite = False
@@ -117,7 +117,7 @@ SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90)], "used_cutof
 SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(25,75), (5,95)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean"]}
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest} #, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation} #, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble}
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdIF": SingleThresholdIF_hyperparameters, "SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, "SingleThresholdBS+SingleThresholdSPC":SingleThresholdBS_SingleThresholdSPC_hyperparameters}
 #%% Preprocess Train data and run algorithms:
@@ -190,10 +190,10 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 #save_model(model, model_path, hyperparameter_string)
                 model.save_model()
                 
-                ######################################################################################################
+                ##########################################################################################################
                 # test visualization
-                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, model)
-                ######################################################################################################
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, model, pretty_plot=True)
+                ##########################################################################################################
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
