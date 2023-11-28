@@ -110,13 +110,15 @@ StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegment
 # hyperparameter_dict = {"NaiveStackEnsemble":NaiveStackEnsemble_hyperparameters}
 
 
-SingleThresholdIF_hyperparameters = {"n_estimators": [1000], "forest_per_station":[True, False]}
+#For IF, pass sequence of dicts to avoid useless hyperparam combos (such as scaling=True, forest_per_station=True)
+SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(10,90)]}]
+                                     
 SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90)], "used_cutoffs":[all_cutoffs]}
-SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(25,75), (5,95)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_mean", "longest_median"]}
+SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(25,75)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_mean", "longest_median"]}
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
-#methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, "SingleThresholdIF":SingleThresholdIsolationForest}
+#methods = {"SingleThresholdIF":SingleThresholdIsolationForest}
+methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, "SingleThresholdIF":SingleThresholdIsolationForest}
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, "SingleThresholdBS+SingleThresholdSPC":SingleThresholdBS_SingleThresholdSPC_hyperparameters, "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 #%% Preprocess Train data and run algorithms:

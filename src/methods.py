@@ -241,14 +241,17 @@ class StatisticalProcessControl(ScoreCalculator):
 
 class IsolationForest(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, **params):
+    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, scaling=False, quantiles=(10,90), **params):
         super().__init__()
         # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
+        # Scaling is only done when forest_per_station = False, quantiles is only used when scaling=True and forest-per_station=False
         
         self.score_function = score_function
         self.used_cutoffs = used_cutoffs
         self.forest_per_station = forest_per_station
         self.params = params
+        self.scaling = scaling
+        self.quantiles = quantiles
         
         # define IsolationForest model
         self.model = IF(**params)
@@ -278,14 +281,22 @@ class IsolationForest(ScoreCalculator):
             if not self.forest_per_station and fit:
                     
                 #flatten and fit model on that (model is only reused if forest_per_station=False)
-                flat_X_dfs_diff = np.array([i for X_df in X_dfs for i in X_df['diff'].values.reshape(-1,1)])
+                if self.scaling:
+                    scaler = RobustScaler(quantile_range=self.quantiles)
+                    flat_X_dfs_diff = np.concatenate([scaler.fit_transform(X_df["diff"].values.reshape(-1,1)) for X_df in X_dfs])
+                else:
+                    flat_X_dfs_diff = np.concatenate([X_df["diff"] for X_df in X_dfs]).reshape(-1,1)
                 self.model.fit(flat_X_dfs_diff)
                 
             #station_maxs = []
             for X_df in X_dfs:
                 if self.forest_per_station:
                     self.model.fit(X_df['diff'].values.reshape(-1,1))
-                score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
+                if not self.scaling:
+                    score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
+                else:
+                    scaler = RobustScaler(quantile_range=self.quantiles)
+                    score = self.model.decision_function(scaler.fit_transform(X_df['diff'].values.reshape(-1,1)))
                 scaled_score = -score + 1
                 if min(scaled_score) < 0:
                     raise ValueError("IF scaled_score lower than 0, something went wrong.")
@@ -312,6 +323,8 @@ class IsolationForest(ScoreCalculator):
         hyperparam_dict = {}
         hyperparam_dict["params"] = self.params
         hyperparam_dict["forest_per_station"] = self.forest_per_station
+        hyperparam_dict["scaling"] = self.scaling
+        hyperparam_dict["quantiles"] = self.quantiles
         model_string = str(hyperparam_dict).encode("utf-8")
         
         return model_string
