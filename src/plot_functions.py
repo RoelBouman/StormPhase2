@@ -151,7 +151,7 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     sns.set_theme()
     
     plt.yticks(fontsize=20)
-    plt.ylabel("Scaled difference factor", fontsize=25)
+    plt.ylabel("Scaled difference vector", fontsize=25)
     
     # plot thresholds
     threshold_handle = plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
@@ -223,9 +223,9 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
 
     plt.yticks(fontsize=20)
     if model.scaling:
-        plt.ylabel("Scaled difference factor", fontsize=25)
+        plt.ylabel("Scaled difference vector", fontsize=25)
     else:
-        plt.ylabel("Difference factor", fontsize=25)
+        plt.ylabel("Difference vector", fontsize=25)
     
     # plot total mean and thresholds
     if model.reference_point == "mean": # only works for reference point = mean
@@ -305,7 +305,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("Difference factor", fontsize=25)    
+    plt.ylabel("Difference vector", fontsize=25)    
     
     # scores plot, colouring the predicted outliers red   
     ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
