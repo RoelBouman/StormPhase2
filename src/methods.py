@@ -288,21 +288,10 @@ class IsolationForest(ScoreCalculator):
                     flat_X_dfs_diff = np.concatenate([X_df["diff"] for X_df in X_dfs]).reshape(-1,1)
                 self.model.fit(flat_X_dfs_diff)
                 
-            #station_maxs = []
             for X_df in X_dfs:
-                if self.forest_per_station:
-                    self.model.fit(X_df['diff'].values.reshape(-1,1))
-                if not self.scaling:
-                    score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
-                else:
-                    scaler = RobustScaler(quantile_range=self.quantiles)
-                    score = self.model.decision_function(scaler.fit_transform(X_df['diff'].values.reshape(-1,1)))
-                scaled_score = -score + 1
-                if min(scaled_score) < 0:
-                    raise ValueError("IF scaled_score lower than 0, something went wrong.")
+                scaled_score = self.get_IF_scores(X_df)
                 y_scores_dfs.append(pd.DataFrame(scaled_score))
 
-    
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.score_function, self.used_cutoffs)
                 
@@ -314,6 +303,20 @@ class IsolationForest(ScoreCalculator):
                 pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
+    
+    def get_IF_scores(self, X_df):
+        if self.forest_per_station:
+            self.model.fit(X_df['diff'].values.reshape(-1,1))
+        if not self.scaling:
+            score = self.model.decision_function(X_df['diff'].values.reshape(-1,1))
+        else:
+            scaler = RobustScaler(quantile_range=self.quantiles)
+            score = self.model.decision_function(scaler.fit_transform(X_df['diff'].values.reshape(-1,1)))
+        scaled_score = -score + 1
+        if min(scaled_score) < 0:
+            raise ValueError("IF scaled_score lower than 0, something went wrong.")
+            
+        return scaled_score
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
@@ -372,23 +375,13 @@ class BinarySegmentation(ScoreCalculator):
                 scaler = RobustScaler(quantile_range=self.quantiles)
             
             for i, X_df in enumerate(X_dfs): 
-                signal = X_df['diff'].values.reshape(-1,1)
+                signal = X_df["diff"].values.reshape(-1,1)
                 
                 if self.scaling:
                     signal = scaler.fit_transform(signal)
                 
-                # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
-                if self.penalty == 'lin':
-                    n = len(signal)
-                    penalty = n * self.beta
-                elif self.penalty == 'fused_lasso':
-                    penalty = self.fused_lasso_penalty(signal, self.beta)
-                else:
-                    # if no correct penalty selected, raise exception
-                    raise Exception("Incorrect penalty")
-                    
-                bkps = self.model.fit_predict(signal, pen = penalty)
-                
+                bkps = self.get_breakpoints(signal)
+
                 y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
     
             if fit:
@@ -402,6 +395,36 @@ class BinarySegmentation(ScoreCalculator):
                 pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
+    
+    def get_breakpoints(self, signal):
+        """
+        Find and return the breakpoints in a given dataframe
+
+        Parameters
+        ----------
+        df : dataframe
+            the dataframe in which the breakpoints must be found
+        
+        Returns
+        -------
+        list of integers
+            the integers represent the positions of the breakpoints found, always includes len(df)
+
+        """
+        
+        # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
+        if self.penalty == 'lin':
+            n = len(signal)
+            penalty = n * self.beta
+        elif self.penalty == 'fused_lasso':
+            penalty = self.fused_lasso_penalty(signal, self.beta)
+        else:
+            # if no correct penalty selected, raise exception
+            raise Exception("Incorrect penalty")
+            
+        bkps = self.model.fit_predict(signal, pen = penalty)
+        
+        return bkps
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
         
