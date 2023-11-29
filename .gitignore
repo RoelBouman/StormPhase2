@@ -123,6 +123,9 @@ dmypy.json
 # Pyre type checker
 .pyre/
 
+# py helper testfile
+test_helper.py
+
 data/
 results/
 results_old/
