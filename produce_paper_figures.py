@@ -19,9 +19,23 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
+from hashlib import sha256
 
-from src.plot_functions import plot_S_original, plot_BU_original
-from src.io_functions import load_PRFAUC_table
+
+from src.plot_functions import plot_S_original, plot_BU_original, plot_predictions
+from src.io_functions import load_PRFAUC_table, load_batch, load_dataframe_list
+
+from src.methods import SingleThresholdStatisticalProcessControl
+from src.methods import DoubleThresholdStatisticalProcessControl
+from src.methods import SingleThresholdIsolationForest
+
+from src.methods import SingleThresholdBinarySegmentation
+from src.methods import DoubleThresholdBinarySegmentation
+
+from src.methods import StackEnsemble
+from src.methods import NaiveStackEnsemble
+
+from src.preprocess import preprocess_per_batch_and_write
 
 sns.set()
 
@@ -172,7 +186,7 @@ plt.show()
 
 #load model:
 preprocessing_hash = "10cab9fc324db7a2fd5d8674c71edb68908b5e572ffa442d201eb0ca0aa288e1"
-hyperparameter_hash = "ecf927381ef6fbb708dcf54fd846cfb856d60791b2ee998ec386c8f17661149a"
+hyperparameter_hash = "863c7a1a49f110ada1d11bf21549b9f60f53c72042a80a36a0969583a18d42e1"
 
 db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
 
@@ -271,4 +285,54 @@ full_validation_results_df.rename(columns={"precision":"Precision", "recall":"Re
 full_validation_results_df.to_latex(buf=os.path.join(table_folder, "full_validation_results.tex"), multirow=True)
 
 #%% Visualize/tabularize segmentation results of different methods
+methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdIF":SingleThresholdIsolationForest}
 
+preprocessing_overwrite=False 
+write_csv_intermediates=False
+
+which_split = "Validation"
+print("Split: Validation")
+X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
+val_file_names = X_val_files
+
+best_hyperparameters = {}
+best_preprocessing_hyperparameters = {}
+for method_name in methods:
+    print("Now plotting: " + method_name)
+    #find best preprocessing and method hyperparameters:
+
+    #Some SQL query:
+    
+    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Test"))
+    
+    (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
+    
+    best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle)
+    best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle)
+
+    preprocessing_hyperparameters = best_preprocessing_hyperparameters[method_name]
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+    
+    X_dfs_preprocessed, y_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash)
+
+ 
+    hyperparameters = best_hyperparameters[method_name] 
+    hyperparameter_string = str(hyperparameters)
+    
+    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+    model_name = model.method_name
+    hyperparameter_hash = model.get_hyperparameter_hash()
+    hyperparameter_hash_filename = model.get_filename()
+    
+    base_scores_path = os.path.join(score_folder, which_split)
+    base_predictions_path = os.path.join(predictions_folder, which_split)
+    scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
+    predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
+    
+    y_pred_dfs, _ = load_dataframe_list(predictions_path)
+    y_score_dfs, _ = load_dataframe_list(scores_path)
+    #########################################################################################################
+    # prediction visualisation testing
+    plot_predictions(X_dfs_preprocessed, y_pred_dfs, val_file_names, model, pretty_plot=True, n_stations=1)
+    #########################################################################################################

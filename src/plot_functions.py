@@ -339,7 +339,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     fig.tight_layout()
     plt.show()
     
-def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None):
+def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None, n_stations = 3):
     """
     Plot the predictions made by a specific model in a way that makes sense for the method
 
@@ -356,12 +356,12 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, 
     pretty_plot : boolean, optional
         decides whether to create plots without excess information. The default is False.
     which_stations : list of ints, optional
-        the indices of the dataframes to be plotted. If None, select random stations
+        the indices of the dataframes to be plotted. If None, select 3 random stations
 
     """
     # select random stations if no stations selected
     if which_stations == None:
-        which_stations = np.random.randint(0, len(X_dfs), 3)
+        which_stations = np.random.randint(0, len(X_dfs), n_stations)
     
     for station in which_stations:
         X_df = X_dfs[station]
