@@ -332,7 +332,8 @@ for method_name in methods:
     
     y_pred_dfs, _ = load_dataframe_list(predictions_path)
     y_score_dfs, _ = load_dataframe_list(scores_path)
-    #########################################################################################################
-    # prediction visualisation testing
+ 
+    plt.figure()
     plot_predictions(X_dfs_preprocessed, y_pred_dfs, val_file_names, model, pretty_plot=True, n_stations=1)
-    #########################################################################################################
+    plt.savefig(os.path.join(figure_folder, method_name+"_predictions.pdf"), format="pdf")
+    plt.savefig(os.path.join(figure_folder, method_name+"_predictions.png"), format="png")
