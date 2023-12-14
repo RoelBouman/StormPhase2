@@ -151,7 +151,7 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     sns.set_theme()
     
     plt.yticks(fontsize=20)
-    plt.ylabel("Scaled difference factor", fontsize=25)
+    plt.ylabel("Scaled difference vector", fontsize=25)
     
     # plot thresholds
     threshold_handle = plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
@@ -223,9 +223,9 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
 
     plt.yticks(fontsize=20)
     if model.scaling:
-        plt.ylabel("Scaled difference factor", fontsize=25)
+        plt.ylabel("Scaled difference vector", fontsize=25)
     else:
-        plt.ylabel("Difference factor", fontsize=25)
+        plt.ylabel("Difference vector", fontsize=25)
     
     # plot total mean and thresholds
     if model.reference_point == "mean": # only works for reference point = mean
@@ -305,7 +305,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     sns.set_theme()
 
     plt.yticks(fontsize=20)
-    plt.ylabel("Difference factor", fontsize=25)    
+    plt.ylabel("Difference vector", fontsize=25)    
     
     # scores plot, colouring the predicted outliers red   
     ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
@@ -339,7 +339,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     fig.tight_layout()
     plt.show()
     
-def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None):
+def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None, n_stations = 3):
     """
     Plot the predictions made by a specific model in a way that makes sense for the method
 
@@ -356,12 +356,12 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, 
     pretty_plot : boolean, optional
         decides whether to create plots without excess information. The default is False.
     which_stations : list of ints, optional
-        the indices of the dataframes to be plotted. If None, select random stations
+        the indices of the dataframes to be plotted. If None, select 3 random stations
 
     """
     # select random stations if no stations selected
     if which_stations == None:
-        which_stations = np.random.randint(0, len(X_dfs), 3)
+        which_stations = np.random.randint(0, len(X_dfs), n_stations)
     
     for station in which_stations:
         X_df = X_dfs[station]

@@ -1,0 +1,12 @@
+name: storm_paper_experiments
+dependencies:
+  - python==3.10
+  - numpy
+  - pandas
+  - scikit-learn
+  - matplotlib
+  - seaborn
+  - jsonpickle
+  - sqlite
+  - ruptures
+  - jinja2

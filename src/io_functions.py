@@ -20,6 +20,17 @@ def save_dataframe_list(dfs, station_names, folder, overwrite):
             
             df.to_csv(file_name)
             
+def load_dataframe_list(data_folder):
+    data_path = os.path.join(data_folder, "stations")
+    
+    data_files = sorted(os.listdir(data_path))
+    
+    dfs = []
+    for file in data_files:
+        dfs.append(pd.read_csv(os.path.join(data_path, file)))
+        
+    return dfs, data_files
+            
 def load_batch(data_folder, which_split):
     X_path = os.path.join(data_folder, which_split, "X")
     y_path = os.path.join(data_folder, which_split, "y")
