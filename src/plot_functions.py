@@ -165,6 +165,10 @@ def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
         elif lower_threshold != None and (first < lower_threshold < second or second < lower_threshold < first):
             crossovers.append([x[i], first, second, lower_threshold])
        
+    # if no crossovers found, return
+    if len(crossovers) == 0:
+        return x, y
+       
     midpoints = [] 
     
     # calculate all the midpoints
