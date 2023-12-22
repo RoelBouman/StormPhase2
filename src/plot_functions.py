@@ -78,26 +78,36 @@ def plot_threshold_colour(values, dates, ax, upper_threshold, lower_threshold = 
 
     Parameters
     ----------
-    X_df : dataframe containing "diff" and "M_timestamp" columns
+    values : array of floats
         the values to be plotted
+    dates : array of strings that can be turned into datetime objects
+        the timestamps belonging to every value
+    ax : Axs object
+            the ax to plot on
+    upper_threshold : float
+        threshold above which the plot is coloured differently
     lower_threshold : float
         threshold below which the plot is coloured differently
-    upper_threshold : float
-        threshold below which the plot is coloured differently
-    ax : Axs object
-        the ax to plot on
     colour1 : string, optional
         the colour of the normal line. The default is 'b'.
     colour2 : string, optional
         the colour of the line outside the thresholds. The default is 'r'.
 
+    Returns
+    ---------
+    dates : array
+        new dates array with dates added that represent the midpoints
+        between points that cross the threshold
     """
     # transform strings to datetime objects
     if len(dates[0]) == 19: # if including seconds
         dates = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in dates]
-    else: # if excluding seconds
+    elif len(dates[0]) == 16: # if excluding seconds
         dates = [datetime.strptime(date, '%Y-%m-%d %H:%M') for date in dates]
-                
+    else:
+        raise Exception("Incorrect timestamp formatting")
+       
+    # adjust the data to make sure colouring is done correctly         
     dates, values = prepare_threshold_data(dates, values, upper_threshold, lower_threshold)    
     
     # preparation for colourmap
@@ -121,6 +131,30 @@ def plot_threshold_colour(values, dates, ax, upper_threshold, lower_threshold = 
     return dates
 
 def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
+    """
+    Adjust the data by finding all crossover points and adding them
+    to the x and y data
+
+    Parameters
+    ----------
+    x : array of datetimes
+        datetimes corresponding the values in y
+    y : array of floats
+        the values
+    upper_threshold : float
+        the upper threshold
+    lower_threshold : float or None
+        the lower threshold, does not exist when None
+
+    Returns
+    -------
+    x : array of datetimes
+        new array with the dates corresponding to the midpoints added
+    y : array of floats
+        new array with values of the midpoints added
+
+    """
+    
     crossovers = []
     
     # find all two points that cross over the thresholds
@@ -145,9 +179,9 @@ def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
             # slightly decrease the y-value so that it is just below the threshold   
             y_new -= 0.00001
             x_new = np.interp(y_new, [second, first], [0, 15])
-                    
+        
+        # create the new timestamp using the interpolated x and adding it to the time            
         new_time = time + timedelta(minutes = int(x_new), seconds = int(60 * (x_new - int(x_new))))
-                
         midpoints.append([new_time, y_new])
     
     midpoints = np.array(midpoints)
