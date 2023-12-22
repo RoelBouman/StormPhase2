@@ -26,6 +26,8 @@ from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_ab
 
 from src.reporting_functions import print_metrics_and_stats
 
+from src.plot_functions import plot_predictions
+
 #%% set process variables
 
 data_folder = "data"
@@ -119,8 +121,8 @@ SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size'
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
-methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, "SingleThresholdIF":SingleThresholdIsolationForest}
-#methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
+#methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation, "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, "SingleThresholdIF":SingleThresholdIsolationForest}
+methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdBS":SingleThresholdBS_hyperparameters, "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, "SingleThresholdBS+SingleThresholdSPC":SingleThresholdBS_SingleThresholdSPC_hyperparameters, "SingleThresholdIF":SingleThresholdIF_hyperparameters}
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
@@ -191,6 +193,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 
                 #save_model(model, model_path, hyperparameter_string)
                 model.save_model()
+                
+                #########################################################################################################
+                # prediction visualisation testing
+                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, model, pretty_plot=True)
+                #########################################################################################################
                 
             else:
                 print("Model already evaluated, loading results instead:")
