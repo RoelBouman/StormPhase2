@@ -194,11 +194,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 #save_model(model, model_path, hyperparameter_string)
                 model.save_model()
                 
-                #########################################################################################################
-                # prediction visualisation testing
-                plot_predictions(X_train_dfs_preprocessed, y_train_predictions_dfs, X_train_files, model, pretty_plot=True)
-                #########################################################################################################
-                
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
