@@ -28,10 +28,11 @@ from src.reporting_functions import print_metrics_and_stats
 
 #%% set process variables
 
-data_folder = "data"
-result_folder = "results"
-intermediates_folder = "intermediates"
-model_folder = "saved_models"
+dataset = "OS_data" #alternatively: route_data
+data_folder = os.path.join("data", dataset)
+result_folder = os.path.join("results", dataset)
+intermediates_folder = os.path.join("intermediates", dataset)
+model_folder = os.path.join("saved_models", dataset)
 
 score_folder = os.path.join(result_folder, "scores")
 predictions_folder = os.path.join(result_folder, "predictions")
@@ -57,7 +58,7 @@ validation_overwrite = False
 
 #%% set up database
 
-DBFILE = "experiment_results.db"
+DBFILE = os.path.join(dataset, "experiment_results.db")
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist

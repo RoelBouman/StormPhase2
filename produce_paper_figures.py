@@ -41,13 +41,14 @@ sns.set()
 
 #%% Data loading
 
-data_folder = "data"
-result_folder = "results"
-intermediates_folder = "intermediates"
-model_folder = "saved_models"
+dataset = "OS_data" #alternatively: route_data
+data_folder = os.path.join("data", dataset)
+result_folder = os.path.join("results", dataset)
+intermediates_folder = os.path.join("intermediates", dataset)
+model_folder = os.path.join("saved_models", dataset)
 
-table_folder = "Tables"
-figure_folder = "Figures"
+table_folder = os.path.join("Tables", dataset)
+figure_folder = os.path.join("Figures", dataset)
 
 os.makedirs(table_folder, exist_ok=True)
 os.makedirs(figure_folder, exist_ok=True)
