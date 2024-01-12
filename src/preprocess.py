@@ -99,7 +99,11 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     # 2 bottom up missing
     
     X_df['S'] = X_df['S_original'].copy()
-    X_df['missing'] = 0
+    
+    #If no "missing" column is supplied, construct one based on set criteria (missing BU or repeating measurements (based on subsequent_nr))
+    if not "missing" in X_df.columns:
+        X_df['missing'] = 0    
+    
     X_df.loc[X_df['BU_original'].isnull(),'missing'] = 2
     
     prev_v = 0
