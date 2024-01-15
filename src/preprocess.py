@@ -79,6 +79,27 @@ def get_event_lengths(y_df):
             lengths[event_start_index:event_end_index] = event_end_index-event_start_index
         return pd.DataFrame({"lengths":lengths})
 
+
+def find_subsequent_duplicates(y, subsequent_duplicates):
+    n = len(y)
+    subsequent_filter = np.zeros((n,))
+
+    if n < 2 or subsequent_duplicates < 1:
+        return subsequent_filter  # No subsequent duplicates possible
+
+    count = 1  # Initialize count for the first element
+    for i in range(1, n):
+        if y[i] == y[i - 1]:
+            count += 1
+        else:
+            count = 1  # Reset count if the current element is different
+
+        if count >= subsequent_duplicates:
+            for j in range(i - count + 1, i + 1):
+                subsequent_filter[j] = 1  # Set subsequent_filter to 1 for the repeating elements
+
+    return subsequent_filter
+
 def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
@@ -104,27 +125,16 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     if not "missing" in X_df.columns:
         X_df['missing'] = 0    
     
-    X_df.loc[X_df['BU_original'].isnull(),'missing'] = 2
+    X_df.loc[X_df['BU_original'].isnull(),'missing'] = 1
+    X_df.loc[X_df['S_original'].isnull(),'missing'] = 1
     
     prev_v = 0
     prev_i = 0
     count = subsequent_nr
     
-    # Flag measurement as missing when # of times after each other the same value
-    for i, v in enumerate(X_df['S']):
-        # if value is same as previous, decrease count by 1
-        if v == prev_v:
-            count -= 1
-            continue
-            
-        # if not, check if previous count below zero, if so, set all missing values to 1
-        elif count <= 0:
-            X_df.loc[prev_i:i - 1, 'missing'] = 1
-            
-        # reset vars
-        prev_v = v
-        prev_i = i
-        count = subsequent_nr
+    subsequent_filter = find_subsequent_duplicates(X_df["S"], subsequent_nr)
+    
+    X_df['missing'] = np.logical_or(X_df["missing"], subsequent_filter)
     
     # Match bottom up with substation measurements for the middle N% of the values and apply sign to substation measurements
     arr = X_df[X_df['missing']==0]
