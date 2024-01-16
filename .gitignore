@@ -146,3 +146,4 @@ binseg_plots/
 *.old
 *.csv
 /raw_data/route_data/route_labeled_metadata.xlsx
+*.~lock.route_labeled_metadata.xlsx\#
