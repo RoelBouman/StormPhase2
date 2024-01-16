@@ -3,6 +3,8 @@ from matplotlib.colors import ListedColormap, BoundaryNorm
 from matplotlib.collections import LineCollection
 import matplotlib.patches as mpatches
 
+from datetime import datetime, timedelta
+
 import seaborn as sns
 
 import pandas as pd
@@ -10,6 +12,7 @@ import numpy as np
 from matplotlib.gridspec import GridSpec
 
 from sklearn.preprocessing import RobustScaler
+
 
 def plot_BU_original(df, **kwargs):
     plt.plot(df["BU_original"], **kwargs)
@@ -69,45 +72,134 @@ def plot_bkps(signal, preds, bkps, ax, **kwargs):
         if bkp != 0 and bkp < len(signal):
             ax.axvline(x=bkp - 0.5, color="k", linewidth= 3, linestyle= "--", label = "Breakpoint")
  
-def plot_threshold_colour(x, ax, upper_threshold, lower_theshold = None, colour1 = 'b', colour2 = 'r'):
+def plot_threshold_colour(values, dates, ax, upper_threshold, lower_threshold = None, colour1 = 'b', colour2 = 'r'):
     """
     Plot a line where the the points outside the thresholds are coloured differently
 
     Parameters
     ----------
-    x : array or series
+    values : array of floats
         the values to be plotted
-    lower_theshold : float
-        threshold below which the plot is coloured differently
-    upper_threshold : float
-        threshold below which the plot is coloured differently
+    dates : array of strings that can be turned into datetime objects
+        the timestamps belonging to every value
     ax : Axs object
-        the ax to plot on
+            the ax to plot on
+    upper_threshold : float
+        threshold above which the plot is coloured differently
+    lower_threshold : float
+        threshold below which the plot is coloured differently
     colour1 : string, optional
         the colour of the normal line. The default is 'b'.
     colour2 : string, optional
         the colour of the line outside the thresholds. The default is 'r'.
 
+    Returns
+    ---------
+    dates : array
+        new dates array with dates added that represent the midpoints
+        between points that cross the threshold
     """
+    # transform strings to datetime objects
+    if len(dates[0]) == 19: # if including seconds
+        dates = [datetime.strptime(date, '%Y-%m-%d %H:%M:%S') for date in dates]
+    elif len(dates[0]) == 16: # if excluding seconds
+        dates = [datetime.strptime(date, '%Y-%m-%d %H:%M') for date in dates]
+    else:
+        raise Exception("Incorrect timestamp formatting")
+       
+    # adjust the data to make sure colouring is done correctly         
+    dates, values = prepare_threshold_data(dates, values, upper_threshold, lower_threshold)    
+    
     # preparation for colourmap
-    y_colormap = np.linspace(0, len(x) - 1, len(x))
-    points = np.array([y_colormap, x]).T.reshape(-1, 1, 2)
+    y_colormap = np.linspace(0, len(values) - 1, len(values))
+    points = np.array([y_colormap, values]).T.reshape(-1, 1, 2)
     segments = np.concatenate([points[:-1], points[1:]], axis=1)
     
     # create a colourmap to paint all points above/below the threshold red
-    if lower_theshold != None:
+    if lower_threshold != None:
         cmap = ListedColormap([colour2, colour1, colour2])
-        norm = BoundaryNorm([-np.inf, lower_theshold, upper_threshold, np.inf], cmap.N)
+        norm = BoundaryNorm([-np.inf, lower_threshold, upper_threshold, np.inf], cmap.N)
     else:
         cmap = ListedColormap([colour1, colour2])
         norm = BoundaryNorm([-np.inf, upper_threshold, np.inf], cmap.N)
     lc = LineCollection(segments, cmap=cmap, norm=norm)
-    lc.set_array(x)
+    lc.set_array(values)
     lc.set_linewidth(2)
     
     ax.add_collection(lc)
     
+    return dates
 
+def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
+    """
+    Adjust the data by finding all crossover points and adding them
+    to the x and y data
+
+    Parameters
+    ----------
+    x : array of datetimes
+        datetimes corresponding the values in y
+    y : array of floats
+        the values
+    upper_threshold : float
+        the upper threshold
+    lower_threshold : float or None
+        the lower threshold, does not exist when None
+
+    Returns
+    -------
+    x : array of datetimes
+        new array with the dates corresponding to the midpoints added
+    y : array of floats
+        new array with values of the midpoints added
+
+    """
+    
+    crossovers = []
+    
+    # find all two points that cross over the thresholds
+    for i, (first,second) in enumerate(zip(y[:-1], y[1:])):
+        if first < upper_threshold < second or second < upper_threshold < first:
+            # save time of first value, the two values themselves, and the threshold value
+            crossovers.append([x[i], first, second, upper_threshold])
+        elif lower_threshold != None and (first < lower_threshold < second or second < lower_threshold < first):
+            crossovers.append([x[i], first, second, lower_threshold])
+       
+    # if no crossovers found, return
+    if len(crossovers) == 0:
+        return x, y
+       
+    midpoints = [] 
+    
+    # calculate all the midpoints
+    for time, first, second, threshold in crossovers:
+        y_new = threshold 
+            
+        if first < second:
+            # slightly decrease the y-value so that it is just above the threshold        
+            y_new += 0.00001
+            x_new = np.interp(y_new, [first, second], [0, 15])
+        else:
+            # slightly decrease the y-value so that it is just below the threshold   
+            y_new -= 0.00001
+            x_new = np.interp(y_new, [second, first], [0, 15])
+        
+        # create the new timestamp using the interpolated x and adding it to the time            
+        new_time = time + timedelta(minutes = int(x_new), seconds = int(60 * (x_new - int(x_new))))
+        midpoints.append([new_time, y_new])
+    
+    midpoints = np.array(midpoints)
+            
+    x = np.concatenate((x, midpoints[:,0]))
+    y = np.concatenate((y, midpoints[:,1]))
+        
+    # sort both arrays by time
+    y = [v for _, v in sorted(zip(x, y))]
+    x = sorted(x) 
+    
+    return x, y
+    
+    
 def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     """
     Plot the predictions and original plot for the statistical profiling method,
@@ -138,7 +230,6 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
      
     fig = plt.figure(figsize=(30,16))  
     
-    
     if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
@@ -147,7 +238,7 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     
     # diff plot coloured correctly:       
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_threshold_colour(X_df["diff"], ax1, upper_threshold=upper_threshold, lower_theshold=lower_threshold)
+    dates = plot_threshold_colour(np.array(X_df["diff"]), np.array(X_df["M_TIMESTAMP"]), ax1, upper_threshold=upper_threshold, lower_threshold=lower_threshold)
     sns.set_theme()
     
     plt.yticks(fontsize=20)
@@ -170,8 +261,8 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
         
         ax2.set_ylabel("Predictions", fontsize=25)
     
-    ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    ticks = np.linspace(0,len(X_df)-1, 10, dtype=int)
+    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45, fontsize=20)
     plt.xlim((0, len(X_df)))
     plt.xlabel("Date", fontsize=25)
     
@@ -311,7 +402,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
     # calculate y_scores
     y_scores = model.get_IF_scores(X_df)
-    plot_threshold_colour(y_scores, ax2, threshold)
+    dates = plot_threshold_colour(np.array(y_scores), np.array(X_df["M_TIMESTAMP"]), ax2, upper_threshold=threshold)
     sns.set_theme()
     
     # plot threshold on scores
@@ -331,8 +422,8 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
         
         ax3.set_ylabel("Predictions", fontsize=25)
     
-    ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    ticks = np.linspace(0,len(X_df)-1, 10, dtype=int)
+    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45, fontsize=20)
     plt.xlim((0, len(X_df)))
     plt.xlabel("Date", fontsize=25)
     
