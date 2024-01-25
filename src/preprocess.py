@@ -10,10 +10,10 @@ from sklearn.preprocessing import RobustScaler
 from .io_functions import save_dataframe_list
 
 
-def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None):
+def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None, uncertain_filter=[4,5]):
     
 
-    uncertain_filter = y_df["label"] == 5
+    uncertain_filter = np.isin(y_df["label"], uncertain_filter)
     
     partial_filter = {}
     #Procedure is non-inclusive on lower cutoff
@@ -65,7 +65,7 @@ def get_event_lengths(y_df):
                     pass
             else:
                 #Event starts
-                if y_df["label"][i] != 0:
+                if y_df["label"][i] == 1: #now defined that events only start at 1, but don't end at 4/5.
                     event_start_index = i
                     event_started = True
                 #Event has not started:
@@ -190,7 +190,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False, uncertain_filter=[4,5]):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -256,7 +256,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, hyperparameter_hash + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df, uncertain_filter=uncertain_filter) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
         
         os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
         with open(preprocessed_file_name, 'wb') as handle:
