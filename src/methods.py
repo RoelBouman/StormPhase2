@@ -461,7 +461,7 @@ class BinarySegmentation(ScoreCalculator):
                 ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
                 
         else:
-            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest'}")
+            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
         
         prev_bkp = 0
                 
@@ -676,7 +676,7 @@ class StackEnsemble(SaveableEnsemble):
             model.report_thresholds()
     
 class NaiveStackEnsemble(StackEnsemble):
-    def __init__(self, base_models_path, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
+    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
         cutoffs_per_method = [all_cutoffs]*len(method_classes)
         
-        super().__init__(base_models_path, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
+        super().__init__(base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
