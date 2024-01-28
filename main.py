@@ -28,7 +28,7 @@ from src.reporting_functions import print_metrics_and_stats
 
 #%% set process variables
 
-dataset = "route_data" #alternatively: route_data
+dataset = "OS_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
@@ -73,27 +73,14 @@ all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': 
 
 #%% define hyperparameters per method:
 
-SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 
-DoubleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
-
-SingleThresholdIF_hyperparameters = {"n_estimators": [1000], "forest_per_station":[True, False]}
-
-SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
-
-DoubleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.12, 0.015], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95)], "scaling": [True], "penalty": ['fused_lasso']}
-
-NaiveStackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":[all_cutoffs]}
-
-StackEnsemble_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
-
-
-#%% testrun define methods:
 
 #For IF, pass sequence of dicts to avoid useless hyperparam combos (such as scaling=True, forest_per_station=True)
 SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}]
 SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)], "used_cutoffs":[all_cutoffs]}
-SingleThresholdBS_hyperparameters = {"beta": [0.12], "model": ['l1'], 'min_size': [100], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80), (25,75)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "loongest_median" "longest_mean"]}
+SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0,05, 0,08, 0.12], "model": ['l1'], 'min_size': [50, 100, 200], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
+
+
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":all_cutoffs}
 
@@ -104,14 +91,18 @@ DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleT
 Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
 
 
+#%% define methods:
+
+
+
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
 methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
-           # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-           #  "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
-           #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-           #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
+             "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
+            # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
             # "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble
