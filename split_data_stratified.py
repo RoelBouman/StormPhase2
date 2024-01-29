@@ -19,10 +19,14 @@ raw_data_folder = "raw_data"
 processed_data_folder = "data"
 
 
-dataset = "route_data" #alternatively: route_data
+dataset = "OS_data" #alternatively: route_data
 intermediates_folder = os.path.join(raw_data_folder, dataset+"_preprocessed")
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+
+#%%
+
+dry_run = True
 
 #%%
 
@@ -160,22 +164,23 @@ all_considered_stations = all_train_stations + all_val_stations + all_test_stati
 print("Events in Train, Val, Test:")
 for stations in (all_train_stations, all_val_stations, all_test_stations):
     print(normalized_lengths_df.loc[stations].sum())
-    print(len(stations))
     
 #%% Save data to folder based on calculated split:
-stations_per_split = {"Train":all_train_stations, "Validation":all_val_stations, "Test": all_test_stations}
-
-for split, station_names in stations_per_split.items():
-    for station_name in station_names:
-        original_X_file = os.path.join(raw_data_folder, dataset, "X", station_name)
-        new_X_file = os.path.join(processed_data_folder, dataset, split, "X", station_name)
-        
-        original_y_file = os.path.join(raw_data_folder, dataset, "y", station_name)
-        new_y_file = os.path.join(processed_data_folder, dataset, split, "y", station_name)
-        
-        os.makedirs(os.path.join(processed_data_folder, dataset, split, "X"), exist_ok=True)
-        os.makedirs(os.path.join(processed_data_folder, dataset, split, "y"), exist_ok=True)
-        
-        shutil.copy(original_X_file, new_X_file)
-        shutil.copy(original_y_file, new_y_file)
+    
+if not dry_run:
+    stations_per_split = {"Train":all_train_stations, "Validation":all_val_stations, "Test": all_test_stations}
+    
+    for split, station_names in stations_per_split.items():
+        for station_name in station_names:
+            original_X_file = os.path.join(raw_data_folder, dataset, "X", station_name)
+            new_X_file = os.path.join(processed_data_folder, dataset, split, "X", station_name)
+            
+            original_y_file = os.path.join(raw_data_folder, dataset, "y", station_name)
+            new_y_file = os.path.join(processed_data_folder, dataset, split, "y", station_name)
+            
+            os.makedirs(os.path.join(processed_data_folder, dataset, split, "X"), exist_ok=True)
+            os.makedirs(os.path.join(processed_data_folder, dataset, split, "y"), exist_ok=True)
+            
+            shutil.copy(original_X_file, new_X_file)
+            shutil.copy(original_y_file, new_y_file)
     
