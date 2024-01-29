@@ -189,7 +189,7 @@ class StatisticalProcessControl(ScoreCalculator):
         self.score_function = score_function
         self.used_cutoffs = used_cutoffs
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -199,8 +199,11 @@ class StatisticalProcessControl(ScoreCalculator):
         
         scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
         predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
-        os.makedirs(scores_path, exist_ok=True)
-        os.makedirs(predictions_path, exist_ok=True)
+        
+        if not dry_run:
+            os.makedirs(scores_path, exist_ok=True)
+            os.makedirs(predictions_path, exist_ok=True)
+            
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
@@ -222,10 +225,11 @@ class StatisticalProcessControl(ScoreCalculator):
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-            with open(scores_path, 'wb') as handle:
-                pickle.dump(y_scores_dfs, handle)
-            with open(predictions_path, 'wb') as handle:
-                pickle.dump(y_prediction_dfs, handle)
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(y_scores_dfs, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
@@ -256,7 +260,7 @@ class IsolationForest(ScoreCalculator):
         # define IsolationForest model
         self.model = IF(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -297,10 +301,11 @@ class IsolationForest(ScoreCalculator):
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-            with open(scores_path, 'wb') as handle:
-                pickle.dump(y_scores_dfs, handle)
-            with open(predictions_path, 'wb') as handle:
-                pickle.dump(y_prediction_dfs, handle)
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(y_scores_dfs, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
@@ -349,7 +354,7 @@ class BinarySegmentation(ScoreCalculator):
         # define Binseg model
         self.model = rpt.Binseg(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -389,10 +394,11 @@ class BinarySegmentation(ScoreCalculator):
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
-            with open(scores_path, 'wb') as handle:
-                pickle.dump(y_scores_dfs, handle)
-            with open(predictions_path, 'wb') as handle:
-                pickle.dump(y_prediction_dfs, handle)
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(y_scores_dfs, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(y_prediction_dfs, handle)
         
         return y_scores_dfs, y_prediction_dfs
     
