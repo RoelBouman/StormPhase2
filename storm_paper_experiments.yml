@@ -3,7 +3,7 @@ dependencies:
   - python==3.10
   - numpy
   - pandas
-  - scikit-learn
+  - scikit-learn>=1.4
   - matplotlib
   - seaborn
   - jsonpickle
