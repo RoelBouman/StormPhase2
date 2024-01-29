@@ -127,11 +127,7 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     
     X_df.loc[X_df['BU_original'].isnull(),'missing'] = 1
     X_df.loc[X_df['S_original'].isnull(),'missing'] = 1
-    
-    prev_v = 0
-    prev_i = 0
-    count = subsequent_nr
-    
+        
     subsequent_filter = find_subsequent_duplicates(X_df["S"], subsequent_nr)
     
     X_df['missing'] = np.logical_or(X_df["missing"], subsequent_filter)
