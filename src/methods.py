@@ -37,7 +37,7 @@ class DependentDoubleThresholdMethod:
 
         self.calculate_and_set_thresholds(used_cutoffs, score_function) #<-------- TODO
         
-    def _calculate_interpolated_partial_confmat(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=10000):
+    def _calculate_interpolated_partial_confmat(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=1000):
         
         fps_ = {}
         tps_ = {}
@@ -81,9 +81,9 @@ class DependentDoubleThresholdMethod:
         
         for i, cutoffs in enumerate(all_cutoffs):
              
-             interpolated_fps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], fps_[str(cutoffs)][:-1])
-             interpolated_tps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], tps_[str(cutoffs)][:-1])
-             interpolated_fns[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], fns_[str(cutoffs)][:-1])
+             interpolated_fps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)][::-1], fps_[str(cutoffs)][::-1])
+             interpolated_tps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)][::-1], tps_[str(cutoffs)][::-1])
+             interpolated_fns[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)][::-1], fns_[str(cutoffs)][::-1])
              
         
         interpolated_fps = pd.DataFrame(interpolated_fps, columns=[str(cutoffs) for cutoffs in all_cutoffs])
@@ -156,7 +156,7 @@ class DependentDoubleThresholdMethod:
 
 
 class ThresholdMethod:
-    def _calculate_interpolated_recall_precision(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=10000):
+    def _calculate_interpolated_recall_precision(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=1000):
         
         precision_ = {}
         recall_ = {}
@@ -233,7 +233,7 @@ class DoubleThresholdMethod(ThresholdMethod):
         self.score_from_confmat = False
         #self.is_single_threshold_method = False
     
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
         if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
@@ -280,7 +280,7 @@ class SingleThresholdMethod(ThresholdMethod):
         self.score_from_confmat = False
         #self.is_single_threshold_method = True
         
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
         if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
@@ -746,7 +746,14 @@ class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMetho
         self.method_name = "DoubleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
+class DependentDoubleThresholdBinarySegmentation(BinarySegmentation, DependentDoubleThresholdMethod, SaveableModel):
     
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DependentDoubleThresholdBS"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+        
 class SaveableEnsemble(SaveableModel):
     def load_model(self):
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
