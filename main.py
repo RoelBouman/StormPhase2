@@ -3,13 +3,16 @@ import os
 import sqlite3
 import jsonpickle
 
-import numpy as np
+#import numpy as np
 from sklearn.model_selection import ParameterGrid
 #import pandas as pd
 from hashlib import sha256
 
 from src.methods import SingleThresholdStatisticalProcessControl
 from src.methods import DoubleThresholdStatisticalProcessControl
+from src.methods import DependentDoubleThresholdStatisticalProcessControl
+
+
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
@@ -22,7 +25,7 @@ from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_metric, save_PRFAUC_table, save_minmax_stats
 from src.io_functions import load_batch, load_metric, load_PRFAUC_table, load_minmax_stats
 #from src.io_functions import print_count_nan
-from src.evaluation import f_beta, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
+from src.evaluation import f_beta, f_beta_from_confmat, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
 from src.reporting_functions import print_metrics_and_stats
 
@@ -38,12 +41,15 @@ score_folder = os.path.join(result_folder, "scores")
 predictions_folder = os.path.join(result_folder, "predictions")
 metric_folder = os.path.join(result_folder, "metrics")
 
-all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+all_cutoffs = [(0, 24), (24, 288)]#, (288, 4032), (4032, np.inf)]
 uncertain_filter = [4,5] #which labels not to include in evaluation
 
 beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
+
+def score_function_from_confmat(fps, tps, fnr):
+    return f_beta_from_confmat(fps, tps, fnr, beta)
 
 report_metrics_and_stats = True
 
@@ -97,7 +103,7 @@ Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresho
 
 SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "used_cutoffs":[all_cutoffs]}
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
-
+DependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
@@ -108,7 +114,8 @@ methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
             # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble
+            # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+             "DependentDoubleThresholdSPC":DependentDoubleThresholdStatisticalProcessControl
            }
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
@@ -119,7 +126,22 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "DoubleThresholdBS":DoubleThresholdBS_hyperparameters, 
                        "DoubleThresholdSPC":DoubleThresholdSPC_hyperparameters, 
                        "DoubleThresholdBS+DoubleThresholdSPC":DoubleThresholdBS_DoubleThresholdSPC_hyperparameters, 
-                       "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters
+                       "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
+                       "DependentDoubleThresholdSPC":DependentDoubleThresholdSPC_hyperparameters
+                       }
+
+#%% which methods need confmat score functions:
+    
+score_function_from_PR = {"SingleThresholdIF":True,
+                       "SingleThresholdSPC":True, 
+                       "SingleThresholdBS":True, 
+                       "SingleThresholdBS+SingleThresholdSPC":True, 
+                       "Naive-SingleThresholdBS+SingleThresholdSPC":True, 
+                       "DoubleThresholdBS":True, 
+                       "DoubleThresholdSPC":True, 
+                       "DoubleThresholdBS+DoubleThresholdSPC":True, 
+                       "Naive-DoubleThresholdBS+DoubleThresholdSPC":True,
+                       "DependentDoubleThresholdSPC":False
                        }
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
@@ -151,8 +173,9 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_string = str(hyperparameters)
             print(hyperparameter_string)
             
-            ### NEW
-            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+            used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
+            
+            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
             model_name = model.method_name
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
@@ -207,7 +230,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     if not model.check_cutoffs(all_cutoffs):
                         print("Loaded model has wrong cutoffs, recalculating thresholds...")
                         model.used_cutoffs = all_cutoffs
-                        model.calculate_thresholds(all_cutoffs, score_function)
+                        model.calculate_thresholds(all_cutoffs, used_score_function)
                     
             model.report_thresholds()
                         
@@ -247,8 +270,9 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_string = str(hyperparameters)
             print(hyperparameter_string)
             
-            ### NEW
-            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+            used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
+            
+            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
             model_name = model.method_name
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
@@ -338,8 +362,9 @@ for method_name in methods:
     hyperparameter_string = str(hyperparameters)
     print(hyperparameter_string)
     
-    ### NEW
-    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+    used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
+    
+    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
     model_name = model.method_name
     hyperparameter_hash = model.get_hyperparameter_hash()
     hyperparameter_hash_filename = model.get_filename()

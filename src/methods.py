@@ -20,6 +20,7 @@ class DependentDoubleThresholdMethod:
     
     def __init__(self):
         self.scores_calculated = False
+        self.score_from_confmat = True
         #self.is_single_threshold_method = False
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
@@ -229,6 +230,7 @@ class DoubleThresholdMethod(ThresholdMethod):
     
     def __init__(self):
         self.scores_calculated = False
+        self.score_from_confmat = False
         #self.is_single_threshold_method = False
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
@@ -275,6 +277,7 @@ class SingleThresholdMethod(ThresholdMethod):
     #score function should be maximized
     def __init__(self):
         self.scores_calculated = False
+        self.score_from_confmat = False
         #self.is_single_threshold_method = True
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=10000):
@@ -708,7 +711,14 @@ class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, Double
         DoubleThresholdMethod.__init__(self)
         self.method_name = "DoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
-
+        
+class DependentDoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DependentDoubleThresholdMethod, SaveableModel):
+    
+    def __init__(self, base_models_path, preprocessing_hash, **params):
+        super().__init__(**params)
+        DoubleThresholdMethod.__init__(self)
+        self.method_name = "DependentDoubleThresholdSPC"
+        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
     
