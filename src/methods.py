@@ -10,10 +10,149 @@ from hashlib import sha256
 
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
+from sklearn.metrics._ranking import _binary_clf_curve
 from sklearn.ensemble import IsolationForest as IF
 
 from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta
+
+class DependentDoubleThresholdMethod:
+    
+    def __init__(self):
+        self.scores_calculated = False
+        #self.is_single_threshold_method = False
+    
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
+        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+                
+        if not self.scores_calculated or recalculate_scores:
+            self.lower_false_positives, self.lower_true_positives, self.lower_false_negatives, self.negative_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
+            self.upper_false_positives, self.upper_true_positives, self.upper_false_negatives, self.positive_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
+            
+            self.scores_calculated = True
+
+        self.calculate_and_set_thresholds(used_cutoffs, score_function) #<-------- TODO
+        
+    def _calculate_interpolated_partial_confmat(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=10000):
+        
+        fps_ = {}
+        tps_ = {}
+        fns_ = {}
+        thresholds_ = {}
+        
+        all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        min_threshold = 0
+        max_threshold = 0
+        
+        for cutoffs in all_cutoffs:
+            filtered_y, filtered_y_scores = filter_label_and_scores_to_array(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, cutoffs)
+            
+            # use only negative values if searching for the lower (negative) threshold, only positive if searching for the upper (positive) threshold 
+            if which_threshold == "positive":
+                filtered_y = filtered_y[filtered_y_scores >= 0]
+                filtered_y_scores = filtered_y_scores[filtered_y_scores >= 0]
+            elif which_threshold == "negative":
+                filtered_y = filtered_y[filtered_y_scores < 0]
+                filtered_y_scores = np.abs(filtered_y_scores[filtered_y_scores < 0])
+            else:
+                raise ValueError("which_threshold is set incorrectly. Valid options are: {\"positive\", \"negative\"}.")
+                                            
+            fps_[str(cutoffs)], tps_[str(cutoffs)], thresholds_[str(cutoffs)] = _binary_clf_curve(filtered_y, filtered_y_scores)
+            fns_[str(cutoffs)] = tps_[str(cutoffs)][-1] - tps_[str(cutoffs)]
+            
+            current_min_threshold = np.min(np.min(thresholds_[str(cutoffs)]))
+            if current_min_threshold < min_threshold:
+                min_threshold = current_min_threshold
+                
+            current_max_threshold = np.max(np.max(thresholds_[str(cutoffs)]))
+            if current_max_threshold > max_threshold:
+                max_threshold = current_max_threshold
+        
+        interpolation_range_ = np.linspace(max_threshold, min_threshold, interpolation_range_length)
+        
+        interpolated_fps = np.zeros((len(interpolation_range_), len(all_cutoffs)))
+        interpolated_tps = np.zeros((len(interpolation_range_), len(all_cutoffs)))
+        interpolated_fns = np.zeros((len(interpolation_range_), len(all_cutoffs)))
+        
+        for i, cutoffs in enumerate(all_cutoffs):
+             
+             interpolated_fps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], fps_[str(cutoffs)][:-1])
+             interpolated_tps[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], tps_[str(cutoffs)][:-1])
+             interpolated_fns[:,i] = np.interp(interpolation_range_, thresholds_[str(cutoffs)], fns_[str(cutoffs)][:-1])
+             
+        
+        interpolated_fps = pd.DataFrame(interpolated_fps, columns=[str(cutoffs) for cutoffs in all_cutoffs])
+        interpolated_tps = pd.DataFrame(interpolated_tps, columns=[str(cutoffs) for cutoffs in all_cutoffs])
+        interpolated_fns = pd.DataFrame(interpolated_fns, columns=[str(cutoffs) for cutoffs in all_cutoffs])
+        
+        return interpolated_fps, interpolated_tps, interpolated_fns, interpolation_range_
+    
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
+        
+        self.false_positive_grid = {}
+        self.true_positive_grid = {}
+        self.false_negative_grid = {}
+        
+        for cutoffs in used_cutoffs:
+            fp_grid_1, fp_grid_2 = np.meshgrid(self.lower_false_positives[str(cutoffs)] , self.upper_false_positives[str(cutoffs)] )
+            self.false_positive_grid[str(cutoffs)]  = fp_grid_1 + fp_grid_2
+            
+            tp_grid_1, tp_grid_2 = np.meshgrid(self.lower_true_positives[str(cutoffs)] , self.upper_true_positives[str(cutoffs)] )
+            self.true_positive_grid[str(cutoffs)]  = tp_grid_1 + tp_grid_2
+            
+            fn_grid_1, fn_grid_2 = np.meshgrid(self.lower_false_negatives[str(cutoffs)] , self.upper_false_negatives[str(cutoffs)] )
+            self.false_negative_grid[str(cutoffs)]  = fn_grid_1 + fn_grid_2
+            
+            
+        self.scores = self._calculate_grid_scores(self.false_positive_grid, self.true_positive_grid, self.false_negative_grid, used_cutoffs, score_function)
+        
+        max_score_indices = self._find_max_score_indices_for_cutoffs(self.scores, used_cutoffs)
+        
+        #calculate optimal thresholds (negative threshold needs to be set to be negative)
+        self.optimal_negative_threshold = -self.negative_thresholds[max_score_indices[1]]
+        self.optimal_positive_threshold = self.positive_thresholds[max_score_indices[0]]
+        
+    def _calculate_grid_scores(self, false_positive_grid, true_positive_grid, false_negative_grid, used_cutoffs, score_function):
+        
+        grid_scores = {}
+        for i, cutoffs in enumerate(used_cutoffs):
+            grid_scores[str(cutoffs)] = score_function(false_positive_grid[str(cutoffs)], true_positive_grid[str(cutoffs)], false_negative_grid[str(cutoffs)])
+            
+        return grid_scores
+        
+    
+    def _find_max_score_indices_for_cutoffs(self, scores_over_cutoffs, used_cutoffs):
+    
+        sum_scores = np.zeros(scores_over_cutoffs[str(used_cutoffs[0])].shape)
+        
+        for cutoffs in used_cutoffs:
+            sum_scores += scores_over_cutoffs[str(cutoffs)]
+            
+        flat_index = np.argmax(sum_scores)
+        
+        max_score_indices = np.unravel_index(flat_index, sum_scores.shape)
+        
+        return max_score_indices
+
+
+    def predict_from_scores_dfs(self, y_scores_dfs):
+        
+        y_prediction_dfs = []
+        for score in y_scores_dfs:
+            pred = np.zeros((score.shape[0],))
+            pred[np.logical_or(np.squeeze(score) < self.optimal_negative_threshold, np.squeeze(score) >= self.optimal_positive_threshold)] = 1
+            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
+            
+        return y_prediction_dfs
+    
+    def report_thresholds(self):
+        print("Optimal thresholds:")
+        print((self.optimal_negative_threshold, self.optimal_positive_threshold))
+
 
 class ThresholdMethod:
     def _calculate_interpolated_recall_precision(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=10000):
@@ -99,8 +238,8 @@ class DoubleThresholdMethod(ThresholdMethod):
             raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
                 
         if not self.scores_calculated or recalculate_scores:
-            self.negative_threshold_recall, self.negative_threshold_precision, self.negative_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative")
-            self.positive_threshold_recall, self.positive_threshold_precision, self.positive_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive")
+            self.negative_threshold_recall, self.negative_threshold_precision, self.negative_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
+            self.positive_threshold_recall, self.positive_threshold_precision, self.positive_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
             
             self.scores_calculated = True
 
@@ -145,9 +284,9 @@ class SingleThresholdMethod(ThresholdMethod):
             raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
                 
         if not self.scores_calculated or recalculate_scores:
-            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical")
+            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical", interpolation_range_length=interpolation_range_length)
             
-            self.score_calculated = True
+            self.scores_calculated = True
         
         self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
@@ -183,7 +322,6 @@ class StatisticalProcessControl(ScoreCalculator):
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
         super().__init__()
-        # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         
         self.quantiles = quantiles
         self.score_function = score_function
@@ -193,7 +331,6 @@ class StatisticalProcessControl(ScoreCalculator):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
-        #         pickle.dump(model, handle)
         model_name = self.method_name
         hyperparameter_hash = self.get_hyperparameter_hash()
         
@@ -247,7 +384,6 @@ class IsolationForest(ScoreCalculator):
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, scaling=False, quantiles=(10,90), **params):
         super().__init__()
-        # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         # Scaling is only done when forest_per_station = False, quantiles is only used when scaling=True and forest-per_station=False
         
         self.score_function = score_function
@@ -340,7 +476,6 @@ class IsolationForest(ScoreCalculator):
 class BinarySegmentation(ScoreCalculator):
     
     def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
-        # score_function must accept results from sklearn.metrics.det_curve (fpr, fnr, thresholds)
         super().__init__()
         self.score_function = score_function
         self.beta = beta

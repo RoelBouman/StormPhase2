@@ -18,6 +18,10 @@ def f_beta(precision, recall, beta=1, eps=np.finfo(float).eps):
     
     return(1+beta**2) * (precision*recall)/((beta**2*precision)+recall+eps)
 
+def f_beta_from_confmat(fp, tp, fn, beta=1, eps=np.finfo(float).eps):
+    
+    return (1+beta**2) * (tp) / ((1+beta**2)*tp + (beta**2)*fn + fp + eps)
+
 def cutoff_averaged_f_beta(y_dfs, y_preds_dfs, label_filters_for_all_cutoffs, beta):
     all_cutoffs = label_filters_for_all_cutoffs[0].keys()
 
