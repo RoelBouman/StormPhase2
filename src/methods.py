@@ -838,3 +838,5 @@ class NaiveStackEnsemble(StackEnsemble):
         cutoffs_per_method = [all_cutoffs]*len(method_classes)
         
         super().__init__(base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
+        
+        self.method_name = "Naive-" + self.method_name
