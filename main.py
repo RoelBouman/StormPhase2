@@ -3,7 +3,7 @@ import os
 import sqlite3
 import jsonpickle
 
-#import numpy as np
+import numpy as np
 from sklearn.model_selection import ParameterGrid
 #import pandas as pd
 from hashlib import sha256
@@ -17,6 +17,7 @@ from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
 from src.methods import DoubleThresholdBinarySegmentation
+from src.methods import DependentDoubleThresholdBinarySegmentation
 
 from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
@@ -41,7 +42,7 @@ score_folder = os.path.join(result_folder, "scores")
 predictions_folder = os.path.join(result_folder, "predictions")
 metric_folder = os.path.join(result_folder, "metrics")
 
-all_cutoffs = [(0, 24), (24, 288)]#, (288, 4032), (4032, np.inf)]
+all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 uncertain_filter = [4,5] #which labels not to include in evaluation
 
 beta = 1.5
@@ -63,7 +64,7 @@ training_overwrite = False
 testing_overwrite = False
 validation_overwrite = False
 
-dry_run = True
+dry_run = False
 
 #%% set up database
 
@@ -85,7 +86,7 @@ all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': 
 
 #For IF, pass sequence of dicts to avoid useless hyperparam combos (such as scaling=True, forest_per_station=True)
 SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}]
-SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)], "used_cutoffs":[all_cutoffs]}
+SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0.12], "model": ['l1'], 'min_size': [50, 100, 200], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
 
 
@@ -99,7 +100,13 @@ DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleT
 Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
 
 
+DependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
+DependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
 #%% define methods:
+SingleThresholdBS_hyperparameters = {"beta": [0.015], "model": ['l1'], 'min_size': [50], "jump": [10], "quantiles": [(15, 85)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
+DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+DependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+    
 
 SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "used_cutoffs":[all_cutoffs]}
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
@@ -107,15 +114,16 @@ DependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
 #methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-           # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-             "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+             "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+             #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "DependentDoubleThresholdSPC":DependentDoubleThresholdStatisticalProcessControl
+             #"DependentDoubleThresholdSPC":DependentDoubleThresholdStatisticalProcessControl,
+             "DependentDoubleThresholdBS":DependentDoubleThresholdBinarySegmentation
            }
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
@@ -127,7 +135,8 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "DoubleThresholdSPC":DoubleThresholdSPC_hyperparameters, 
                        "DoubleThresholdBS+DoubleThresholdSPC":DoubleThresholdBS_DoubleThresholdSPC_hyperparameters, 
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
-                       "DependentDoubleThresholdSPC":DependentDoubleThresholdSPC_hyperparameters
+                       "DependentDoubleThresholdSPC":DependentDoubleThresholdSPC_hyperparameters,
+                       "DependentDoubleThresholdBS":DependentDoubleThresholdBS_hyperparameters
                        }
 
 #%% which methods need confmat score functions:
@@ -141,7 +150,8 @@ score_function_from_PR = {"SingleThresholdIF":True,
                        "DoubleThresholdSPC":True, 
                        "DoubleThresholdBS+DoubleThresholdSPC":True, 
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":True,
-                       "DependentDoubleThresholdSPC":False
+                       "DependentDoubleThresholdSPC":False,
+                       "DependentDoubleThresholdBS":False
                        }
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
@@ -160,12 +170,16 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
     preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
     
+    print("-----------------------------------------------")
     print("Now preprocessing: ")
+    print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
     X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
     
     for method_name in methods:
+        print("-----------------------------------------------")
         print("Now training: " + method_name)
+        print("-----------------------------------------------")
         all_hyperparameters = hyperparameter_dict[method_name]
         hyperparameter_list = list(ParameterGrid(all_hyperparameters))
         
@@ -257,12 +271,16 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
     preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
     
+    print("-----------------------------------------------")
     print("Now preprocessing: ")
+    print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
     X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
     
     for method_name in methods:
+        print("-----------------------------------------------")
         print("Now testing: " + method_name)
+        print("-----------------------------------------------")
         all_hyperparameters = hyperparameter_dict[method_name]
         hyperparameter_list = list(ParameterGrid(all_hyperparameters))
         
@@ -337,7 +355,9 @@ val_file_names = X_val_files
 best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
 for method_name in methods:
+    print("-----------------------------------------------")
     print("Now validating: " + method_name)
+    print("-----------------------------------------------")
     #find best preprocessing and method hyperparameters:
 
     #Some SQL query:
@@ -353,7 +373,9 @@ for method_name in methods:
     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
     preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
     
+    print("-----------------------------------------------")
     print("Now preprocessing: ")
+    print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
     X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
 
