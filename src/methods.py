@@ -14,15 +14,30 @@ from sklearn.metrics._ranking import _binary_clf_curve
 from sklearn.ensemble import IsolationForest as IF
 
 from .helper_functions import filter_label_and_scores_to_array
-from .evaluation import f_beta
+from .evaluation import f_beta, f_beta_from_confmat
 
-class DependentDoubleThresholdMethod:
-    
-    def __init__(self):
+class IndependentDoubleThresholdMethod:
+    #score function must accept false_positives, true_positives,false_negatives as input
+    #score function should be maximized
+    def __init__(self, score_function=None, score_function_kwargs=None):
         self.scores_calculated = False
-        self.score_from_confmat = True
-        #self.is_single_threshold_method = False
-    
+        
+        if score_function is None:
+            try:
+                beta = score_function_kwargs["beta"]
+            except KeyError:
+                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+            
+            def score_function_from_confmat(fps, tps, fns):
+                return f_beta_from_confmat(fps, tps, fns, beta)
+        
+        else:
+            def score_function_from_confmat(*args):
+                return f_beta_from_confmat(*args, **score_function_kwargs)
+            
+        self.score_function = score_function_from_confmat
+        
+        
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
@@ -35,7 +50,7 @@ class DependentDoubleThresholdMethod:
             
             self.scores_calculated = True
 
-        self.calculate_and_set_thresholds(used_cutoffs, score_function) #<-------- TODO
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
     def _calculate_interpolated_partial_confmat(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=1000):
         
@@ -107,7 +122,6 @@ class DependentDoubleThresholdMethod:
             
             fn_grid_1, fn_grid_2 = np.meshgrid(self.lower_false_negatives[str(cutoffs)] , self.upper_false_negatives[str(cutoffs)] )
             self.false_negative_grid[str(cutoffs)]  = fn_grid_1 + fn_grid_2
-            
             
         self.scores = self._calculate_grid_scores(self.false_positive_grid, self.true_positive_grid, self.false_negative_grid, used_cutoffs, score_function)
         
@@ -227,11 +241,25 @@ class ThresholdMethod:
         return max_score_index
 
 class DoubleThresholdMethod(ThresholdMethod):
-    
-    def __init__(self):
+    #score function must accept precision and recall as input
+    #score function should be maximized
+    def __init__(self, score_function = None, score_function_kwargs=None):
         self.scores_calculated = False
-        self.score_from_confmat = False
-        #self.is_single_threshold_method = False
+        
+        if score_function is None:
+            try:
+                beta = score_function_kwargs["beta"]
+            except KeyError:
+                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+            
+            def score_function(precision, recall):
+                return f_beta(precision, recall, beta)
+        
+        else:
+            def score_function(precision, recall):
+                return f_beta(precision, recall, **score_function_kwargs)
+            
+        self.score_function = score_function
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
@@ -275,10 +303,23 @@ class DoubleThresholdMethod(ThresholdMethod):
 class SingleThresholdMethod(ThresholdMethod):
     #score function must accept precision and recall as input
     #score function should be maximized
-    def __init__(self):
+    def __init__(self, score_function = None, score_function_kwargs=None):
         self.scores_calculated = False
-        self.score_from_confmat = False
-        #self.is_single_threshold_method = True
+        
+        if score_function is None:
+            try:
+                beta = score_function_kwargs["beta"]
+            except KeyError:
+                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+            
+            def score_function(precision, recall):
+                return f_beta(precision, recall, beta)
+        
+        else:
+            def score_function(precision, recall):
+                return f_beta(precision, recall, **score_function_kwargs)
+            
+        self.score_function = score_function
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
@@ -323,11 +364,10 @@ class ScoreCalculator:
         
 class StatisticalProcessControl(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
+    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
         super().__init__()
         
         self.quantiles = quantiles
-        self.score_function = score_function
         self.used_cutoffs = used_cutoffs
     
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
@@ -385,11 +425,10 @@ class StatisticalProcessControl(ScoreCalculator):
 
 class IsolationForest(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, scaling=False, quantiles=(10,90), **params):
+    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], forest_per_station=True, scaling=False, quantiles=(10,90), **params):
         super().__init__()
         # Scaling is only done when forest_per_station = False, quantiles is only used when scaling=True and forest-per_station=False
         
-        self.score_function = score_function
         self.used_cutoffs = used_cutoffs
         self.forest_per_station = forest_per_station
         self.params = params
@@ -478,9 +517,8 @@ class IsolationForest(ScoreCalculator):
     
 class BinarySegmentation(ScoreCalculator):
     
-    def __init__(self, score_function=f_beta, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
+    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
         super().__init__()
-        self.score_function = score_function
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
@@ -697,64 +735,62 @@ class SaveableModel(ABC):
 
 class SingleThresholdStatisticalProcessControl(StatisticalProcessControl, SingleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
+        SingleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
         self.method_name = "SingleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
-
         
 class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
+        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
         self.method_name = "DoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class DependentDoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DependentDoubleThresholdMethod, SaveableModel):
+class IndependentDoubleThresholdStatisticalProcessControl(StatisticalProcessControl, IndependentDoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
-        self.method_name = "DependentDoubleThresholdSPC"
+        IndependentDoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+        self.method_name = "IndependentDoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
+        SingleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
         self.method_name = "SingleThresholdIF"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
 
-
 class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        SingleThresholdMethod.__init__(self)
+        SingleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
         self.method_name = "SingleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
-
         
 class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
+        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
         self.method_name = "DoubleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class DependentDoubleThresholdBinarySegmentation(BinarySegmentation, DependentDoubleThresholdMethod, SaveableModel):
+class IndependentDoubleThresholdBinarySegmentation(BinarySegmentation, IndependentDoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, **params):
+    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        DoubleThresholdMethod.__init__(self)
-        self.method_name = "DependentDoubleThresholdBS"
+        IndependentDoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+        self.method_name = "IndependentDoubleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class SaveableEnsemble(SaveableModel):
+    
     def load_model(self):
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         full_path = os.path.join(method_path, self.filename)
@@ -765,14 +801,13 @@ class SaveableEnsemble(SaveableModel):
         
 class StackEnsemble(SaveableEnsemble):
     
-    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta):
+    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method):
 
         self.is_ensemble = True
         
         self.method_classes = method_classes
         self.method_hyperparameter_dicts = method_hyperparameter_dict_list
         self.cutoffs_per_method = cutoffs_per_method
-        self.score_function = f_beta
         self.preprocessing_hash = preprocessing_hash
         
         self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
@@ -783,12 +818,12 @@ class StackEnsemble(SaveableEnsemble):
         super().__init__(base_models_path, preprocessing_hash)
 
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
         self._scores = []
         temp_scores = []
         self._predictions = []
         for model in self.models:
-            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit)
+            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit, dry_run)
             temp_scores.append(scores)
             self._predictions.append(predictions)
         
@@ -834,9 +869,9 @@ class StackEnsemble(SaveableEnsemble):
             model.report_thresholds()
     
 class NaiveStackEnsemble(StackEnsemble):
-    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, all_cutoffs, score_function=f_beta):
+    def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, all_cutoffs):
         cutoffs_per_method = [all_cutoffs]*len(method_classes)
         
-        super().__init__(base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method, score_function=f_beta)
+        super().__init__(base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method)
         
         self.method_name = "Naive-" + self.method_name

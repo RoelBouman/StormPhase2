@@ -10,14 +10,14 @@ from hashlib import sha256
 
 from src.methods import SingleThresholdStatisticalProcessControl
 from src.methods import DoubleThresholdStatisticalProcessControl
-from src.methods import DependentDoubleThresholdStatisticalProcessControl
+from src.methods import IndependentDoubleThresholdStatisticalProcessControl
 
 
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
 from src.methods import DoubleThresholdBinarySegmentation
-from src.methods import DependentDoubleThresholdBinarySegmentation
+from src.methods import IndependentDoubleThresholdBinarySegmentation
 
 from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
@@ -46,12 +46,6 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 uncertain_filter = [4,5] #which labels not to include in evaluation
 
 beta = 1.5
-def score_function(precision, recall):
-    return f_beta(precision, recall, beta)
-
-def score_function_from_confmat(fps, tps, fnr):
-    return f_beta_from_confmat(fps, tps, fnr, beta)
-
 report_metrics_and_stats = True
 
 remove_missing = True
@@ -64,7 +58,7 @@ training_overwrite = False
 testing_overwrite = False
 validation_overwrite = False
 
-dry_run = False
+dry_run = True
 
 #%% set up database
 
@@ -91,7 +85,7 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0
 
 
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
-Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":all_cutoffs}
+Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "all_cutoffs":[all_cutoffs]}
 
 
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
@@ -100,30 +94,36 @@ DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleT
 Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
 
 
-DependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
-DependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
+IndependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
 #%% define methods:
-SingleThresholdBS_hyperparameters = {"beta": [0.015], "model": ['l1'], 'min_size': [50], "jump": [10], "quantiles": [(15, 85)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
+SingleThresholdBS_hyperparameters = {"beta": [0.015], "model": ['l1'], 'min_size': [50], "jump": [10], "quantiles": [(15, 85)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"], "score_function_kwargs":[{"beta":beta}]}
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
-DependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+IndependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
     
 
-SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "used_cutoffs":[all_cutoffs]}
+SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "score_function_kwargs":[{"beta":beta}]}
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
-DependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
+IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
-#methods = {"SingleThresholdBS":SingleThresholdBinarySegmentation}
+Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, IndependentDoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
+SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
+SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] = [all_cutoffs]
+
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+            #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
+             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-             "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"DependentDoubleThresholdSPC":DependentDoubleThresholdStatisticalProcessControl,
-             "DependentDoubleThresholdBS":DependentDoubleThresholdBinarySegmentation
+             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+             #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
+             "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
+             "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
+
            }
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
@@ -135,24 +135,12 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "DoubleThresholdSPC":DoubleThresholdSPC_hyperparameters, 
                        "DoubleThresholdBS+DoubleThresholdSPC":DoubleThresholdBS_DoubleThresholdSPC_hyperparameters, 
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
-                       "DependentDoubleThresholdSPC":DependentDoubleThresholdSPC_hyperparameters,
-                       "DependentDoubleThresholdBS":DependentDoubleThresholdBS_hyperparameters
+                       "IndependentDoubleThresholdSPC":IndependentDoubleThresholdSPC_hyperparameters,
+                       "IndependentDoubleThresholdBS":IndependentDoubleThresholdBS_hyperparameters,
+                       "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
+                       "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
                        }
 
-#%% which methods need confmat score functions:
-    
-score_function_from_PR = {"SingleThresholdIF":True,
-                       "SingleThresholdSPC":True, 
-                       "SingleThresholdBS":True, 
-                       "SingleThresholdBS+SingleThresholdSPC":True, 
-                       "Naive-SingleThresholdBS+SingleThresholdSPC":True, 
-                       "DoubleThresholdBS":True, 
-                       "DoubleThresholdSPC":True, 
-                       "DoubleThresholdBS+DoubleThresholdSPC":True, 
-                       "Naive-DoubleThresholdBS+DoubleThresholdSPC":True,
-                       "DependentDoubleThresholdSPC":False,
-                       "DependentDoubleThresholdBS":False
-                       }
 #%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
@@ -187,9 +175,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_string = str(hyperparameters)
             print(hyperparameter_string)
             
-            used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
-            
-            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
+            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
             model_name = model.method_name
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
@@ -244,7 +230,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     if not model.check_cutoffs(all_cutoffs):
                         print("Loaded model has wrong cutoffs, recalculating thresholds...")
                         model.used_cutoffs = all_cutoffs
-                        model.calculate_thresholds(all_cutoffs, used_score_function)
+                        model.calculate_and_set_thresholds(all_cutoffs, model.score_function)
                     
             model.report_thresholds()
                         
@@ -288,9 +274,8 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_string = str(hyperparameters)
             print(hyperparameter_string)
             
-            used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
             
-            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
+            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
             model_name = model.method_name
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
@@ -384,9 +369,7 @@ for method_name in methods:
     hyperparameter_string = str(hyperparameters)
     print(hyperparameter_string)
     
-    used_score_function = score_function if score_function_from_PR[method_name] else score_function_from_confmat
-    
-    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=used_score_function)
+    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
     model_name = model.method_name
     hyperparameter_hash = model.get_hyperparameter_hash()
     hyperparameter_hash_filename = model.get_filename()
