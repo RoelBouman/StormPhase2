@@ -26,7 +26,7 @@ from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_dataframe_list, save_metric, save_PRFAUC_table, save_minmax_stats
 from src.io_functions import load_batch, load_metric, load_PRFAUC_table, load_minmax_stats
 #from src.io_functions import print_count_nan
-from src.evaluation import f_beta, f_beta_from_confmat, cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
+from src.evaluation import cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
 
 from src.reporting_functions import print_metrics_and_stats
 
@@ -58,7 +58,7 @@ training_overwrite = False
 testing_overwrite = False
 validation_overwrite = False
 
-dry_run = True
+dry_run = False
 
 #%% set up database
 
@@ -107,19 +107,20 @@ DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
 Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, IndependentDoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
-SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
-SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] = [all_cutoffs]
+SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters.copy()
+del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
+SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-            #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+             "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+             #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
              #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+             #"IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
              #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
              "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
              "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble

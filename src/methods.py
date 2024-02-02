@@ -24,19 +24,21 @@ class IndependentDoubleThresholdMethod:
         
         if score_function is None:
             try:
-                beta = score_function_kwargs["beta"]
+                self.score_function_beta = score_function_kwargs["beta"]
             except KeyError:
                 raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
-            def score_function_from_confmat(fps, tps, fns):
-                return f_beta_from_confmat(fps, tps, fns, beta)
+            self.score_function = self.score_function_from_confmat_with_beta
         
         else:
-            def score_function_from_confmat(*args):
-                return f_beta_from_confmat(*args, **score_function_kwargs)
+            self.score_function = self.custom_score_function_from_confmat
+            self.score_function_kwargs = score_function_kwargs
             
-        self.score_function = score_function_from_confmat
-        
+    def score_function_from_confmat_with_beta(self, fps, tps, fns):
+        return f_beta_from_confmat(fps, tps, fns, self.score_function_beta)
+    
+    def custom_score_function_from_confmat(self, score_function, *args):
+        return score_function(*args, **self.score_function_kwargs)
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
@@ -248,18 +250,21 @@ class DoubleThresholdMethod(ThresholdMethod):
         
         if score_function is None:
             try:
-                beta = score_function_kwargs["beta"]
+                self.score_function_beta = score_function_kwargs["beta"]
             except KeyError:
                 raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
-            def score_function(precision, recall):
-                return f_beta(precision, recall, beta)
+            self.score_function = self.score_function_from_precision_recall_with_beta
         
         else:
-            def score_function(precision, recall):
-                return f_beta(precision, recall, **score_function_kwargs)
-            
-        self.score_function = score_function
+            self.score_function = self.custom_score_function_from_precision_recall
+            self.score_function_kwargs = score_function_kwargs
+        
+    def score_function_from_precision_recall_with_beta(self, precision, recall):
+        return f_beta(precision, recall, self.score_function_beta)
+    
+    def custom_score_function_from_precision_recall(self, score_function, *args):
+        return score_function(*args, **self.score_function_kwargs)
     
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
@@ -308,18 +313,21 @@ class SingleThresholdMethod(ThresholdMethod):
         
         if score_function is None:
             try:
-                beta = score_function_kwargs["beta"]
+                self.score_function_beta = score_function_kwargs["beta"]
             except KeyError:
                 raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
-            def score_function(precision, recall):
-                return f_beta(precision, recall, beta)
+            self.score_function = self.score_function_from_precision_recall_with_beta
         
         else:
-            def score_function(precision, recall):
-                return f_beta(precision, recall, **score_function_kwargs)
-            
-        self.score_function = score_function
+            self.score_function = self.custom_score_function_from_precision_recall
+            self.score_function_kwargs = score_function_kwargs
+        
+    def score_function_from_precision_recall_with_beta(self, precision, recall):
+        return f_beta(precision, recall, self.score_function_beta)
+    
+    def custom_score_function_from_precision_recall(self, score_function, *args):
+        return score_function(*args, **self.score_function_kwargs)
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
