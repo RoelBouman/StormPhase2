@@ -55,8 +55,8 @@ write_csv_intermediates = True
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
 training_overwrite = False 
-testing_overwrite = False
 validation_overwrite = False
+testing_overwrite = False
 
 dry_run = False
 
@@ -112,7 +112,7 @@ del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs
 SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-             "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+             #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
              #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
@@ -120,8 +120,8 @@ methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
-             #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
+             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+             "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
              "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
              "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
 
@@ -148,8 +148,9 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
 
 # load Train data
 which_split = "Train"
-
+print("-----------------------------------------------")
 print("Split: Train")
+print("-----------------------------------------------")
 X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 
 train_file_names = X_train_files
@@ -241,15 +242,17 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
 
 if dry_run:
     raise RuntimeError("Dry run is not implemented past training.")
-#%% Test
-#%% load Test data
-which_split = "Test"
-print("Split: Test")
-X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
+#%% Validation
+#%% load Validation data
+which_split = "Validation"
+print("-----------------------------------------------")
+print("Split: Validation")
+print("-----------------------------------------------")
+X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 
-test_file_names = X_test_files
+val_file_names = X_val_files
     
-#%% Preprocess Test data and run algorithms:
+#%% Preprocess val data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
@@ -262,11 +265,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     print("Now preprocessing: ")
     print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
-    X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
+    X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
     
     for method_name in methods:
         print("-----------------------------------------------")
-        print("Now testing: " + method_name)
+        print("Now validating: " + method_name)
         print("-----------------------------------------------")
         all_hyperparameters = hyperparameter_dict[method_name]
         hyperparameter_list = list(ParameterGrid(all_hyperparameters))
@@ -291,19 +294,19 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             
             full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
             
-            if testing_overwrite or not os.path.exists(full_metric_path):
+            if validation_overwrite or not os.path.exists(full_metric_path):
                 
-                y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=testing_overwrite)
+                y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=validation_overwrite)
     
-                metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+                metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
-                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
+                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
                 absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
-                PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+                PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
                 if not dry_run:
-                    save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
-                    save_dataframe_list(y_test_predictions_dfs, test_file_names, os.path.join(predictions_path, "stations"), overwrite=testing_overwrite)
+                    save_dataframe_list(y_val_scores_dfs, val_file_names, os.path.join(scores_path, "stations"), overwrite=validation_overwrite)
+                    save_dataframe_list(y_val_predictions_dfs, val_file_names, os.path.join(predictions_path, "stations"), overwrite=validation_overwrite)
                     
                     save_metric(metric, fscore_path, hyperparameter_hash)
                     save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
@@ -325,30 +328,29 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
 
 
-#%% Validation
-#%% load Validation data
-
-
-#%% Preprocess Val data and run algorithms:
+#%% Test
+# Preprocess Test data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
 
-which_split = "Validation"
-print("Split: Validation")
-X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
-val_file_names = X_val_files
+which_split = "Test"
+print("-----------------------------------------------")
+print("Split: Test")
+print("-----------------------------------------------")
+X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
+test_file_names = X_test_files
 
 best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
 for method_name in methods:
     print("-----------------------------------------------")
-    print("Now validating: " + method_name)
+    print("Now Testing: " + method_name)
     print("-----------------------------------------------")
     #find best preprocessing and method hyperparameters:
 
     #Some SQL query:
     
-    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Test"))
+    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
     
     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
     
@@ -363,7 +365,7 @@ for method_name in methods:
     print("Now preprocessing: ")
     print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
-    X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, event_lengths_val = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
+    X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, event_lengths_test = preprocess_per_batch_and_write(X_test_dfs, y_test_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, test_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, uncertain_filter, dry_run)
 
  
     hyperparameters = best_hyperparameters[method_name] 
@@ -385,19 +387,19 @@ for method_name in methods:
     
     full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
     
-    if validation_overwrite or not os.path.exists(full_metric_path):
+    if testing_overwrite or not os.path.exists(full_metric_path):
         
-        y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=validation_overwrite)
+        y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=testing_overwrite)
 
-        metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
-        minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
+        minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
         absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
-        PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
+        PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
         if not dry_run:
-            save_dataframe_list(y_val_scores_dfs, val_file_names, os.path.join(scores_path, "stations"), overwrite=validation_overwrite)
-            save_dataframe_list(y_val_predictions_dfs, val_file_names, os.path.join(predictions_path, "stations"), overwrite=validation_overwrite)
+            save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
+            save_dataframe_list(y_test_predictions_dfs, test_file_names, os.path.join(predictions_path, "stations"), overwrite=testing_overwrite)
             
             save_metric(metric, fscore_path, hyperparameter_hash)
             save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
