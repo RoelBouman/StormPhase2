@@ -400,6 +400,7 @@ class StatisticalProcessControl(ScoreCalculator):
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
+            self.load_model()
         else:
             
             y_scores_dfs = []
@@ -465,6 +466,7 @@ class IsolationForest(ScoreCalculator):
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
+            self.load_model()
         else:
             y_scores_dfs = []
                 
@@ -557,6 +559,7 @@ class BinarySegmentation(ScoreCalculator):
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
+            self.load_model()
         else:
             y_scores_dfs = []
             
