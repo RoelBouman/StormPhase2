@@ -10,10 +10,10 @@ from sklearn.preprocessing import RobustScaler
 from .io_functions import save_dataframe_list
 
 
-def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None):
+def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None, uncertain_filter=[4,5]):
     
 
-    uncertain_filter = y_df["label"] == 5
+    uncertain_filter = np.isin(y_df["label"], uncertain_filter)
     
     partial_filter = {}
     #Procedure is non-inclusive on lower cutoff
@@ -65,7 +65,7 @@ def get_event_lengths(y_df):
                     pass
             else:
                 #Event starts
-                if y_df["label"][i] != 0:
+                if y_df["label"][i] == 1: #now defined that events only start at 1, but don't end at 4/5.
                     event_start_index = i
                     event_started = True
                 #Event has not started:
@@ -127,11 +127,7 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     
     X_df.loc[X_df['BU_original'].isnull(),'missing'] = 1
     X_df.loc[X_df['S_original'].isnull(),'missing'] = 1
-    
-    prev_v = 0
-    prev_i = 0
-    count = subsequent_nr
-    
+        
     subsequent_filter = find_subsequent_duplicates(X_df["S"], subsequent_nr)
     
     X_df['missing'] = np.logical_or(X_df["missing"], subsequent_filter)
@@ -190,7 +186,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False, uncertain_filter=[4,5], dry_run=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -207,11 +203,12 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         X_dfs_preprocessed = [X_df for (X_df, y_df) in dfs_preprocessed]
         y_dfs_preprocessed = [y_df for (X_df, y_df) in dfs_preprocessed]
         
-        os.makedirs(preprocessed_pickles_folder, exist_ok = True)
-        with open(preprocessed_file_name_X, 'wb') as handle:
-            pickle.dump(X_dfs_preprocessed, handle)
-        with open(preprocessed_file_name_y, 'wb') as handle:
-            pickle.dump(y_dfs_preprocessed, handle)
+        if not dry_run:
+            os.makedirs(preprocessed_pickles_folder, exist_ok = True)
+            with open(preprocessed_file_name_X, 'wb') as handle:
+                pickle.dump(X_dfs_preprocessed, handle)
+            with open(preprocessed_file_name_y, 'wb') as handle:
+                pickle.dump(y_dfs_preprocessed, handle)
     else:
         print("Loading preprocessed X data")
         with open(preprocessed_file_name_X, 'rb') as handle:
@@ -219,9 +216,10 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         print("Loading preprocessed y data")
         with open(preprocessed_file_name_y, 'rb') as handle:
             y_dfs_preprocessed = pickle.load(handle)
-
+        
+    
     # only happens for X, not for y
-    if write_csv_intermediates:
+    if write_csv_intermediates and not dry_run:
         print("Writing CSV intermediates: X data")
         type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, hyperparameter_hash)
         save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
@@ -235,15 +233,16 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
         print("Preprocessing event lengths")
         event_lengths = [get_event_lengths(df) for df in y_dfs_preprocessed]
         
-        os.makedirs(event_lengths_pickles_folder, exist_ok = True)
-        with open(preprocessed_file_name, 'wb') as handle:
-            pickle.dump(event_lengths, handle)
+        if not dry_run:
+            os.makedirs(event_lengths_pickles_folder, exist_ok = True)
+            with open(preprocessed_file_name, 'wb') as handle:
+                pickle.dump(event_lengths, handle)
     else:
         print("Loading preprocessed event lengths")
         with open(preprocessed_file_name, 'rb') as handle:
             event_lengths = pickle.load(handle)
 
-    if write_csv_intermediates:
+    if write_csv_intermediates and not dry_run:
         print("Writing CSV intermediates: event lengths")
         type_event_lengths_csvs_folder = os.path.join(event_lengths_csvs_folder, hyperparameter_hash)
         save_dataframe_list(event_lengths, file_names, type_event_lengths_csvs_folder, overwrite = preprocessing_overwrite)
@@ -256,17 +255,18 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, hyperparameter_hash + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df, uncertain_filter=uncertain_filter) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
         
-        os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
-        with open(preprocessed_file_name, 'wb') as handle:
-            pickle.dump(label_filters_for_all_cutoffs, handle)
+        if not dry_run:
+            os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
+            with open(preprocessed_file_name, 'wb') as handle:
+                pickle.dump(label_filters_for_all_cutoffs, handle)
     else:
         print("Loading preprocessed labels per cutoff")
         with open(preprocessed_file_name, 'rb') as handle:
             label_filters_for_all_cutoffs = pickle.load(handle)
 
-    if write_csv_intermediates:
+    if write_csv_intermediates and not dry_run:
         print("Writing CSV intermediates: label filters per cutoff")
         type_label_filters_per_cutoff_csvs_folder = os.path.join(label_filters_per_cutoff_csvs_folder, hyperparameter_hash)
         label_filters_for_all_cutoffs_dfs = [pd.DataFrame(l) for l in label_filters_for_all_cutoffs]
