@@ -58,7 +58,7 @@ db_cursor = db_connection.cursor()
 #%% choose station IDs
 
 # IDs must be from same split
-station_IDs = ["1", "11", "019"]
+station_IDs = ["1", "041", "019"]
 
 train_IDs = os.listdir(os.path.join(data_folder, "Train", "X"))
 test_IDs = os.listdir(os.path.join(data_folder, "Test", "X"))
@@ -99,6 +99,15 @@ for station_ID in station_IDs:
     
     X_dfs.append(X_df)
 
+#%% load y dfs
+
+y_dfs = []
+
+for station_ID in station_IDs:
+    y_df = pd.read_csv(os.path.join(data_folder, station_dataset_dict[station_ID], "y", station_ID + ".csv"))
+    
+    y_dfs.append(y_df)
+
 #%% load predictions
 
 model_name = model.method_name
@@ -115,4 +124,4 @@ for station_ID in station_IDs:
  
 #%% plot the predictions
 
-plot_predictions(X_dfs, y_pred_dfs, station_IDs, model, pretty_plot=True, which_stations = range(0, len(station_IDs)))
+plot_predictions(X_dfs, y_dfs, y_pred_dfs, station_IDs, model, show_TP_FP_FN=True, opacity_TP=0.6, pretty_plot=True, which_stations = range(0, len(station_IDs)))
