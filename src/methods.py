@@ -395,8 +395,10 @@ class IsolationForest(ScoreCalculator):
         
         scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
         predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
-        os.makedirs(scores_path, exist_ok=True)
-        os.makedirs(predictions_path, exist_ok=True)
+        if not dry_run:
+            os.makedirs(scores_path, exist_ok=True)
+            os.makedirs(predictions_path, exist_ok=True)
+        
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
@@ -488,8 +490,11 @@ class BinarySegmentation(ScoreCalculator):
         
         scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
         predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
-        os.makedirs(scores_path, exist_ok=True)
-        os.makedirs(predictions_path, exist_ok=True)
+        
+        if not dry_run:
+            os.makedirs(scores_path, exist_ok=True)
+            os.makedirs(predictions_path, exist_ok=True)
+        
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
@@ -499,6 +504,9 @@ class BinarySegmentation(ScoreCalculator):
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
+            
+            
+            
         else:
             y_scores_dfs = []
             
