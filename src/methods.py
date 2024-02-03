@@ -28,17 +28,18 @@ class IndependentDoubleThresholdMethod:
             except KeyError:
                 raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
+            self.score_function_kwargs = score_function_kwargs
             self.score_function = self.score_function_from_confmat_with_beta
         
         else:
             self.score_function = self.custom_score_function_from_confmat
             self.score_function_kwargs = score_function_kwargs
             
-    def score_function_from_confmat_with_beta(self, fps, tps, fns):
-        return f_beta_from_confmat(fps, tps, fns, self.score_function_beta)
+    def score_function_from_confmat_with_beta(self, fps, tps, fns, **kwargs):
+        return f_beta_from_confmat(fps, tps, fns, **kwargs)
     
-    def custom_score_function_from_confmat(self, score_function, *args):
-        return score_function(*args, **self.score_function_kwargs)
+    def custom_score_function_from_confmat(self, score_function, *args, **kwargs):
+        return score_function(*args, **kwargs)
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
@@ -137,7 +138,7 @@ class IndependentDoubleThresholdMethod:
         
         grid_scores = {}
         for i, cutoffs in enumerate(used_cutoffs):
-            grid_scores[str(cutoffs)] = score_function(false_positive_grid[str(cutoffs)], true_positive_grid[str(cutoffs)], false_negative_grid[str(cutoffs)])
+            grid_scores[str(cutoffs)] = self.score_function(false_positive_grid[str(cutoffs)], true_positive_grid[str(cutoffs)], false_negative_grid[str(cutoffs)], **self.score_function_kwargs)
             
         return grid_scores
         
@@ -171,7 +172,66 @@ class IndependentDoubleThresholdMethod:
         print((self.optimal_negative_threshold, self.optimal_positive_threshold))
 
 
-class ThresholdMethod:
+
+class SingleThresholdMethod:
+    #score function must accept precision and recall as input
+    #score function should be maximized
+    def __init__(self, score_function = None, score_function_kwargs=None):
+        self.scores_calculated = False
+        
+        if score_function is None:
+            try:
+                self.score_function_beta = score_function_kwargs["beta"]
+            except KeyError:
+                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+            
+            self.score_function_kwargs = score_function_kwargs
+            self.score_function = self.score_function_from_precision_recall_with_beta
+        
+        else:
+            self.score_function = self.custom_score_function_from_precision_recall
+            self.score_function_kwargs = score_function_kwargs
+        
+    def score_function_from_precision_recall_with_beta(self, precision, recall, **kwargs):
+        return f_beta(precision, recall, **kwargs)
+    
+    def custom_score_function_from_precision_recall(self, score_function, *args):
+        return score_function(*args, **self.score_function_kwargs)
+        
+    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
+        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+        
+        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+                
+        if not self.scores_calculated or recalculate_scores:
+            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical", interpolation_range_length=interpolation_range_length)
+            
+            self.scores_calculated = True
+        
+        self.calculate_and_set_thresholds(used_cutoffs, score_function)
+        
+    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
+        self.scores = self._calculate_interpolated_scores(self.recall, self.precision, used_cutoffs, score_function)
+        
+        max_score_index = self._find_max_score_index_for_cutoffs(self.scores, used_cutoffs)
+        
+        #calculate optimal thresholds (negative threshold needs to be set to be negative)
+        self.optimal_threshold = self.thresholds[max_score_index]
+        
+    def predict_from_scores_dfs(self, y_scores_dfs):
+        y_prediction_dfs = []
+        for score in y_scores_dfs:
+            pred = np.zeros((score.shape[0],))
+            pred[np.abs(np.squeeze(score)) >= self.optimal_threshold] = 1
+            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
+            
+        return y_prediction_dfs
+    
+    def report_thresholds(self):
+        print("Optimal threshold:")
+        print((self.optimal_threshold))
+        
     def _calculate_interpolated_recall_precision(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=1000):
         
         precision_ = {}
@@ -227,7 +287,7 @@ class ThresholdMethod:
         
         interpolated_scores = np.zeros((len(interpolated_recall), len(used_cutoffs)))
         for i, cutoffs in enumerate(used_cutoffs):
-            interpolated_scores[:,i] = score_function(interpolated_precision[str(cutoffs)], interpolated_recall[str(cutoffs)])
+            interpolated_scores[:,i] = self.score_function(interpolated_precision[str(cutoffs)], interpolated_recall[str(cutoffs)], **self.score_function_kwargs)
             
         interpolated_scores = pd.DataFrame(interpolated_scores, columns=[str(cutoffs) for cutoffs in used_cutoffs])
         return interpolated_scores
@@ -242,126 +302,69 @@ class ThresholdMethod:
     
         return max_score_index
 
-class DoubleThresholdMethod(ThresholdMethod):
-    #score function must accept precision and recall as input
-    #score function should be maximized
-    def __init__(self, score_function = None, score_function_kwargs=None):
-        self.scores_calculated = False
+# class DoubleThresholdMethod(ThresholdMethod):
+#     #score function must accept precision and recall as input
+#     #score function should be maximized
+#     def __init__(self, score_function = None, score_function_kwargs=None):
+#         self.scores_calculated = False
         
-        if score_function is None:
-            try:
-                self.score_function_beta = score_function_kwargs["beta"]
-            except KeyError:
-                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+#         if score_function is None:
+#             try:
+#                 self.score_function_beta = score_function_kwargs["beta"]
+#             except KeyError:
+#                 raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
-            self.score_function = self.score_function_from_precision_recall_with_beta
+#             self.score_function = self.score_function_from_precision_recall_with_beta
         
-        else:
-            self.score_function = self.custom_score_function_from_precision_recall
-            self.score_function_kwargs = score_function_kwargs
+#         else:
+#             self.score_function = self.custom_score_function_from_precision_recall
+#             self.score_function_kwargs = score_function_kwargs
         
-    def score_function_from_precision_recall_with_beta(self, precision, recall):
-        return f_beta(precision, recall, self.score_function_beta)
+#     def score_function_from_precision_recall_with_beta(self, precision, recall):
+#         return f_beta(precision, recall, self.score_function_beta)
     
-    def custom_score_function_from_precision_recall(self, score_function, *args):
-        return score_function(*args, **self.score_function_kwargs)
+#     def custom_score_function_from_precision_recall(self, score_function, *args):
+#         return score_function(*args, **self.score_function_kwargs)
     
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
-        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+#     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
+#         self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
-        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
-            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+#         if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+#             raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
                 
-        if not self.scores_calculated or recalculate_scores:
-            self.negative_threshold_recall, self.negative_threshold_precision, self.negative_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
-            self.positive_threshold_recall, self.positive_threshold_precision, self.positive_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
+#         if not self.scores_calculated or recalculate_scores:
+#             self.negative_threshold_recall, self.negative_threshold_precision, self.negative_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
+#             self.positive_threshold_recall, self.positive_threshold_precision, self.positive_thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
             
-            self.scores_calculated = True
+#             self.scores_calculated = True
 
-        self.calculate_and_set_thresholds(used_cutoffs, score_function)
+#         self.calculate_and_set_thresholds(used_cutoffs, score_function)
         
-    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
-        self.negative_scores = self._calculate_interpolated_scores(self.negative_threshold_recall, self.negative_threshold_precision, used_cutoffs, score_function)
-        self.positive_scores = self._calculate_interpolated_scores(self.positive_threshold_recall, self.positive_threshold_precision, used_cutoffs, score_function)
+#     def calculate_and_set_thresholds(self, used_cutoffs, score_function):
+#         self.negative_scores = self._calculate_interpolated_scores(self.negative_threshold_recall, self.negative_threshold_precision, used_cutoffs, score_function)
+#         self.positive_scores = self._calculate_interpolated_scores(self.positive_threshold_recall, self.positive_threshold_precision, used_cutoffs, score_function)
         
-        negative_max_score_index = self._find_max_score_index_for_cutoffs(self.negative_scores, used_cutoffs)
-        positive_max_score_index = self._find_max_score_index_for_cutoffs(self.positive_scores, used_cutoffs)
+#         negative_max_score_index = self._find_max_score_index_for_cutoffs(self.negative_scores, used_cutoffs)
+#         positive_max_score_index = self._find_max_score_index_for_cutoffs(self.positive_scores, used_cutoffs)
         
-        #calculate optimal thresholds (negative threshold needs to be set to be negative)
-        self.optimal_negative_threshold = -self.negative_thresholds[negative_max_score_index]
-        self.optimal_positive_threshold = self.positive_thresholds[positive_max_score_index]
+#         #calculate optimal thresholds (negative threshold needs to be set to be negative)
+#         self.optimal_negative_threshold = -self.negative_thresholds[negative_max_score_index]
+#         self.optimal_positive_threshold = self.positive_thresholds[positive_max_score_index]
             
-    def predict_from_scores_dfs(self, y_scores_dfs):
+#     def predict_from_scores_dfs(self, y_scores_dfs):
         
-        y_prediction_dfs = []
-        for score in y_scores_dfs:
-            pred = np.zeros((score.shape[0],))
-            pred[np.logical_or(np.squeeze(score) < self.optimal_negative_threshold, np.squeeze(score) >= self.optimal_positive_threshold)] = 1
-            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
+#         y_prediction_dfs = []
+#         for score in y_scores_dfs:
+#             pred = np.zeros((score.shape[0],))
+#             pred[np.logical_or(np.squeeze(score) < self.optimal_negative_threshold, np.squeeze(score) >= self.optimal_positive_threshold)] = 1
+#             y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
             
-        return y_prediction_dfs
+#         return y_prediction_dfs
     
-    def report_thresholds(self):
-        print("Optimal thresholds:")
-        print((self.optimal_negative_threshold, self.optimal_positive_threshold))
+#     def report_thresholds(self):
+#         print("Optimal thresholds:")
+#         print((self.optimal_negative_threshold, self.optimal_positive_threshold))
 
-class SingleThresholdMethod(ThresholdMethod):
-    #score function must accept precision and recall as input
-    #score function should be maximized
-    def __init__(self, score_function = None, score_function_kwargs=None):
-        self.scores_calculated = False
-        
-        if score_function is None:
-            try:
-                self.score_function_beta = score_function_kwargs["beta"]
-            except KeyError:
-                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
-            
-            self.score_function = self.score_function_from_precision_recall_with_beta
-        
-        else:
-            self.score_function = self.custom_score_function_from_precision_recall
-            self.score_function_kwargs = score_function_kwargs
-        
-    def score_function_from_precision_recall_with_beta(self, precision, recall):
-        return f_beta(precision, recall, self.score_function_beta)
-    
-    def custom_score_function_from_precision_recall(self, score_function, *args):
-        return score_function(*args, **self.score_function_kwargs)
-        
-    def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, score_function, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
-        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
-        
-        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
-            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
-                
-        if not self.scores_calculated or recalculate_scores:
-            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical", interpolation_range_length=interpolation_range_length)
-            
-            self.scores_calculated = True
-        
-        self.calculate_and_set_thresholds(used_cutoffs, score_function)
-        
-    def calculate_and_set_thresholds(self, used_cutoffs, score_function):
-        self.scores = self._calculate_interpolated_scores(self.recall, self.precision, used_cutoffs, score_function)
-        
-        max_score_index = self._find_max_score_index_for_cutoffs(self.scores, used_cutoffs)
-        
-        #calculate optimal thresholds (negative threshold needs to be set to be negative)
-        self.optimal_threshold = self.thresholds[max_score_index]
-        
-    def predict_from_scores_dfs(self, y_scores_dfs):
-        y_prediction_dfs = []
-        for score in y_scores_dfs:
-            pred = np.zeros((score.shape[0],))
-            pred[np.abs(np.squeeze(score)) >= self.optimal_threshold] = 1
-            y_prediction_dfs.append(pd.Series(pred).to_frame(name="label"))
-            
-        return y_prediction_dfs
-    
-    def report_thresholds(self):
-        print("Optimal threshold:")
-        print((self.optimal_threshold))
 
 class ScoreCalculator:
     def __init__(self):
@@ -752,13 +755,13 @@ class SingleThresholdStatisticalProcessControl(StatisticalProcessControl, Single
         self.method_name = "SingleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
+# class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
-        super().__init__(**params)
-        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
-        self.method_name = "DoubleThresholdSPC"
-        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+#     def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
+#         super().__init__(**params)
+#         DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+#         self.method_name = "DoubleThresholdSPC"
+#         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class IndependentDoubleThresholdStatisticalProcessControl(StatisticalProcessControl, IndependentDoubleThresholdMethod, SaveableModel):
     
@@ -784,13 +787,13 @@ class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMetho
         self.method_name = "SingleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
+# class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
     
-    def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
-        super().__init__(**params)
-        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
-        self.method_name = "DoubleThresholdBS"
-        SaveableModel.__init__(self, base_models_path, preprocessing_hash)
+#     def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
+#         super().__init__(**params)
+#         DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+#         self.method_name = "DoubleThresholdBS"
+#         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class IndependentDoubleThresholdBinarySegmentation(BinarySegmentation, IndependentDoubleThresholdMethod, SaveableModel):
     
