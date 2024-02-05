@@ -113,17 +113,17 @@ SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_met
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-             #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
              #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
-             "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
-             "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
-             "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
+            # "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+            # "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
+            # "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
+            # "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
 
            }
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}

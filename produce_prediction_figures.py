@@ -7,6 +7,8 @@ import sqlite3
 import pandas as pd
 import numpy as np
 
+from hashlib import sha256
+
 import seaborn as sns
 
 from src.plot_functions import plot_predictions
@@ -24,7 +26,7 @@ sns.set()
 
 #%% Data loading
 
-data_folder = "data"
+data_folder = os.path.join("data", "OS_data")
 result_folder = "results"
 intermediates_folder = "intermediates"
 model_folder = "saved_models"
@@ -47,7 +49,7 @@ validation_name = "Validation"
 
 all_dataset_names = [train_name, test_name, validation_name]
 
-#%%
+#%% connect to database
 
 DBFILE = "experiment_results.db"
 database_exists = os.path.exists(DBFILE)
@@ -73,22 +75,34 @@ validation_ID_dict = {ID.replace(".csv", ""): "Validation" for ID in validation_
 #fastest dict merge: https://stackoverflow.com/questions/1781571/how-to-concatenate-two-dictionaries-to-create-a-new-one
 station_dataset_dict = dict(train_ID_dict, **test_ID_dict)
 station_dataset_dict.update(validation_ID_dict)
-    
-#%% load model
+  
+#%% select your own hyperparameters
 
-#load model:
-preprocessing_hash = "10cab9fc324db7a2fd5d8674c71edb68908b5e572ffa442d201eb0ca0aa288e1"
-hyperparameter_hash = "863c7a1a49f110ada1d11bf21549b9f60f53c72042a80a36a0969583a18d42e1"
+# will throw error if combination of HP has not been run in main yet  
+preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5, }
+model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
+
+preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+
+#%% use best model hyperparameters
+"""
+method_name = "SingleThresholdSPC"
+
+best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
+(preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
 
 db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
+model_hyperparameters = jsonpickle.loads(db_result)
+"""
 
-hyperparameters = jsonpickle.loads(db_result)
+#%% load model
 
 beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
-model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
 
 #%% load preprocessed X dfs
 
