@@ -13,9 +13,10 @@ from src.plot_functions import *
 
 
 #%% define environment variables
-data_folder = "data"
-result_folder = "results"
-intermediates_folder = "intermediates"
+dataset = "OS_data" #alternatively: route_data
+data_folder = os.path.join("data", dataset)
+result_folder = os.path.join("results", dataset)
+intermediates_folder = os.path.join("intermediates", dataset)
 
 preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
