@@ -401,7 +401,7 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     plt.show()
 
 
-def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
+def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -425,8 +425,14 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
      
     fig = plt.figure(figsize=(30,16))
     
-    if pretty_plot:
+    # decide plot size dependent on whether to include IF scores and predictions/title
+    if pretty_plot and show_IF_scores:
         gs = GridSpec(4, 1, figure=fig)
+    elif pretty_plot and not show_IF_scores:
+        gs = GridSpec(2, 1, figure=fig)
+    elif not pretty_plot and not show_IF_scores:
+        plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        gs = GridSpec(3, 1, figure=fig)
     else:
         plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
         gs = GridSpec(5, 1, figure=fig)
@@ -444,25 +450,29 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     plt.yticks(fontsize=20)
     plt.ylabel("Difference vector", fontsize=25)    
     
-    # scores plot, colouring the predicted outliers red   
-    ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
-    # calculate y_scores
-    y_scores = model.get_IF_scores(X_df)
-    dates = plot_threshold_colour(np.array(y_scores), np.array(X_df["M_TIMESTAMP"]), ax2, upper_threshold=threshold)
-    sns.set_theme()
+    # define dates already to allow plt.xticks to still function, even if show_IF_scores is False
+    dates = X_df["M_TIMESTAMP"]
     
-    # plot threshold on scores
-    threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
-    
-    ax2.set_ylabel("Scores", fontsize=25)
-    
-    # helper to add red colour to legend
-    red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
-    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
+    # scores plot, colouring the predicted outliers red
+    if show_IF_scores:
+        ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
+        # calculate y_scores
+        y_scores = model.get_IF_scores(X_df)
+        dates = plot_threshold_colour(np.array(y_scores), np.array(X_df["M_TIMESTAMP"]), ax2, upper_threshold=threshold)
+        sns.set_theme()
+        
+        # plot threshold on scores
+        threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
+        
+        ax2.set_ylabel("Scores", fontsize=25)
+        
+        # helper to add red colour to legend
+        red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
+        plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
     
     # Predictions plot
     if not pretty_plot:
-        ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
+        ax3 = fig.add_subplot(gs[-1,:],sharex=ax1)
         plot_labels(preds, label="label")
         sns.set_theme()
         
@@ -476,7 +486,7 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     fig.tight_layout()
     plt.show()
     
-def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_TP_FP_FN = True, opacity_TP = 0.3, pretty_plot = False, which_stations = None, n_stations = 3):
+def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_IF_scores = True, show_TP_FP_FN = True, opacity_TP = 0.3, pretty_plot = False, which_stations = None, n_stations = 3):
     """
     Plot the predictions made by a specific model in a way that makes sense for the method
 
@@ -535,7 +545,7 @@ def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_TP_FP_FN 
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_IF(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+                plot_IF(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
                 
 def scale_diff_data(df, quantiles):
     """

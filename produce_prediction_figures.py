@@ -75,26 +75,32 @@ validation_ID_dict = {ID.replace(".csv", ""): "Validation" for ID in validation_
 #fastest dict merge: https://stackoverflow.com/questions/1781571/how-to-concatenate-two-dictionaries-to-create-a-new-one
 station_dataset_dict = dict(train_ID_dict, **test_ID_dict)
 station_dataset_dict.update(validation_ID_dict)
-  
-#%% select your own hyperparameters
 
-# will throw error if combination of HP has not been run in main yet  
-preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5, }
-model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
+#%% choose HP
 
-preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
-preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
-
-#%% use best model hyperparameters
-"""
+use_best_model = False
 method_name = "SingleThresholdSPC"
 
-best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
-(preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
+# if use_best_model is False, use these
+preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5, }
+model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
+  
+#%% hyperparameter selection
 
-db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
-model_hyperparameters = jsonpickle.loads(db_result)
-"""
+# use your own hyperparameters
+if not use_best_model:
+    # will throw error if combination of HP has not been run in main yet  
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+
+# use best model hyperparameters
+else:    
+    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
+    (preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
+    
+    db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
+    model_hyperparameters = jsonpickle.loads(db_result)
+
 
 #%% load model
 
@@ -103,6 +109,9 @@ def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
 model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+
+# get hash (if not using best model) for prediction loading
+hyperparameter_hash = model.get_hyperparameter_hash()
 
 #%% load preprocessed X dfs
 
@@ -138,4 +147,4 @@ for station_ID in station_IDs:
  
 #%% plot the predictions
 
-plot_predictions(X_dfs, y_dfs, y_pred_dfs, station_IDs, model, show_TP_FP_FN=True, opacity_TP=0.6, pretty_plot=True, which_stations = range(0, len(station_IDs)))
+plot_predictions(X_dfs, y_dfs, y_pred_dfs, station_IDs, model, show_IF_scores=True, show_TP_FP_FN=True, opacity_TP=0.6, pretty_plot=True, which_stations = range(0, len(station_IDs)))
