@@ -10,3 +10,4 @@ dependencies:
   - sqlite
   - ruptures
   - jinja2
+  - numba
