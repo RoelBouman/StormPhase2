@@ -14,11 +14,11 @@ import seaborn as sns
 from src.plot_functions import plot_predictions
 
 from src.methods import SingleThresholdStatisticalProcessControl
-from src.methods import DoubleThresholdStatisticalProcessControl
+#from src.methods import DoubleThresholdStatisticalProcessControl
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
-from src.methods import DoubleThresholdBinarySegmentation
+#from src.methods import DoubleThresholdBinarySegmentation
 
 from src.evaluation import f_beta
 
@@ -26,10 +26,11 @@ sns.set()
 
 #%% Data loading
 
-data_folder = os.path.join("data", "OS_data")
-result_folder = "results"
-intermediates_folder = "intermediates"
-model_folder = "saved_models"
+dataset = "OS_data" #alternatively: route_data
+data_folder = os.path.join("data", dataset)
+result_folder = os.path.join("results", dataset)
+intermediates_folder = os.path.join("intermediates", dataset)
+model_folder = os.path.join("saved_models", dataset)
 
 table_folder = "Tables"
 figure_folder = "Figures"
@@ -51,7 +52,7 @@ all_dataset_names = [train_name, test_name, validation_name]
 
 #%% connect to database
 
-DBFILE = "experiment_results.db"
+DBFILE = dataset+"_experiment_results.db"
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
@@ -60,8 +61,7 @@ db_cursor = db_connection.cursor()
 #%% choose station IDs
 
 # IDs must be from same split
-station_IDs = ["1", "041", "019"]
-
+station_IDs = ["1","041"]
 train_IDs = os.listdir(os.path.join(data_folder, "Train", "X"))
 test_IDs = os.listdir(os.path.join(data_folder, "Test", "X"))
 validation_IDs = os.listdir(os.path.join(data_folder, "Validation", "X"))
@@ -78,11 +78,11 @@ station_dataset_dict.update(validation_ID_dict)
 
 #%% choose HP
 
-use_best_model = False
+use_best_model = True
 method_name = "SingleThresholdSPC"
 
 # if use_best_model is False, use these
-preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5, }
+preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
 model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
   
 #%% hyperparameter selection
@@ -135,12 +135,13 @@ for station_ID in station_IDs:
 
 model_name = model.method_name
 
-base_predictions_path = os.path.join(predictions_folder, station_dataset_dict[station_ID])
-predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
-    
 y_pred_dfs = []
 
 for station_ID in station_IDs:
+    
+    base_predictions_path = os.path.join(predictions_folder, station_dataset_dict[station_ID])
+    predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
+        
     y_df = pd.read_csv(os.path.join(predictions_path, "stations", station_ID + ".csv"))
     
     y_pred_dfs.append(y_df)
