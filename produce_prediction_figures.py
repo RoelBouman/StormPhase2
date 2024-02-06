@@ -1,11 +1,11 @@
 #%% package loading
 import os
-import pickle
+#import pickle
 import jsonpickle
 import sqlite3
 
 import pandas as pd
-import numpy as np
+#import numpy as np
 
 from hashlib import sha256
 
