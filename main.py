@@ -54,9 +54,9 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False 
-validation_overwrite = False
-testing_overwrite = False
+training_overwrite = True 
+validation_overwrite = True
+testing_overwrite = True
 
 dry_run = False
 
@@ -79,7 +79,7 @@ all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': 
 
 
 #For IF, pass sequence of dicts to avoid useless hyperparam combos (such as scaling=True, forest_per_station=True)
-SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}]
+SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False], "score_function_kwargs":[{"beta":beta}]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)], "score_function_kwargs":[{"beta":beta}]}]
 SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
 SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0.12], "model": ['l1'], 'min_size': [50, 100, 200], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
 
@@ -111,19 +111,19 @@ SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleTh
 del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
 SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
-methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-             #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
              #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
-             "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
-             "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
-             "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
+            # "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+            # "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
+            # "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
+            # "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
 
            }
 #methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
