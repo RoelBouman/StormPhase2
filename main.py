@@ -56,7 +56,7 @@ training_overwrite = False
 validation_overwrite = False
 testing_overwrite = False
 
-dry_run = True
+dry_run = False
 
 #%% set up database
 
@@ -135,8 +135,8 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
                        "IndependentDoubleThresholdSPC":IndependentDoubleThresholdSPC_hyperparameters,
                        "IndependentDoubleThresholdBS":IndependentDoubleThresholdBS_hyperparameters,
-                       "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
-                       "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
+                       # "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
+                       # "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
                        }
 
 #%% Preprocess Train data and run algorithms:
@@ -211,7 +211,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
                     db_connection.commit()
                 
-                    model.save_model()
                 
             else:
                 print("Model already evaluated, loading results instead:")
@@ -391,7 +390,8 @@ for method_name in methods:
         PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
         if bootstrap_validation:
-            metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std = calculate_bootstrap_stats
+            metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations=bootstrap_iterations)
+
         
         if not dry_run:
             save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
