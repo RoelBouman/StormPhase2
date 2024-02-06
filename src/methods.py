@@ -182,8 +182,8 @@ class SingleThresholdMethod:
         if score_function is None:
             try:
                 self.score_function_beta = score_function_kwargs["beta"]
-            except KeyError:
-                raise KeyError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
+            except TypeError:
+                raise TypeError("If score_function is set to None, score_function_kwargs should contain key:value pair for 'beta':..." )
             
             self.score_function_kwargs = score_function_kwargs
             self.score_function = self.score_function_from_precision_recall_with_beta
