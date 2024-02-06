@@ -9,14 +9,12 @@ from sklearn.model_selection import ParameterGrid
 from hashlib import sha256
 
 from src.methods import SingleThresholdStatisticalProcessControl
-from src.methods import DoubleThresholdStatisticalProcessControl
 from src.methods import IndependentDoubleThresholdStatisticalProcessControl
 
 
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
-from src.methods import DoubleThresholdBinarySegmentation
 from src.methods import IndependentDoubleThresholdBinarySegmentation
 
 from src.methods import StackEnsemble
@@ -58,7 +56,7 @@ training_overwrite = False
 validation_overwrite = False
 testing_overwrite = False
 
-dry_run = False
+dry_run = True
 
 #%% set up database
 
@@ -79,9 +77,9 @@ all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': 
 
 
 #For IF, pass sequence of dicts to avoid useless hyperparam combos (such as scaling=True, forest_per_station=True)
-SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}]
-SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)]}
-SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0.12], "model": ['l1'], 'min_size': [50, 100, 200], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"]}
+SingleThresholdIF_hyperparameters = [{"n_estimators": [1000], "forest_per_station":[True], "scaling":[False], "score_function_kwargs":[{"beta":beta}]}, {"n_estimators": [1000], "forest_per_station":[False], "scaling":[True], "quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)], "score_function_kwargs":[{"beta":beta}]}]
+SingleThresholdSPC_hyperparameters = {"quantiles":[(5,95), (10,90), (15, 85), (20,80), (25,75)], "score_function_kwargs":[{"beta":beta}]}
+SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0.12], "model": ['l1'], 'min_size': [50, 100, 200], "jump": [10], "quantiles": [(5,95), (10,90), (15, 85), (20,80)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"], "score_function_kwargs":[{"beta":beta}]}
 
 
 SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[{'beta':0.12, 'model':'l1','min_size':100, 'jump':10, 'quantiles':(5,95), 'scaling':True, 'penalty':'fused_lasso'},{'quantiles': (5, 95)}]], "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
@@ -106,27 +104,26 @@ SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "score_function_kwa
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
-Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, IndependentDoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
-SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters.copy()
-del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
-SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
+# Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, IndependentDoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
+# SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters.copy()
+# del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
+# SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
-methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-             #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, 
+            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
              #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
-             "IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
-             "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
-             "SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
+             #"IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+             #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
+             #"Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
+             #"SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
 
            }
-#methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl}
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, 
                        "SingleThresholdBS":SingleThresholdBS_hyperparameters, 
@@ -214,7 +211,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
                     db_connection.commit()
                 
-                    #save_model(model, model_path, hyperparameter_string)
                     model.save_model()
                 
             else:
@@ -223,16 +219,13 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
                 minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
-                #Model is instead loaded at model inititiation 
-                #model.load_model(model_path, hyperparameter_string)
-            
                 #check if loaded model has saved thresholds for correct optimization cutoff set:
                 #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
                 if not hasattr(model, "is_ensemble"):
                     if not model.check_cutoffs(all_cutoffs):
                         print("Loaded model has wrong cutoffs, recalculating thresholds...")
                         model.used_cutoffs = all_cutoffs
-                        model.calculate_and_set_thresholds(all_cutoffs, model.score_function)
+                        model.calculate_and_set_thresholds(all_cutoffs)
                     
             model.report_thresholds()
                         
@@ -396,6 +389,9 @@ for method_name in methods:
         minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
         absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
         PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
+        
+        if bootstrap_validation:
+            metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std = calculate_bootstrap_stats
         
         if not dry_run:
             save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)

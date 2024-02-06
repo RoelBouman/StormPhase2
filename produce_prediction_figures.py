@@ -7,6 +7,8 @@ import sqlite3
 import pandas as pd
 import numpy as np
 
+from hashlib import sha256
+
 import seaborn as sns
 
 from src.plot_functions import plot_predictions
@@ -24,7 +26,7 @@ sns.set()
 
 #%% Data loading
 
-data_folder = "data"
+data_folder = os.path.join("data", "OS_data")
 result_folder = "results"
 intermediates_folder = "intermediates"
 model_folder = "saved_models"
@@ -47,7 +49,7 @@ validation_name = "Validation"
 
 all_dataset_names = [train_name, test_name, validation_name]
 
-#%%
+#%% connect to database
 
 DBFILE = "experiment_results.db"
 database_exists = os.path.exists(DBFILE)
@@ -58,7 +60,7 @@ db_cursor = db_connection.cursor()
 #%% choose station IDs
 
 # IDs must be from same split
-station_IDs = ["1", "11", "019"]
+station_IDs = ["1", "041", "019"]
 
 train_IDs = os.listdir(os.path.join(data_folder, "Train", "X"))
 test_IDs = os.listdir(os.path.join(data_folder, "Test", "X"))
@@ -73,22 +75,43 @@ validation_ID_dict = {ID.replace(".csv", ""): "Validation" for ID in validation_
 #fastest dict merge: https://stackoverflow.com/questions/1781571/how-to-concatenate-two-dictionaries-to-create-a-new-one
 station_dataset_dict = dict(train_ID_dict, **test_ID_dict)
 station_dataset_dict.update(validation_ID_dict)
+
+#%% choose HP
+
+use_best_model = False
+method_name = "SingleThresholdSPC"
+
+# if use_best_model is False, use these
+preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5, }
+model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
+  
+#%% hyperparameter selection
+
+# use your own hyperparameters
+if not use_best_model:
+    # will throw error if combination of HP has not been run in main yet  
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+
+# use best model hyperparameters
+else:    
+    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
+    (preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
     
+    db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
+    model_hyperparameters = jsonpickle.loads(db_result)
+
+
 #%% load model
-
-#load model:
-preprocessing_hash = "10cab9fc324db7a2fd5d8674c71edb68908b5e572ffa442d201eb0ca0aa288e1"
-hyperparameter_hash = "863c7a1a49f110ada1d11bf21549b9f60f53c72042a80a36a0969583a18d42e1"
-
-db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
-
-hyperparameters = jsonpickle.loads(db_result)
 
 beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
-model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
+model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+
+# get hash (if not using best model) for prediction loading
+hyperparameter_hash = model.get_hyperparameter_hash()
 
 #%% load preprocessed X dfs
 
@@ -98,6 +121,15 @@ for station_ID in station_IDs:
     X_df = pd.read_csv(os.path.join(preprocessed_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
     
     X_dfs.append(X_df)
+
+#%% load y dfs
+
+y_dfs = []
+
+for station_ID in station_IDs:
+    y_df = pd.read_csv(os.path.join(data_folder, station_dataset_dict[station_ID], "y", station_ID + ".csv"))
+    
+    y_dfs.append(y_df)
 
 #%% load predictions
 
@@ -115,4 +147,4 @@ for station_ID in station_IDs:
  
 #%% plot the predictions
 
-plot_predictions(X_dfs, y_pred_dfs, station_IDs, model, pretty_plot=True, which_stations = range(0, len(station_IDs)))
+plot_predictions(X_dfs, y_dfs, y_pred_dfs, station_IDs, model, show_IF_scores=True, show_TP_FP_FN=True, opacity_TP=0.6, pretty_plot=True, which_stations = range(0, len(station_IDs)))

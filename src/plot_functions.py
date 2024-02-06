@@ -40,13 +40,48 @@ def plot_labels(df, **kwargs):
     #plt.imshow((df["label"]==5).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")
     plt.plot(df["label"], **kwargs)
 
+def plot_TP_FP_FN(y_df, preds, opacity, ax):
+    true_values = y_df["label"]
+    predictions = preds["label"]
+    
+    true_values[true_values == 5] = 0 # set all 5s to zero 
+    
+    TP = np.logical_and(true_values, predictions) # AND between the two arrays
+    FP = np.logical_and(np.logical_not(true_values), predictions) # AND with negated true values
+    FN = np.logical_and(true_values, np.logical_not(predictions)) # AND with negated predictions
+    
+    TP_index = np.where(TP == 1)[0]
+    FP_index = np.where(FP == 1)[0]
+    FN_index = np.where(FN == 1)[0]
+    
+    
+    for i in TP_index:
+        ax.axvline(i, color='g', linewidth=3, alpha=opacity)
+    for i in FP_index:
+        ax.axvline(i, color='y', linewidth=3, alpha=opacity)
+    for i in FN_index:
+        ax.axvline(i, color='c', linewidth=3, alpha=opacity)
+        
+    
+    TP_handle = mpatches.Patch(color='g', label='True Positive')
+    FP_handle = mpatches.Patch(color='y', label='False Positive')
+    FN_handle = mpatches.Patch(color='c', label='False Negative')
 
-def plot_bkps(signal, preds, bkps, ax, **kwargs):
+    
+    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=20, loc="upper left")
+
+    ax.add_artist(legend1)
+
+def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, **kwargs):
     """
     Adapted from rpt.display for our purposes
     (https://dev.ipol.im/~truong/ruptures-docs/build/html/_modules/ruptures/show/display.html)
 
     """
+    # colour background according to TP,FP,FN
+    if show_TP_FP_FN:
+        plot_TP_FP_FN(y_df, preds, opacity, ax)
+    
     ax.plot(signal, **kwargs)
     
     # color each regime according to breakpoints
@@ -64,8 +99,9 @@ def plot_bkps(signal, preds, bkps, ax, **kwargs):
             col = "#4286f4"
             label = None
         
-        # colour section
-        ax.axvspan(max(0, prev_bkp - 0.5), bkp - 0.5, facecolor=col, alpha=alpha, label = label)
+        # colour section if not coloured according to TP,FP,FN
+        if not show_TP_FP_FN:
+            ax.axvspan(max(0, prev_bkp - 0.5), bkp - 0.5, facecolor=col, alpha=alpha, label = label)
         prev_bkp = bkp
         
         # print breakpoint line
@@ -200,7 +236,7 @@ def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
     return x, y
     
     
-def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
+def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the predictions and original plot for the statistical profiling method,
     overlay with thresholds and colour appropriately
@@ -238,6 +274,11 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     
     # diff plot coloured correctly:       
     ax1 = fig.add_subplot(gs[:4,:])
+    
+    # colour background according to TP,FP,FN
+    if show_TP_FP_FN:
+        plot_TP_FP_FN(y_df, preds, opacity_TP, ax1)
+    
     dates = plot_threshold_colour(np.array(X_df["diff"]), np.array(X_df["M_TIMESTAMP"]), ax1, upper_threshold=upper_threshold, lower_threshold=lower_threshold)
     sns.set_theme()
     
@@ -269,7 +310,7 @@ def plot_SP(X_df, preds, threshold, file, model_string, pretty_plot):
     fig.tight_layout()
     plt.show()
     
-def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
+def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -309,7 +350,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
     bkps = model.get_breakpoints(X_df["diff"].values.reshape(-1,1))
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(X_df['diff'], preds, bkps, ax1)
+    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
@@ -360,7 +401,7 @@ def plot_BS(X_df, preds, threshold, file, model, model_string, pretty_plot):
     plt.show()
 
 
-def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
+def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the predictions and original plot for the binary segmentation method,
     overlay with thresholds
@@ -384,39 +425,54 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
      
     fig = plt.figure(figsize=(30,16))
     
-    if pretty_plot:
+    # decide plot size dependent on whether to include IF scores and predictions/title
+    if pretty_plot and show_IF_scores:
         gs = GridSpec(4, 1, figure=fig)
+    elif pretty_plot and not show_IF_scores:
+        gs = GridSpec(2, 1, figure=fig)
+    elif not pretty_plot and not show_IF_scores:
+        plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        gs = GridSpec(3, 1, figure=fig)
     else:
         plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
         gs = GridSpec(5, 1, figure=fig)
     
     # Diff plot:    
     ax1 = fig.add_subplot(gs[:2,:])
+    
+    # colour background according to TP,FP,FN
+    if show_TP_FP_FN:
+        plot_TP_FP_FN(y_df, preds, opacity_TP, ax1)
+    
     plot_diff(X_df)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
     plt.ylabel("Difference vector", fontsize=25)    
     
-    # scores plot, colouring the predicted outliers red   
-    ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
-    # calculate y_scores
-    y_scores = model.get_IF_scores(X_df)
-    dates = plot_threshold_colour(np.array(y_scores), np.array(X_df["M_TIMESTAMP"]), ax2, upper_threshold=threshold)
-    sns.set_theme()
+    # define dates already to allow plt.xticks to still function, even if show_IF_scores is False
+    dates = X_df["M_TIMESTAMP"]
     
-    # plot threshold on scores
-    threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
-    
-    ax2.set_ylabel("Scores", fontsize=25)
-    
-    # helper to add red colour to legend
-    red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
-    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
+    # scores plot, colouring the predicted outliers red
+    if show_IF_scores:
+        ax2 = fig.add_subplot(gs[2:4,:], sharex=ax1)
+        # calculate y_scores
+        y_scores = model.get_IF_scores(X_df)
+        dates = plot_threshold_colour(np.array(y_scores), np.array(X_df["M_TIMESTAMP"]), ax2, upper_threshold=threshold)
+        sns.set_theme()
+        
+        # plot threshold on scores
+        threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
+        
+        ax2.set_ylabel("Scores", fontsize=25)
+        
+        # helper to add red colour to legend
+        red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
+        plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
     
     # Predictions plot
     if not pretty_plot:
-        ax3 = fig.add_subplot(gs[4,:],sharex=ax1)
+        ax3 = fig.add_subplot(gs[-1,:],sharex=ax1)
         plot_labels(preds, label="label")
         sns.set_theme()
         
@@ -430,7 +486,7 @@ def plot_IF(X_df, preds, threshold, file, model, model_string, pretty_plot):
     fig.tight_layout()
     plt.show()
     
-def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, which_stations = None, n_stations = 3):
+def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_IF_scores = True, show_TP_FP_FN = True, opacity_TP = 0.3, pretty_plot = False, which_stations = None, n_stations = 3):
     """
     Plot the predictions made by a specific model in a way that makes sense for the method
 
@@ -456,6 +512,7 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, 
     
     for station in which_stations:
         X_df = X_dfs[station]
+        y_df = y_dfs[station]
         preds = predictions[station]
         file = dfs_files[station]
         
@@ -465,30 +522,30 @@ def plot_predictions(X_dfs, predictions, dfs_files, model, pretty_plot = False, 
             case "SingleThresholdSPC" :
                 threshold = model.optimal_threshold
                 scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), pretty_plot)
+                plot_SP(scaled_df, y_df, preds, threshold, file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
             
             case "DoubleThresholdSPC" :
                 threshold = model.optimal_threshold
                 scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, preds, threshold, file, str(model.get_model_string()), pretty_plot)
+                plot_SP(scaled_df, y_df, preds, threshold, file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
         
             case "SingleThresholdBS" :
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
+                plot_BS(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
             
             case "DoubleThresholdBS" :
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
+                plot_BS(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
             
             case "SingleThresholdIF" :
                 threshold = model.optimal_threshold
                 if model.scaling:
                     X_df = scale_diff_data(X_df, model.quantiles)
-                plot_IF(X_df, preds, threshold, file, model, str(model.get_model_string()), pretty_plot)
+                plot_IF(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
                 
 def scale_diff_data(df, quantiles):
     """
