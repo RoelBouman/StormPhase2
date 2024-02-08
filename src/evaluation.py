@@ -9,9 +9,9 @@ import numpy as np
 import pandas as pd
 from numba import njit
 
-from sklearn.metrics import fbeta_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import fbeta_score, precision_score, recall_score, roc_auc_score, confusion_matrix
 
-from .helper_functions import filter_label_and_predictions_to_array
+from .helper_functions import filter_label_and_predictions_to_array, filter_label_and_predictions
 
 
 def f_beta(precision, recall, beta=1, eps=np.finfo(float).eps):
@@ -86,43 +86,43 @@ def calculate_unsigned_absolute_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, loa
 
     return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
 
+@njit
+def bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station):
+    for indices in bootstrap_samples:
+        confmats = [confmat_per_station[i] for i in indices]
+        
+        confmat_sum = np.array([0,0,0,0])
+        for confmat in confmats:
+            confmat_sum += confmat
+            
+        
+
 def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations=10000):
-    y_arrays = df_list_to_array_list(y_dfs, column="label")
-    y_pred_arrays = df_list_to_array_list(y_pred_dfs, column="label")
-    label_array_filters_for_all_cutoffs = label_filters_to_array(label_filters_for_all_cutoffs)
+
+    all_cutoffs = label_filters_for_all_cutoffs[0].keys()
     
-    metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std = _calculate_bootstrap_stats(y_arrays, y_pred_arrays, label_array_filters_for_all_cutoffs, beta, bootstrap_iterations=bootstrap_iterations)
+    n_cutoffs = len(all_cutoffs)
+    n_dfs = len(y_dfs)
+
+    confmat_per_station_per_cutoff = {}
+    
+    for cutoffs in all_cutoffs:
+        filtered_y, filtered_y_preds = filter_label_and_predictions(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, cutoffs)
+        
+        confmat_per_station = np.zeros((len(y_dfs),4))
+        for i, (y, y_pred) in enumerate(zip(filtered_y, filtered_y_preds)):
+            confmat_per_station[i,:] = confusion_matrix(y, y_pred, label=[0,1]).ravel() #TODO: cast to int32
+        
+        confmat_per_station_per_cutoff[str(cutoffs)] = confmat_per_station
+        
+    bootstrap_samples = nnp.random.choice(np.arange(n_dfs, dtype=np.int32), size=(bootstrap_iterations, n_dfs))
+    
+    for cutoffs in all_cutoffs:
+            _,_,_,_ = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station)
 
     return metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std
 
 
-
-def calculate_PRFAUC_table_from_arrays(y_arrays, y_pred_arrays, label_array_filters_for_all_cutoffs, beta):
-    n_cutoffs = label_array_filters_for_all_cutoffs[0].shape[1]
-
-    precisions = np.zeros((n_cutoffs,))
-    recalls = np.zeros((n_cutoffs,))
-    fbetas = np.zeros((n_cutoffs,))
-    AUCs = np.zeros((n_cutoffs,))
-    
-    for i in range(n_cutoffs):
-        filtered_y, filtered_y_preds = filter_array_label_and_predictions_to_array(y_arrays, y_pred_arrays, label_array_filters_for_all_cutoffs, cutoff=i)
-        
-        
-        precisions.append(precision_score(filtered_y, filtered_y_preds))
-        recalls.append(recall_score(filtered_y, filtered_y_preds))
-        fbetas.append(fbeta_score(filtered_y, filtered_y_preds, beta=beta))
-        AUCs.append(roc_auc_score(filtered_y, filtered_y_preds))
-        
-    PRFAUC_table = pd.DataFrame(index=all_cutoffs)
-    PRFAUC_table.index.name = "Cutoffs"
-    
-    PRFAUC_table["precision"] = precisions
-    PRFAUC_table["recall"] = recalls
-    PRFAUC_table["F"+str(beta)] = fbetas
-    PRFAUC_table["ROC/AUC"] = AUCs
-    
-    return PRFAUC_table
 
 
 
