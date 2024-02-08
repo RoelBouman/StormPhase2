@@ -574,10 +574,8 @@ class BinarySegmentation(ScoreCalculator):
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def fused_lasso_penalty(self, signal, beta):
-        tot_sum = 0
         mean = np.mean(signal)
-        for i in signal:
-            tot_sum += np.abs(i - mean)
+        tot_sum = np.sum(np.abs(signal - mean))
         
         return beta * tot_sum
     
