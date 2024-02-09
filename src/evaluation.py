@@ -146,7 +146,8 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
         #confmat_per_station_per_cutoff[str(cutoffs)] = confmat_per_station
         
         table_mean[i,:], table_std[i,:] = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta)
-
+    
+    
     PRF_mean_table = pd.DataFrame(index=all_cutoffs)
     PRF_mean_table.index.name = "Cutoffs"
     
@@ -160,38 +161,11 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
     PRF_std_table["precision"] = table_std[:,0]
     PRF_std_table["recall"] = table_std[:,1]
     PRF_std_table["F"+str(beta)] = table_std[:,2]
+    
+    #if any nans, repeat procedure:
+    if PRF_mean_table.isnull().any().any():
+        print("NaN in validation results due to invalid split, recalculating:...")
+        PRF_mean_table, PRF_std_table = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations)
 
     return PRF_mean_table, PRF_std_table
 
-
-
-
-
-@njit
-def _calculate_bootstrap_stats(y_arrays, y_pred_arrays, label_array_filters_for_all_cutoffs, beta,  bootstrap_iterations=10000):
-    
-    n_cutoffs = len(label_array_filters_for_all_cutoffs[0])
-    n_dfs = len(y_arrays)
-    
-    PRFAUC_table_per_iteration = np.zeros((n_cutoffs, 4, bootstrap_iterations))
-    metric_per_iteration = np.zeros((bootstrap_iterations,))
-    
-    for i in range(bootstrap_iterations):
-        
-        bootstrap_indices  = np.random.choice(n_dfs, size=n_dfs)
-        
-        y_arrays_bootstrapped = [y_arrays[j] for j in bootstrap_indices]
-        y_pred_arrays_bootstrapped = [y_pred_arrays[j] for j in bootstrap_indices]
-        label_filters_for_all_cutoffs_bootstrapped = [label_array_filters_for_all_cutoffs[j] for j in bootstrap_indices]
-        
-        
-        PRFAUC_table_per_iteration[:,:,i] = calculate_PRFAUC_table(y_arrays_bootstrapped, y_pred_arrays_bootstrapped, label_filters_for_all_cutoffs_bootstrapped, beta)
-    #     metric_per_iteration[i] = cutoff_averaged_f_beta(y_arrays_bootstrapped, y_pred_arrays_bootstrapped, label_filters_for_all_cutoffs_bootstrapped, beta)
-        
-    # metric_mean = np.mean(metric_per_iteration)
-    # metric_std = np.std(metric_per_iteration)
-    
-    # PRFAUC_table_mean = np.mean(PRFAUC_table_per_iteration, axis=2)
-    # PRFAUC_table_std = np.std(PRFAUC_table_per_iteration, axis=2)
-    
-    # return metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std
