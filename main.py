@@ -103,7 +103,6 @@ DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
 #%% define methods:
 SingleThresholdBS_hyperparameters = {"beta": [0.015], "model": ['l1'], 'min_size': [50], "jump": [10], "quantiles": [(15, 85)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"], "score_function_kwargs":[{"beta":beta}]}
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
-DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
     
 
 SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "score_function_kwargs":[{"beta":beta}]}
@@ -116,13 +115,13 @@ DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
-             "DoubleThresholdBS":DoubleThresholdBinarySegmentation,
+             "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
+             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation,
              #"Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
              #"SingleThresholdBS+DoubleThresholdSPC":StackEnsemble
 
