@@ -9,13 +9,13 @@ from sklearn.model_selection import ParameterGrid
 from hashlib import sha256
 
 from src.methods import SingleThresholdStatisticalProcessControl
-from src.methods import IndependentDoubleThresholdStatisticalProcessControl
+from src.methods import DoubleThresholdStatisticalProcessControl
 
 
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
-from src.methods import IndependentDoubleThresholdBinarySegmentation
+from src.methods import DoubleThresholdBinarySegmentation
 
 from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
@@ -96,36 +96,33 @@ DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleT
 Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
 
 
-IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
-IndependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
+DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
 #%% define methods:
 SingleThresholdBS_hyperparameters = {"beta": [0.015], "model": ['l1'], 'min_size': [50], "jump": [10], "quantiles": [(15, 85)], "scaling": [True], "penalty": ['fused_lasso'], "reference_point":["mean", "median", "longest_median", "longest_mean"], "score_function_kwargs":[{"beta":beta}]}
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
-IndependentDoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
+DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
     
 
 SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90)], "score_function_kwargs":[{"beta":beta}]}
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
-IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
-# Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, IndependentDoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
-# SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters.copy()
-# del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
-# SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
+# Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, DoubleThresholdStatisticalProcessControl]], "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], "all_cutoffs":[all_cutoffs]}
+# SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters.copy()
+# del SingleThresholdBS_DoubleThresholdSPC_hyperparameters["all_cutoffs"] 
+# SingleThresholdBS_DoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+            #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-             #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
-             #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
-             #"Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
-             #"SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
+             "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
+             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation,
+             #"Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+             #"SingleThresholdBS+DoubleThresholdSPC":StackEnsemble
 
            }
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
@@ -137,10 +134,10 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "DoubleThresholdSPC":DoubleThresholdSPC_hyperparameters, 
                        "DoubleThresholdBS+DoubleThresholdSPC":DoubleThresholdBS_DoubleThresholdSPC_hyperparameters, 
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
-                       "IndependentDoubleThresholdSPC":IndependentDoubleThresholdSPC_hyperparameters,
-                       "IndependentDoubleThresholdBS":IndependentDoubleThresholdBS_hyperparameters,
-                       # "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
-                       # "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
+                       "DoubleThresholdSPC":DoubleThresholdSPC_hyperparameters,
+                       "DoubleThresholdBS":DoubleThresholdBS_hyperparameters,
+                       # "Naive-SingleThresholdBS+DoubleThresholdSPC":Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters,
+                       # "SingleThresholdBS+DoubleThresholdSPC":SingleThresholdBS_DoubleThresholdSPC_hyperparameters
                        }
 
 #%% Preprocess Train data and run algorithms:

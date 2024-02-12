@@ -16,7 +16,7 @@ from sklearn.ensemble import IsolationForest as IF
 from .helper_functions import filter_label_and_scores_to_array
 from .evaluation import f_beta, f_beta_from_confmat
 
-class IndependentDoubleThresholdMethod:
+class DoubleThresholdMethod:
     #score function must accept false_positives, true_positives,false_negatives as input
     #score function should be maximized
     def __init__(self, score_function=None, score_function_kwargs=None):
@@ -706,12 +706,12 @@ class SingleThresholdStatisticalProcessControl(StatisticalProcessControl, Single
         self.method_name = "SingleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class IndependentDoubleThresholdStatisticalProcessControl(StatisticalProcessControl, IndependentDoubleThresholdMethod, SaveableModel):
+class DoubleThresholdStatisticalProcessControl(StatisticalProcessControl, DoubleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        IndependentDoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
-        self.method_name = "IndependentDoubleThresholdSPC"
+        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+        self.method_name = "DoubleThresholdSPC"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class SingleThresholdIsolationForest(IsolationForest, SingleThresholdMethod, SaveableModel):
@@ -730,12 +730,12 @@ class SingleThresholdBinarySegmentation(BinarySegmentation, SingleThresholdMetho
         self.method_name = "SingleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
-class IndependentDoubleThresholdBinarySegmentation(BinarySegmentation, IndependentDoubleThresholdMethod, SaveableModel):
+class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMethod, SaveableModel):
     
     def __init__(self, base_models_path, preprocessing_hash, score_function=None, score_function_kwargs=None, **params):
         super().__init__(**params)
-        IndependentDoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
-        self.method_name = "IndependentDoubleThresholdBS"
+        DoubleThresholdMethod.__init__(self, score_function=score_function, score_function_kwargs=score_function_kwargs)
+        self.method_name = "DoubleThresholdBS"
         SaveableModel.__init__(self, base_models_path, preprocessing_hash)
         
 class SaveableEnsemble(SaveableModel):
