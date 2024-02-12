@@ -62,6 +62,8 @@ bootstrap_iterations = 10000
 
 dry_run = False
 
+verbose = True
+
 #%% set up database
 
 DBFILE = dataset+"_experiment_results.db"
@@ -119,8 +121,8 @@ methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
-             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation,
+             #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
+             "DoubleThresholdBS":DoubleThresholdBinarySegmentation,
              #"Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
              #"SingleThresholdBS+DoubleThresholdSPC":StackEnsemble
 
@@ -153,6 +155,10 @@ X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
 
 train_file_names = X_train_files
 
+base_scores_path = os.path.join(score_folder, which_split)
+base_predictions_path = os.path.join(predictions_folder, which_split)
+base_intermediates_path = os.path.join(intermediates_folder, which_split)
+
 preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
 for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
@@ -180,8 +186,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
             
-            base_scores_path = os.path.join(score_folder, which_split)
-            base_predictions_path = os.path.join(predictions_folder, which_split)
             scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
             predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
             fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
@@ -192,7 +196,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             
             if training_overwrite or not os.path.exists(full_model_path):
                 
-                y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=training_overwrite, fit=True, dry_run=dry_run)
+                y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, base_intermediates_path=base_intermediates_path, overwrite=training_overwrite, fit=True, dry_run=dry_run, verbose=verbose)
     
                 metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
                 
@@ -244,6 +248,10 @@ print("-----------------------------------------------")
 X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
 
 val_file_names = X_val_files
+
+base_scores_path = os.path.join(score_folder, which_split)
+base_predictions_path = os.path.join(predictions_folder, which_split)
+base_intermediates_path = os.path.join(intermediates_folder, which_split)
     
 #%% Preprocess val data and run algorithms:
 # Peprocess entire batch
@@ -277,8 +285,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             hyperparameter_hash = model.get_hyperparameter_hash()
             hyperparameter_hash_filename = model.get_filename()
             
-            base_scores_path = os.path.join(score_folder, which_split)
-            base_predictions_path = os.path.join(predictions_folder, which_split)
             scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
             predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
             fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
@@ -289,7 +295,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             
             if validation_overwrite or not os.path.exists(full_metric_path):
                 
-                y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=validation_overwrite)
+                y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, base_intermediates_path=base_intermediates_path, overwrite=validation_overwrite, verbose=verbose)
     
                 metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
@@ -333,6 +339,10 @@ print("-----------------------------------------------")
 X_test_dfs, y_test_dfs, X_test_files = load_batch(data_folder, which_split)
 test_file_names = X_test_files
 
+base_scores_path = os.path.join(score_folder, which_split)
+base_predictions_path = os.path.join(predictions_folder, which_split)
+base_intermediates_path = os.path.join(intermediates_folder, which_split)
+
 best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
 for method_name in methods:
@@ -370,8 +380,6 @@ for method_name in methods:
     hyperparameter_hash = model.get_hyperparameter_hash()
     hyperparameter_hash_filename = model.get_filename()
     
-    base_scores_path = os.path.join(score_folder, which_split)
-    base_predictions_path = os.path.join(predictions_folder, which_split)
     scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
     predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
     fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
@@ -387,7 +395,7 @@ for method_name in methods:
     
     if testing_overwrite or not os.path.exists(full_metric_path):
         
-        y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, overwrite=testing_overwrite)
+        y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=base_scores_path, base_predictions_path=base_predictions_path, base_intermediates_path=base_intermediates_path, overwrite=testing_overwrite, verbose=verbose)
 
         metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
