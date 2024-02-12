@@ -58,7 +58,7 @@ validation_overwrite = False
 testing_overwrite = False
 
 bootstrap_validation = True
-bootstrap_iterations = 2
+bootstrap_iterations = 10000
 
 dry_run = False
 
