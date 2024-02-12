@@ -119,7 +119,9 @@ def bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, be
     std_metrics[1] = np.std(metrics[:,1])
     std_metrics[2] = np.std(metrics[:,2])
     
-    return mean_metrics, std_metrics
+    fbetas = metrics[:,2]
+    
+    return mean_metrics, std_metrics, fbetas
 
 
 def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations=10000):
@@ -135,6 +137,7 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
     
     table_mean = np.zeros((n_cutoffs,3))
     table_std = np.zeros((n_cutoffs,3))
+    fbetas = np.zeros((n_cutoffs, bootstrap_iterations,))
     
     for i, cutoffs in enumerate(all_cutoffs):
         filtered_y, filtered_y_preds = filter_label_and_predictions(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, cutoffs)
@@ -145,7 +148,7 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
         
         #confmat_per_station_per_cutoff[str(cutoffs)] = confmat_per_station
         
-        table_mean[i,:], table_std[i,:] = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta)
+        table_mean[i,:], table_std[i,:], fbetas[i,:] = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta)
     
     
     PRF_mean_table = pd.DataFrame(index=all_cutoffs)
@@ -162,10 +165,13 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
     PRF_std_table["recall"] = table_std[:,1]
     PRF_std_table["F"+str(beta)] = table_std[:,2]
     
+    avg_fbeta_mean = np.mean(np.mean(fbetas, axis=0))
+    avg_fbeta_std = np.std(np.mean(fbetas, axis=0))
+    
     #if any nans, repeat procedure:
     if PRF_mean_table.isnull().any().any():
         print("NaN in validation results due to invalid split, recalculating:...")
-        PRF_mean_table, PRF_std_table = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations)
+        PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations)
 
-    return PRF_mean_table, PRF_std_table
+    return PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std
 
