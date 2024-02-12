@@ -49,18 +49,6 @@ def load_batch(data_folder, which_split):
         y_dfs.append(pd.read_csv(os.path.join(y_path, file)))
         
     return X_dfs, y_dfs, file_names
-
-# def save_model(model, model_path, hyperparameter_string):
-#     os.makedirs(model_path, exist_ok=True)
-#     full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
-#     with open(full_file_name, 'wb') as handle:
-#         pickle.dump(model, handle)
-
-# def load_model(model_path, hyperparameter_string):
-#     full_file_name = os.path.join(model_path, hyperparameter_string+".pickle")
-#     with open(full_file_name, 'rb') as handle:
-#         model = pickle.load(handle)
-#     return model
     
 def save_metric(metric, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)
@@ -75,16 +63,16 @@ def load_metric(metric_path, hyperparameter_string):
     
     return metric
 
-def save_PRFAUC_table(PRFAUC_table, metric_path, hyperparameter_string):
+def save_table(table, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)
     
-    PRFAUC_table.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=True, header=True)
+    table.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=True, header=True)
 
-def load_PRFAUC_table(PRFAUC_table_path, hyperparameter_string):
-    PRFAUC_table = pd.read_csv(os.path.join(PRFAUC_table_path, hyperparameter_string+".csv"))
-    PRFAUC_table.set_index("Cutoffs", inplace=True)
+def load_table(table_path, hyperparameter_string):
+    table = pd.read_csv(os.path.join(table_path, hyperparameter_string+".csv"))
+    table.set_index("Cutoffs", inplace=True)
 
-    return PRFAUC_table
+    return table
 
 def save_minmax_stats(minmax_stats, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)    

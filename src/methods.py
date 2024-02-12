@@ -334,7 +334,7 @@ class StatisticalProcessControl(ScoreCalculator):
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
-        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
@@ -358,7 +358,9 @@ class StatisticalProcessControl(ScoreCalculator):
                     pickle.dump(y_scores_dfs, handle)
                 with open(predictions_path, 'wb') as handle:
                     pickle.dump(y_prediction_dfs, handle)
-        
+                if fit:
+                    self.save_model()
+                    
         return y_scores_dfs, y_prediction_dfs
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
@@ -402,7 +404,7 @@ class IsolationForest(ScoreCalculator):
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
-        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
@@ -435,6 +437,8 @@ class IsolationForest(ScoreCalculator):
                     pickle.dump(y_scores_dfs, handle)
                 with open(predictions_path, 'wb') as handle:
                     pickle.dump(y_prediction_dfs, handle)
+                if fit:
+                    self.save_model()
         
         return y_scores_dfs, y_prediction_dfs
     
@@ -498,14 +502,12 @@ class BinarySegmentation(ScoreCalculator):
         scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
-        if os.path.exists(scores_path) and os.path.exists(predictions_path) and not overwrite:
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
-            
-            
             
         else:
             y_scores_dfs = []
@@ -533,7 +535,8 @@ class BinarySegmentation(ScoreCalculator):
                     pickle.dump(y_scores_dfs, handle)
                 with open(predictions_path, 'wb') as handle:
                     pickle.dump(y_prediction_dfs, handle)
-        
+                if fit:
+                    self.save_model()
         return y_scores_dfs, y_prediction_dfs
     
     def get_breakpoints(self, signal):
@@ -571,10 +574,8 @@ class BinarySegmentation(ScoreCalculator):
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
     
     def fused_lasso_penalty(self, signal, beta):
-        tot_sum = 0
         mean = np.mean(signal)
-        for i in signal:
-            tot_sum += np.abs(i - mean)
+        tot_sum = np.sum(np.abs(signal - mean))
         
         return beta * tot_sum
     
@@ -600,6 +601,7 @@ class BinarySegmentation(ScoreCalculator):
             elif reference_point.lower() == "longest_median":
                 ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
                 
+            self.reference_point_value = ref_point
         else:
             raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
         
@@ -664,10 +666,15 @@ class SaveableModel(ABC):
             
         return filename
     
-    def save_model(self, overwrite=True):
+    def get_full_model_path(self):
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         os.makedirs(method_path, exist_ok=True)
         full_path = os.path.join(method_path, self.filename)
+        
+        return full_path
+    
+    def save_model(self, overwrite=True):
+        full_path = self.get_full_model_path()
         
         if not os.path.exists(full_path) or overwrite:
             f = open(full_path, 'wb')

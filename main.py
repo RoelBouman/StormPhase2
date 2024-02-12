@@ -21,12 +21,13 @@ from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
 
 from src.preprocess import preprocess_per_batch_and_write
-from src.io_functions import save_dataframe_list, save_metric, save_PRFAUC_table, save_minmax_stats
-from src.io_functions import load_batch, load_metric, load_PRFAUC_table, load_minmax_stats
+from src.io_functions import save_dataframe_list, save_metric, save_table, save_minmax_stats
+from src.io_functions import load_batch, load_metric, load_table, load_minmax_stats
 #from src.io_functions import print_count_nan
-from src.evaluation import cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table
+from src.evaluation import cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table, calculate_bootstrap_stats
 
-from src.reporting_functions import print_metrics_and_stats
+
+from src.reporting_functions import print_metrics_and_stats, bootstrap_stats_to_printable
 
 #%% set process variables
 
@@ -56,7 +57,10 @@ training_overwrite = False
 validation_overwrite = False
 testing_overwrite = False
 
-dry_run = True
+bootstrap_validation = True
+bootstrap_iterations = 10000
+
+dry_run = False
 
 #%% set up database
 
@@ -109,16 +113,16 @@ IndependentDoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparamete
 # del SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["all_cutoffs"] 
 # SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
+methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
              #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
              #"DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
              #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
+             "IndependentDoubleThresholdSPC":IndependentDoubleThresholdStatisticalProcessControl,
              #"IndependentDoubleThresholdBS":IndependentDoubleThresholdBinarySegmentation,
              #"Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":NaiveStackEnsemble,
              #"SingleThresholdBS+IndependentDoubleThresholdSPC":StackEnsemble
@@ -135,8 +139,8 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "Naive-DoubleThresholdBS+DoubleThresholdSPC":Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
                        "IndependentDoubleThresholdSPC":IndependentDoubleThresholdSPC_hyperparameters,
                        "IndependentDoubleThresholdBS":IndependentDoubleThresholdBS_hyperparameters,
-                       "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
-                       "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
+                       # "Naive-SingleThresholdBS+IndependentDoubleThresholdSPC":Naive_SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters,
+                       # "SingleThresholdBS+IndependentDoubleThresholdSPC":SingleThresholdBS_IndependentDoubleThresholdSPC_hyperparameters
                        }
 
 #%% Preprocess Train data and run algorithms:
@@ -204,19 +208,18 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     save_dataframe_list(y_train_predictions_dfs, train_file_names, os.path.join(predictions_path, "stations"), overwrite=training_overwrite)
                     
                     save_metric(metric, fscore_path, hyperparameter_hash)
-                    save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+                    save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
                     #save metric to database for easy querying:
                     db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
                     db_connection.commit()
                 
-                    model.save_model()
                 
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
-                PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+                PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
                 minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
                 #check if loaded model has saved thresholds for correct optimization cutoff set:
@@ -302,7 +305,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     save_dataframe_list(y_val_predictions_dfs, val_file_names, os.path.join(predictions_path, "stations"), overwrite=validation_overwrite)
                     
                     save_metric(metric, fscore_path, hyperparameter_hash)
-                    save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+                    save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
                     #save metric to database for easy querying:
@@ -311,7 +314,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
-                PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+                PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
                 minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
                 #Model is instead loaded at model inititiation 
@@ -378,6 +381,9 @@ for method_name in methods:
     PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
     minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
     
+    PRF_mean_table_path = os.path.join(metric_folder, "PRF_mean_table", which_split, model_name, preprocessing_hash)
+    PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, model_name, preprocessing_hash)
+    
     full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
     
     if testing_overwrite or not os.path.exists(full_metric_path):
@@ -391,28 +397,42 @@ for method_name in methods:
         PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
         if bootstrap_validation:
-            metric_mean, metric_std, PRFAUC_table_mean, PRFAUC_table_std = calculate_bootstrap_stats
-        
+            PRF_mean_table, PRF_std_table = calculate_bootstrap_stats(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta, bootstrap_iterations=bootstrap_iterations)
+            
         if not dry_run:
             save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
             save_dataframe_list(y_test_predictions_dfs, test_file_names, os.path.join(predictions_path, "stations"), overwrite=testing_overwrite)
             
             save_metric(metric, fscore_path, hyperparameter_hash)
-            save_PRFAUC_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+            save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
             save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
             
             #save metric to database for easy querying:
             db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
             db_connection.commit()
+            
+            if bootstrap_validation:
+                save_table(PRF_mean_table, PRF_mean_table_path, hyperparameter_hash)
+                save_table(PRF_std_table, PRF_std_table_path, hyperparameter_hash)
+                
     else:
         print("Model already evaluated, loading results instead:")
         metric = load_metric(fscore_path, hyperparameter_hash)
-        PRFAUC_table = load_PRFAUC_table(PRFAUC_table_path, hyperparameter_hash)
+        PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
         minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
-        
-        #Model is instead loaded at model inititiation 
-        #model.load_model(model_path, hyperparameter_string)
-                
+    
+        if bootstrap_validation:
+            PRF_mean_table = load_table(PRF_mean_table_path, hyperparameter_hash)
+            PRF_std_table = load_table(PRF_std_table_path, hyperparameter_hash)
+
+    
+    
     if report_metrics_and_stats:
         print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+        
+        if bootstrap_validation:
+            print("Bootstrap results:")
+            print(bootstrap_stats_to_printable(PRF_mean_table, PRF_std_table))
+            
+        
 
