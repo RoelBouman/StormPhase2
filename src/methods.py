@@ -600,10 +600,10 @@ class BinarySegmentation(ScoreCalculator):
                 ref_point = np.mean(df[first_bkp_longest_segment:last_bkp_longest_segment])
             elif reference_point.lower() == "longest_median":
                 ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
-                
-            self.reference_point_value = ref_point
         else:
             raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
+        
+        self.reference_point_value = ref_point
         
         prev_bkp = 0
                 

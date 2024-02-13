@@ -60,8 +60,8 @@ db_cursor = db_connection.cursor()
 
 #%% choose station IDs
 
-# IDs must be from same split
 station_IDs = ["1","041"]
+
 train_IDs = os.listdir(os.path.join(data_folder, "Train", "X"))
 test_IDs = os.listdir(os.path.join(data_folder, "Test", "X"))
 validation_IDs = os.listdir(os.path.join(data_folder, "Validation", "X"))
@@ -78,13 +78,15 @@ station_dataset_dict.update(validation_ID_dict)
 
 #%% choose HP
 
-use_best_model = True
-method_name = "SingleThresholdSPC"
+use_best_model = False
+method_name = "SingleThresholdBS"
 
 # if use_best_model is False, use these
-preprocessing_hyperparameters = {'subsequent_nr': 5, 'lin_fit_quantiles': (10, 90)}
-model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
-  
+preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5}
+#model_hyperparameters = {'quantiles': (10, 90), 'score_function_kwargs': {'beta': 1.5}}
+#model_hyperparameters = {'forest_per_station': False, 'n_estimators': 1000, 'quantiles': (20, 80), 'scaling': True, 'score_function_kwargs': {'beta': 1.5}}
+model_hyperparameters = {'beta': 0.015, 'jump': 10, 'min_size': 50, 'model': 'l1', 'penalty': 'fused_lasso', 'quantiles': (15, 85), 'reference_point': 'mean', 'scaling': True, 'score_function_kwargs': {'beta': 1.5}}
+
 #%% hyperparameter selection
 
 # use your own hyperparameters
@@ -108,7 +110,9 @@ beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
 
-model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+#model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+#model = SingleThresholdIsolationForest(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+model = SingleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
 
 # get hash (if not using best model) for prediction loading
 hyperparameter_hash = model.get_hyperparameter_hash()

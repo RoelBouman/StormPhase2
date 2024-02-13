@@ -360,13 +360,10 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
         plt.ylabel("Difference vector", fontsize=25)
     
     # plot total mean and thresholds
-    if model.reference_point == "mean": # only works for reference point = mean
-        total_mean = np.mean(X_df['diff']) 
-        plt.axhline(y=total_mean, color='orange', linestyle='-', linewidth=2, label = "Reference Point")
-        plt.axhline(y=total_mean + lower_threshold, color='black', linestyle='dashed', label = "threshold")
-        plt.axhline(y=total_mean + upper_threshold, color='black', linestyle='dashed')
-    else:
-        raise Exception("Only use this function when plotting on models that use the mean as reference-point") 
+    ref_point_value = model.reference_point_value
+    plt.axhline(y=ref_point_value, color='orange', linestyle='-', linewidth=2, label = "Reference Point: " + model.reference_point)
+    plt.axhline(y=ref_point_value + lower_threshold, color='black', linestyle='dashed', label = "threshold")
+    plt.axhline(y=ref_point_value + upper_threshold, color='black', linestyle='dashed')
         
     prev_bkp = 0
     
