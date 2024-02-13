@@ -447,8 +447,9 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_sco
     plt.yticks(fontsize=20)
     plt.ylabel("Difference vector", fontsize=25)    
     
-    # remove x-ticks
-    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) 
+    # remove x-ticks if scores are also shown
+    if show_IF_scores:
+        plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) 
     
     # define dates already to allow plt.xticks to still function, even if show_IF_scores is False
     dates = X_df["M_TIMESTAMP"]
