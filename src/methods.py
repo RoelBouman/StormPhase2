@@ -21,6 +21,7 @@ class DoubleThresholdMethod:
     #score function should be maximized
     def __init__(self, score_function=None, score_function_kwargs=None):
         self.scores_calculated = False
+        self.threshold_optimization_method = "DoubleThreshold"
         
         if score_function is None:
             try:
@@ -178,6 +179,7 @@ class SingleThresholdMethod:
     #score function should be maximized
     def __init__(self, score_function = None, score_function_kwargs=None):
         self.scores_calculated = False
+        self.threshold_optimization_method = "SingleThreshold"
         
         if score_function is None:
             try:
@@ -314,48 +316,61 @@ class StatisticalProcessControl(ScoreCalculator):
     def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], quantiles=(10,90)):
         super().__init__()
         
+        self.score_calculation_method_name = "StatisticalProcessControl"
+        
         self.quantiles = quantiles
         self.used_cutoffs = used_cutoffs
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
+        #Get paths
         model_name = self.method_name
-        hyperparameter_hash = self.get_hyperparameter_hash()
+        score_calculator_name = self.score_calculation_method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()        
         
-        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
-        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        scores_folder = os.path.join(base_scores_path, score_calculator_name, hyperparameter_hash)
+        predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
         
         if not dry_run:
-            os.makedirs(scores_path, exist_ok=True)
-            os.makedirs(predictions_path, exist_ok=True)
-            
-        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
-        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+            os.makedirs(scores_folder, exist_ok=True)
+            os.makedirs(predictions_folder, exist_ok=True)
         
-        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+        scores_path = os.path.join(scores_folder, "scores.pickle")
+        predictions_path = os.path.join(predictions_folder, str(self.used_cutoffs)+ ".pickle")
+        
+        #Calculate scores, or reload if already calculated
+        if os.path.exists(scores_path) and not overwrite:
+            if verbose:
+                print("Scores already exist, reloading")
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
-            with open(predictions_path, 'rb') as handle:
-                y_prediction_dfs = pickle.load(handle)
-            self.load_model()
         else:
-            
             y_scores_dfs = []
             
             for X_df in X_dfs:
                 scaler = RobustScaler(quantile_range=self.quantiles)
                 y_scores_dfs.append(pd.DataFrame(scaler.fit_transform(X_df["diff"].values.reshape(-1,1))))
-                
+        
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(y_scores_dfs, handle)
+        
+        #Calculate predictions from scores
+        if os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+            if verbose:
+                print("Predictions and model already exist, reloading")
+            with open(predictions_path, 'rb') as handle:
+                y_prediction_dfs = pickle.load(handle)
+            self.load_model()
+        else:
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
             if not dry_run:
-                with open(scores_path, 'wb') as handle:
-                    pickle.dump(y_scores_dfs, handle)
                 with open(predictions_path, 'wb') as handle:
                     pickle.dump(y_prediction_dfs, handle)
                 if fit:
@@ -363,9 +378,9 @@ class StatisticalProcessControl(ScoreCalculator):
                     
         return y_scores_dfs, y_prediction_dfs
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
     
     def get_model_string(self):
         model_string = str({"quantiles":self.quantiles}).encode("utf-8")
@@ -379,6 +394,8 @@ class IsolationForest(ScoreCalculator):
         super().__init__()
         # Scaling is only done when forest_per_station = False, quantiles is only used when scaling=True and forest-per_station=False
         
+        self.score_calculation_method_name = "IsolationForest"
+        
         self.used_cutoffs = used_cutoffs
         self.forest_per_station = forest_per_station
         self.params = params
@@ -388,7 +405,7 @@ class IsolationForest(ScoreCalculator):
         # define IsolationForest model
         self.model = IF(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -405,6 +422,8 @@ class IsolationForest(ScoreCalculator):
         predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
         
         if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+            if verbose:
+                print("Scores/predictions/model already exist, reloading")
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
             with open(predictions_path, 'rb') as handle:
@@ -456,9 +475,9 @@ class IsolationForest(ScoreCalculator):
             
         return scaled_score
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
     
     def get_model_string(self):
         hyperparam_dict = {}
@@ -474,6 +493,9 @@ class BinarySegmentation(ScoreCalculator):
     
     def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
         super().__init__()
+        
+        self.score_calculation_method_name = "BinarySegmentation"
+        
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
@@ -485,58 +507,102 @@ class BinarySegmentation(ScoreCalculator):
         # define Binseg model
         self.model = rpt.Binseg(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
-        model_name = self.method_name
-        hyperparameter_hash = self.get_hyperparameter_hash()
         
-        scores_path = os.path.join(base_scores_path, model_name, hyperparameter_hash)
-        predictions_path = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        #Get paths:
+        model_name = self.method_name
+        score_calculator_name = self.score_calculation_method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
+        breakpoints_hash = self.get_breakpoints_hash()
+        
+        scores_folder = os.path.join(base_scores_path, score_calculator_name, hyperparameter_hash)
+        predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        breakpoints_folder = os.path.join(base_intermediates_path, score_calculator_name, breakpoints_hash)
         
         if not dry_run:
-            os.makedirs(scores_path, exist_ok=True)
-            os.makedirs(predictions_path, exist_ok=True)
+            os.makedirs(scores_folder, exist_ok=True)
+            os.makedirs(predictions_folder, exist_ok=True)
+            os.makedirs(breakpoints_folder, exist_ok=True)
         
-        scores_path = os.path.join(scores_path, str(self.used_cutoffs)+ ".pickle")
-        predictions_path = os.path.join(predictions_path, str(self.used_cutoffs)+ ".pickle")
+        scores_path = os.path.join(scores_folder, "scores.pickle")
+        predictions_path = os.path.join(predictions_folder, str(self.used_cutoffs)+ ".pickle")
+        breakpoints_path = os.path.join(breakpoints_folder, "breakpoints.pickle")
         
-        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+        #Get scores
+        if os.path.exists(scores_path) and not overwrite:
+            
+            if verbose:
+                print("Scores already exist, reloading")
+            
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
+                
+        else:
+            
+            
+            if self.scaling:
+                scaler = RobustScaler(quantile_range=self.quantiles)
+            
+            #calculate signals by getting diff column and optionally scaling
+            signals = []
+            for X_df in X_dfs: 
+                signal = X_df["diff"].values.reshape(-1,1)
+                
+                if self.scaling:
+                    signal = scaler.fit_transform(signal)
+                signals.append(signal)
+                
+            #load breakpoints if they exist, otherwise calculate them
+            if os.path.exists(breakpoints_path) and not overwrite:
+                
+                if verbose:
+                    print("Breakpoints already exist, reloading")
+                    
+                with open(breakpoints_path, 'rb') as handle:
+                    breakpoints_per_station = pickle.load(handle)
+            else:
+                breakpoints_per_station = []
+                for signal in signals:
+                    breakpoints_per_station.append(self.get_breakpoints(signal))
+                
+                if not dry_run:
+                    with open(breakpoints_path, 'wb') as handle:
+                        pickle.dump(breakpoints_per_station, handle)
+            
+            #Finally: calculate scores
+            y_scores_dfs = []
+            for bkps, signal in zip(breakpoints_per_station, signals):
+                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
+            
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(y_scores_dfs, handle)
+            
+        #Get predictions from scores, load model if it exists, if not recalculate
+        if os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+            if verbose:
+                print("Model and predictions already exist, reloading")
+                
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
             
         else:
-            y_scores_dfs = []
             
-            if self.scaling:
-                scaler = RobustScaler(quantile_range=self.quantiles)
-            
-            for i, X_df in enumerate(X_dfs): 
-                signal = X_df["diff"].values.reshape(-1,1)
-                
-                if self.scaling:
-                    signal = scaler.fit_transform(signal)
-                
-                bkps = self.get_breakpoints(signal)
-
-                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
-    
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
             if not dry_run:
-                with open(scores_path, 'wb') as handle:
-                    pickle.dump(y_scores_dfs, handle)
                 with open(predictions_path, 'wb') as handle:
                     pickle.dump(y_prediction_dfs, handle)
                 if fit:
                     self.save_model()
+                    
         return y_scores_dfs, y_prediction_dfs
     
     def get_breakpoints(self, signal):
@@ -569,9 +635,9 @@ class BinarySegmentation(ScoreCalculator):
         
         return bkps
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
     
     def fused_lasso_penalty(self, signal, beta):
         mean = np.mean(signal)
@@ -601,9 +667,9 @@ class BinarySegmentation(ScoreCalculator):
             elif reference_point.lower() == "longest_median":
                 ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
                 
-            self.reference_point_value = ref_point
         else:
             raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
+        self.reference_point_value = ref_point
         
         prev_bkp = 0
                 
@@ -617,7 +683,26 @@ class BinarySegmentation(ScoreCalculator):
             prev_bkp = bkp
         
         return y_score            
+    
+    def get_breakpoints_string(self):
+        hyperparam_dict = {}
+        hyperparam_dict["beta"] = self.beta
+        hyperparam_dict["quantiles"] = self.quantiles
+        hyperparam_dict["scaling"] = self.scaling
+        hyperparam_dict["penalty"] = self.penalty
+        hyperparam_dict["params"] = self.params
+        model_string = str(hyperparam_dict).encode("utf-8")
         
+        return model_string
+    
+    def get_breakpoints_hash(self):
+        breakpoints_string = self.get_breakpoints_string()
+        
+        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
+        breakpoints_hash = sha256(breakpoints_string).hexdigest()
+        
+        return breakpoints_hash
+    
     def get_model_string(self):
         hyperparam_dict = {}
         hyperparam_dict["beta"] = self.beta
@@ -767,7 +852,7 @@ class StackEnsemble(SaveableEnsemble):
         super().__init__(base_models_path, preprocessing_hash)
 
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=True, dry_run=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False):
         self._scores = []
         temp_scores = []
         self._predictions = []
@@ -779,9 +864,9 @@ class StackEnsemble(SaveableEnsemble):
         self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
         return(self._scores, self._combine_predictions(self._predictions))
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False)
         
     def _combine_predictions(self, prediction_list):
         combined_predictions = []
