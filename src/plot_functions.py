@@ -443,12 +443,15 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_sco
     # colour background according to TP,FP,FN
     if show_TP_FP_FN:
         plot_TP_FP_FN(y_df, preds, opacity_TP, ax1)
-    
+        
     plot_diff(X_df)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
     plt.ylabel("Difference vector", fontsize=25)    
+    
+    # remove x-ticks
+    plt.tick_params(axis='x', which='both', bottom=False, top=False, labelbottom=False) 
     
     # define dates already to allow plt.xticks to still function, even if show_IF_scores is False
     dates = X_df["M_TIMESTAMP"]
