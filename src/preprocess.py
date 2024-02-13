@@ -5,12 +5,16 @@ import pickle
 import numpy as np
 import pandas as pd
 import scipy.optimize as opt
-from sklearn.preprocessing import RobustScaler
+#from sklearn.preprocessing import RobustScaler
 
 from .io_functions import save_dataframe_list
 
 
-def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None, uncertain_filter=[4,5]):
+def transform_array_numpy(y, translation_dict):
+    translation_func = np.vectorize(translation_dict.get)
+    return translation_func(y)
+
+def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=False, missing_df=None, uncertain_filter=[5]):
     
 
     uncertain_filter = np.isin(y_df["label"], uncertain_filter)
@@ -19,13 +23,9 @@ def get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missi
     #Procedure is non-inclusive on lower cutoff
     for cutoffs in all_cutoffs:
         low_cutoff, high_cutoff = cutoffs
-        #Only keep rows (timestamps) where the 
+        
         partial_filter[str(cutoffs)] = np.logical_and(length_df["lengths"] > low_cutoff, length_df["lengths"] <= high_cutoff)
         
-        #labels_for_all_cutoffs[str(cutoffs)] = y_df.loc[filter_condition[str(cutoffs)], "label"]
-        
-        #labels_for_all_cutoffs[str(cutoffs)] = (np.logical_or(np.logical_and(event_lengths["lengths"] > low_cutoff), (event_lengths["lengths"] <= high_cutoff)), event_lengths["lengths"] == 0)
-    
     full_filters = {}
     for cutoffs in all_cutoffs:
         other_cutoffs = list(set(all_cutoffs).difference(set([cutoffs])))
@@ -100,7 +100,7 @@ def find_subsequent_duplicates(y, subsequent_duplicates):
 
     return subsequent_filter
 
-def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple) -> pd.DataFrame:
+def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple, label_transform_dict: dict, remove_uncertain: bool) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
     Args:
@@ -111,6 +111,12 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     Returns:
         pd.DataFrame: DataFrame with the columns M_TIMESTAMP, S_original, BU_original, diff_original, S, BU, diff, and missing.
     """ 
+    
+    #set copy on write option in pandas:
+    
+    pd.options.mode.copy_on_write = True
+
+        
     # Calculate difference and add label column.
     X_df['diff_original'] = X_df['S_original']-X_df['BU_original']
         
@@ -132,8 +138,17 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     
     X_df['missing'] = np.logical_or(X_df["missing"], subsequent_filter)
     
+    #Transform labels so that they are only [0,1,5] for [normal, anomalouos, uncertain]
+    y_df.loc[np.logical_not(y_df["label"].isnull()), "label"] = transform_array_numpy(y_df.loc[np.logical_not(y_df["label"].isnull()), "label"], label_transform_dict)
+    
+    if remove_uncertain:
+        uncertain_filter = y_df["label"] != 5
+        X_df = X_df.loc[uncertain_filter,:]
+        y_df = y_df.loc[uncertain_filter,:]
+    
     # Match bottom up with substation measurements for the middle N% of the values and apply sign to substation measurements
-    arr = X_df[X_df['missing']==0]
+    
+    arr = X_df[X_df['missing']==0].copy()
     
     low_quant, up_quant = lin_fit_quantiles
     low_quant_value = np.percentile(arr['diff_original'],low_quant)
@@ -142,10 +157,10 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     arr = arr[np.logical_and(arr['diff_original'] > low_quant_value, arr['diff_original'] < up_quant_value)]
     
     a, b = match_bottomup_load(bottomup_load=arr['BU_original'], measurements=arr['S_original'])
-    X_df['BU'] = a*X_df['BU_original']+b
+    X_df.loc[:,'BU'] = a*X_df['BU_original']+b
     if X_df['S_original'].min()>=0 and X_df['BU_original'].iloc[X_df['S_original'].argmin()] < 0:
         X_df['S'] = np.sign(X_df['BU'])*X_df['S']
-    X_df['diff'] = X_df['S']-X_df['BU']
+    X_df.loc[:,'diff'] = X_df['S']-X_df['BU']
         
     # remove all diff NaN in X and y
     y_df = y_df[X_df['diff'].notna()]
@@ -186,7 +201,7 @@ def match_bottomup_load(bottomup_load: Union[pd.Series, np.ndarray], measurement
     a, b = ab.x
     return a, b
 
-def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False, uncertain_filter=[4,5], dry_run=False):
+def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, file_names, all_cutoffs, hyperparameters, hyperparameter_hash, remove_missing=False, dry_run=False):
     #Set preprocessing settings here:
     preprocessed_pickles_folder = os.path.join(intermediates_folder, "preprocessed_data_pickles", which_split)
     preprocessed_csvs_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs", which_split)
@@ -255,7 +270,7 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
     preprocessed_file_name = os.path.join(label_filters_per_cutoff_pickles_folder, hyperparameter_hash + ".pickle")
     if preprocessing_overwrite or not os.path.exists(preprocessed_file_name):
         print("Preprocessing labels per cutoff")
-        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df, uncertain_filter=uncertain_filter) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
+        label_filters_for_all_cutoffs = [get_label_filters_for_all_cutoffs(y_df, length_df, all_cutoffs, remove_missing=remove_missing, missing_df=X_df) for y_df, length_df, X_df in zip(y_dfs_preprocessed, event_lengths, X_dfs_preprocessed)]
         
         if not dry_run:
             os.makedirs(label_filters_per_cutoff_pickles_folder, exist_ok = True)
