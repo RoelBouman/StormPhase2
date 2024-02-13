@@ -41,32 +41,49 @@ def plot_labels(df, **kwargs):
     plt.plot(df["label"], **kwargs)
 
 def plot_TP_FP_FN(y_df, preds, opacity, ax):
-    true_values = y_df["label"]
-    predictions = preds["label"]
+    """
+    Colour the background of the plot according to the true and false positives, and the false negatives
+
+    Parameters
+    ----------
+    y_df : dataframe
+        dataframe containing the real labels
+    preds : dataframe
+        dataframe containing the predictions (0 or 1)
+    opacity : float between 0 and 1
+        value representing the opacity of the background colour
+    ax : an axes object
+        the ax on which the background is coloured
+
+    """
+    # use copy explicitly to avoid warnings, even though the copy is also made without
+    true_values = y_df["label"].copy()
+    predictions = preds["label"].copy()
     
     true_values[true_values == 5] = 0 # set all 5s to zero 
     
+    # get TPs, FPs and FNs
     TP = np.logical_and(true_values, predictions) # AND between the two arrays
     FP = np.logical_and(np.logical_not(true_values), predictions) # AND with negated true values
     FN = np.logical_and(true_values, np.logical_not(predictions)) # AND with negated predictions
     
+    # find the indexes
     TP_index = np.where(TP == 1)[0]
     FP_index = np.where(FP == 1)[0]
     FN_index = np.where(FN == 1)[0]
     
-    
+    # use the indexes to colour the background using vertical lines
     for i in TP_index:
         ax.axvline(i, color='g', linewidth=3, alpha=opacity)
     for i in FP_index:
         ax.axvline(i, color='y', linewidth=3, alpha=opacity)
     for i in FN_index:
         ax.axvline(i, color='c', linewidth=3, alpha=opacity)
-        
     
+    # create handles for the legend
     TP_handle = mpatches.Patch(color='g', label='True Positive')
     FP_handle = mpatches.Patch(color='y', label='False Positive')
     FN_handle = mpatches.Patch(color='c', label='False Negative')
-
     
     legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=20, loc="upper left", bbox_to_anchor=(1.01, 1))
 
@@ -238,13 +255,15 @@ def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
     
 def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
-    Plot the predictions and original plot for the statistical profiling method,
-    overlay with thresholds and colour appropriately
+    Plot the statistical profiling method,
+    overlay the difference vector with thresholds and colour appropriately
 
     Parameters
     ----------
     X_df : dataframe
-        dataframe to be plottedd
+        dataframe to be plotted
+    y_df : dataframe
+        dataframe containing the real labels
     preds : dataframe
         dataframe containing the predictions (0 or 1)
     threshold : int or tuple
@@ -252,7 +271,11 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     file : string
         filename of the dataframe
     model_string : string
-        current model
+        string representation of the current model
+    show_TP_FP_FN : boolean
+        indicates whether to colour the background according to TP,FP and FN
+    opacity_TP : float between 0 and 1
+        represents the opacity of the background colour for th TP,FP,FN colouring
     pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
@@ -312,21 +335,30 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     
 def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
-    Plot the predictions and original plot for the binary segmentation method,
-    overlay with thresholds
+    Plot the binary segmentation method, 
+    overlay difference vector with thresholds, breakpoints and reference point,
+    colour predictions outside threshold appropriately
 
     Parameters
     ----------
     X_df : dataframe
-        dataframe to be plotted, contains column named "diff"
+        dataframe to be plotted
+    y_df : dataframe
+        dataframe containing the real labels
     preds : dataframe
         dataframe containing the predictions (0 or 1)
     threshold : int or tuple
         threshold that decides which values are classified as outliers
     file : string
         filename of the dataframe
-    model_string : string
+    model : a SaveableModel object
         current model
+    model_string : string
+        string representation of the current model
+    show_TP_FP_FN : boolean
+        indicates whether to colour the background according to TP,FP and FN
+    opacity_TP : float between 0 and 1
+        represents the opacity of the background colour for th TP,FP,FN colouring
     pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
@@ -359,7 +391,7 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     else:
         plt.ylabel("Difference vector", fontsize=25)
     
-    # plot total mean and thresholds
+    # plot reference point and thresholds
     ref_point_value = model.reference_point_value
     plt.axhline(y=ref_point_value, color='orange', linestyle='-', linewidth=2, label = "Reference Point: " + model.reference_point)
     plt.axhline(y=ref_point_value + lower_threshold, color='black', linestyle='dashed', label = "threshold")
@@ -400,21 +432,30 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
 
 def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
-    Plot the predictions and original plot for the binary segmentation method,
-    overlay with thresholds
+    Plot the isolation forest method
 
     Parameters
     ----------
     X_df : dataframe
-        dataframe to be plottedd
+        dataframe to be plotted
+    y_df : dataframe
+        dataframe containing the real labels
     preds : dataframe
         dataframe containing the predictions (0 or 1)
     threshold : int
         threshold on the scores that decides which values are classified as outliers
     file : string
         filename of the dataframe
-    model_string : string
+    model : a SaveableModel object
         current model
+    model_string : string
+        string representation of the current model
+    show_IF_score : boolean
+        indicates whether to plot the Isolation Forest scores as well (with threshold and outlier colouring)
+    show_TP_FP_FN : boolean
+        indicates whether to colour the background according to TP,FP and FN
+    opacity_TP : float between 0 and 1
+        represents the opacity of the background colour for th TP,FP,FN colouring
     pretty_plot : boolean
         indicates whether to print the plot without title and predictions
 
@@ -495,16 +536,26 @@ def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_IF_scores
     ----------
     X_dfs : list of dataframes
         the dataframes on which the predictions were made
+    y_dfs: list of dataframes
+        the dataframes containing the true labels, must be in the same order as X_dfs
     predictions : list of dataframes
         the dataframes with the predictions (0 and 1s), must be in the same order as X_dfs
     dfs_files : list of strings
         the file names of the dataframes, must be in the same order as X_dfs
     model : a SaveableModel object
         the model used to predict on the data
+    show_IF_score : boolean
+        indicates whether to plot the Isolation Forest scores as well (with threshold and outlier colouring)
+    show_TP_FP_FN : boolean
+        indicates whether to colour the background according to TP,FP and FN
+    opacity_TP : float between 0 and 1
+        represents the opacity of the background colour for th TP,FP,FN colouring
     pretty_plot : boolean, optional
         decides whether to create plots without excess information. The default is False.
     which_stations : list of ints, optional
-        the indices of the dataframes to be plotted. If None, select 3 random stations
+        the indices of the dataframes to be plotted, if None, select random dataframes
+    n_station : int
+        the amount of stations to be plotted, if randomly selected
 
     """
     # select random stations if no stations selected
