@@ -68,7 +68,7 @@ def plot_TP_FP_FN(y_df, preds, opacity, ax):
     FN_handle = mpatches.Patch(color='c', label='False Negative')
 
     
-    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=20, loc="upper left")
+    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=20, loc="upper left", bbox_to_anchor=(1.01, 1))
 
     ax.add_artist(legend1)
 
@@ -264,7 +264,7 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     else: 
         lower_threshold, upper_threshold = -threshold, threshold
      
-    fig = plt.figure(figsize=(30,16))  
+    fig = plt.figure(figsize=(32,16))  
     
     if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
@@ -292,7 +292,7 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     # helper to add red colour to legend
     red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
     
-    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
+    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
     
     # Predictions plot
     if not pretty_plot:
@@ -382,7 +382,7 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower right")
+    plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
     
     # Predictions plot
     if not pretty_plot:
@@ -468,7 +468,7 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_sco
         
         # helper to add red colour to legend
         red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
-        plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left")
+        plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
     
     # Predictions plot
     if not pretty_plot:
