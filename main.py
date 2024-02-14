@@ -41,7 +41,6 @@ predictions_folder = os.path.join(result_folder, "predictions")
 metric_folder = os.path.join(result_folder, "metrics")
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
-uncertain_filter = [4,5] #which labels not to include in evaluation
 
 beta = 1.5
 report_metrics_and_stats = True
@@ -170,6 +169,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     print("Now preprocessing: ")
     print("-----------------------------------------------")
     print(preprocessing_hyperparameter_string)
+
     X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, dry_run)
     
     for method_name in methods:
@@ -216,7 +216,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
                     #save metric to database for easy querying:
-                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
+                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
                     db_connection.commit()
                 
                 
@@ -299,7 +299,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             
             if validation_overwrite or not os.path.exists(full_metric_path):
                 
-                y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=scores_path, base_predictions_path=predictions_path, intermediates_path=base_intermediates_path, overwrite=validation_overwrite, verbose=verbose)
+                y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=validation_overwrite, verbose=verbose)
     
                 metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
@@ -316,7 +316,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
                     #save metric to database for easy querying:
-                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
+                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
                     db_connection.commit()
             else:
                 print("Model already evaluated, loading results instead:")
@@ -361,8 +361,8 @@ for method_name in methods:
     
     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
     
-    best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle)
-    best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle)
+    best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle, keys=True)
+    best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle, keys=True)
 
     preprocessing_hyperparameters = best_preprocessing_hyperparameters[method_name]
     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
