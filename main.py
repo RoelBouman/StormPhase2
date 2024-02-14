@@ -30,7 +30,7 @@ from src.reporting_functions import print_metrics_and_stats, bootstrap_stats_to_
 
 #%% set process variables
 
-dataset = "route_data" #alternatively: route_data
+dataset = "OS_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
@@ -116,8 +116,8 @@ DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 # SingleThresholdBS_DoubleThresholdSPC_hyperparameters["cutoffs_per_method"] = [[all_cutoffs[2:], all_cutoffs[:2]]]
 
 methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-             #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+             "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
            #  "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
            #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
             # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
