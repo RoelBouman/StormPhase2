@@ -115,7 +115,8 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     #set copy on write option in pandas:
     
     pd.options.mode.copy_on_write = True
-
+    X_df = X_df.copy()
+    y_df = y_df.copy()
         
     # Calculate difference and add label column.
     X_df['diff_original'] = X_df['S_original']-X_df['BU_original']
