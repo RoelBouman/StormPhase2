@@ -8,6 +8,8 @@ import os
 import pickle
 from hashlib import sha256
 
+from numba import njit
+
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics._ranking import _binary_clf_curve
@@ -489,6 +491,21 @@ class IsolationForest(ScoreCalculator):
         
         return model_string
 
+@njit
+def _data_to_score(signal, bkps, reference_point_value):
+    y_score = np.zeros(len(signal), dtype=np.float64)
+    prev_bkp = 0
+            
+    for bkp in bkps:
+        segment = signal[prev_bkp:bkp] # define a segment between two breakpoints
+        segment_mean = np.mean(segment)
+        
+        # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
+        y_score[prev_bkp:bkp] = reference_point_value - segment_mean   
+        
+        prev_bkp = bkp
+    
+    return y_score
 
 class BinarySegmentationBreakpointCalculator():
     
@@ -509,13 +526,13 @@ class BinarySegmentationBreakpointCalculator():
 
         Parameters
         ----------
-        df : dataframe
+        signal : dataframe
             the dataframe in which the breakpoints must be found
         
         Returns
         -------
         list of integers
-            the integers represent the positions of the breakpoints found, always includes len(df)
+            the integers represent the positions of the breakpoints found, always includes len(signal)
 
         """
         
@@ -539,13 +556,13 @@ class BinarySegmentationBreakpointCalculator():
         
         return beta * tot_sum
     
-    def data_to_score(self, df, bkps, reference_point):
-        y_score = np.zeros(len(df))
+    
+    def calculate_reference_point_value(self, signal, bkps, reference_point):
         
         if reference_point.lower() == "mean":
-            ref_point = np.mean(df) # calculate mean of all values in timeseries
+            ref_point = np.mean(signal) # calculate mean of all values in timeseries
         elif reference_point.lower() == "median":
-            ref_point = np.median(df)
+            ref_point = np.median(signal)
         elif reference_point.lower() == "longest_mean" or reference_point.lower() == "longest_median": #compare to longest segment mean
             prev_bkp = 0
             longest_segment_length = 0
@@ -557,26 +574,21 @@ class BinarySegmentationBreakpointCalculator():
                     longest_segment_length = segment_length
                 prev_bkp = bkp
             if reference_point.lower() == "longest_mean":
-                ref_point = np.mean(df[first_bkp_longest_segment:last_bkp_longest_segment])
+                ref_point = np.mean(signal[first_bkp_longest_segment:last_bkp_longest_segment])
             elif reference_point.lower() == "longest_median":
-                ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
+                ref_point = np.median(signal[first_bkp_longest_segment:last_bkp_longest_segment])
                 
         else:
             raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
-        self.reference_point_value = ref_point
-        
-        prev_bkp = 0
-                
-        for bkp in bkps:
-            segment = df[prev_bkp:bkp] # define a segment between two breakpoints
-            segment_mean = np.mean(segment)
             
-            # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
-            y_score[prev_bkp:bkp] = ref_point - segment_mean   
             
-            prev_bkp = bkp
+        return ref_point
+    
+    def data_to_score(self, signal, bkps, reference_point):
         
-        return y_score            
+        self.reference_point_value = self.calculate_reference_point_value(signal, bkps, reference_point)
+        
+        return _data_to_score(signal, bkps, self.reference_point_value)
     
     def get_breakpoints_string(self):
         hyperparam_dict = {}
@@ -652,7 +664,7 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
                 signal = X_df["diff"].values.reshape(-1,1)
                 
                 if self.scaling:
-                    signal = scaler.fit_transform(signal)
+                    signal = scaler.fit_transform(signal).astype(np.float64).squeeze()
                 signals.append(signal)
                 
             #load breakpoints if they exist, otherwise calculate them
@@ -843,6 +855,42 @@ class SaveableEnsemble(SaveableModel):
         f.close()      
         self.__dict__.update(tmp_dict) 
         
+        
+class SequentialEnsemble(SaveableEnsemble):
+    
+    def __init__(self, base_models_path, preprocessing_hash, segmentation_method, anomaly_detection_method, method_hyperparameter_list, cutoffs_per_method):
+
+        self.is_ensemble = True
+        
+        self.segmentation_method = segmentation_method
+        self.anomaly_detection_method = anomaly_detection_method
+        self.method_hyperparameter_list = method_hyperparameter_list
+        self.cutoffs_per_method = cutoffs_per_method
+        self.preprocessing_hash = preprocessing_hash
+        
+        self.segmentation_method(base_models_path, preprocessing_hash, **method_hyperparameter_list[0], used_cutoffs=cutoffs_per_method[0])
+        self.anomaly_detection_method(base_models_path, preprocessing_hash, **method_hyperparameter_list[1], used_cutoffs=cutoffs_per_method[1])
+        #self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        
+        self.method_name = "Sequential-"+"+".join([model.method_name for model in self.models])
+        
+        super().__init__(base_models_path, preprocessing_hash)
+    
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
+        
+        
+        #First fit segmenter based on used_cutoffs for segmentation_method:
+            
+        #After initial fit, find segments which are not predicted as 1
+        # for each of these segments, apply anomaly detection method to get scores
+        # Optimize thresholds for scores of these segments based on used cutoffs for anomaly detection method
+        # Obtain predictions per segment
+        
+        #Recombine predictions of segmenter with predictions of AD method in order to get final predictions
+        
+        #Scores should be list of matrices/dfs, with each column indicating the method used for production of said scores
+        return scores, predictions
+    
 class StackEnsemble(SaveableEnsemble):
     
     def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method):
@@ -861,22 +909,22 @@ class StackEnsemble(SaveableEnsemble):
         
         super().__init__(base_models_path, preprocessing_hash)
 
-        
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False):
+
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
         self._scores = []
         temp_scores = []
         self._predictions = []
         for model in self.models:
-            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit, dry_run)
+            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit, dry_run, verbose)
             temp_scores.append(scores)
             self._predictions.append(predictions)
         
         self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
         return(self._scores, self._combine_predictions(self._predictions))
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
         
     def _combine_predictions(self, prediction_list):
         combined_predictions = []
