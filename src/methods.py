@@ -1008,6 +1008,13 @@ class SequentialEnsemble(SaveableEnsemble):
             
             final_scores = [pd.concat([segmenter_score.squeeze(), ad_score.squeeze()], axis=1, keys=[self.segmentation_method.method_name, self.anomaly_detection_method.method_name]) for segmenter_score, ad_score in zip(y_scores_dfs_segmenter, final_ad_scores)]        #Scores should be list of matrices/dfs, with each column indicating the method used for production of said scores
             
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(final_scores, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(final_predictions, handle)
+                self.save_model()
+            
         return final_scores, final_predictions
         
     
