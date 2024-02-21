@@ -63,7 +63,7 @@ dry_run = False
 
 verbose = False
 
-model_test_run = True #Only run 1 hyperparameter setting per model type
+model_test_run = True #Only run 1 hyperparameter setting per model type if True
 
 #%% set up database
 
@@ -168,19 +168,27 @@ Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detecti
 
 
 methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
-           "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-           "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
-           "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-           "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-           "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-           "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-           "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
-           "DoubleThresholdBS":DoubleThresholdBinarySegmentation,
-           "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-           "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-           "SequentialTest":SequentialEnsemble
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+            
+            "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+            "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+            
+            "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
+            "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
+            
+            "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
+            "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+            "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            
+            "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
+            "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble}
 
-           }
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, 
                        "SingleThresholdBS":SingleThresholdBS_hyperparameters, 
@@ -198,12 +206,10 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "SingleThresholdBS+DoubleThresholdSPC":SingleThresholdBS_DoubleThresholdSPC_hyperparameters,
                        "DoubleThresholdBS+SingleThresholdSPC":DoubleThresholdBS_SingleThresholdSPC_hyperparameters,
 
-
                        "Sequential-SingleThresholdBS+SingleThresholdSPC":Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters, 
                        "Sequential-DoubleThresholdBS+DoubleThresholdSPC":Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters,
                        "Sequential-SingleThresholdBS+DoubleThresholdSPC":Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters,
                        "Sequential-DoubleThresholdBS+SingleThresholdSPC":Sequential_DoubleThresholdBS_SingleThresholdSPC_hyperparameters,
-
                        }
 
 #%% Preprocess Train data and run algorithms:
@@ -259,8 +265,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
             
             full_model_path = os.path.join(model_folder, model_name, preprocessing_hash, hyperparameter_hash_filename)
+            full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
+            full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
+            full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
             
-            if training_overwrite or not os.path.exists(full_model_path):
+            if training_overwrite or not os.path.exists(full_model_path) or not os.path.exists(full_metric_path) or not os.path.exists(full_table_path) or not os.path.exists(full_minmax_path):
                 
                 y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=training_overwrite, fit=True, dry_run=dry_run, verbose=verbose)
     
@@ -271,17 +280,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
                 
                 if not dry_run:
-                    # save_dataframe_list(y_train_scores_dfs, train_file_names, os.path.join(scores_path, "stations"), overwrite=training_overwrite)
-                    # save_dataframe_list(y_train_predictions_dfs, train_file_names, os.path.join(predictions_path, "stations"), overwrite=training_overwrite)
-                    
+
                     save_metric(metric, fscore_path, hyperparameter_hash)
                     save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
-                    #save metric to database for easy querying:
-                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
-                    db_connection.commit()
-                
                 
             else:
                 print("Model already evaluated, loading results instead:")
@@ -301,6 +304,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                         
             if report_metrics_and_stats:
                 print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+                
+            if not dry_run:
+                #save metric to database for easy querying:
+                db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
+                db_connection.commit()
             
             if model_test_run:
                 break
@@ -362,8 +370,10 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
             
             full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
+            full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
+            full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
             
-            if validation_overwrite or not os.path.exists(full_metric_path):
+            if validation_overwrite or not os.path.exists(full_metric_path) or not os.path.exists(full_table_path) or not os.path.exists(full_minmax_path):
                 
                 y_val_scores_dfs, y_val_predictions_dfs = model.transform_predict(X_val_dfs_preprocessed, y_val_dfs_preprocessed, label_filters_for_all_cutoffs_val, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=validation_overwrite, verbose=verbose)
     
@@ -374,27 +384,24 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
                 if not dry_run:
-                    # save_dataframe_list(y_val_scores_dfs, val_file_names, os.path.join(scores_path, "stations"), overwrite=validation_overwrite)
-                    # save_dataframe_list(y_val_predictions_dfs, val_file_names, os.path.join(predictions_path, "stations"), overwrite=validation_overwrite)
-                    
                     save_metric(metric, fscore_path, hyperparameter_hash)
                     save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
                     
-                    #save metric to database for easy querying:
-                    db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
-                    db_connection.commit()
             else:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
                 PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
                 minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
-                #Model is instead loaded at model inititiation 
-                #model.load_model(model_path, hyperparameter_string)
                         
             if report_metrics_and_stats:
                 print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+                
+            if not dry_run:
+                #save metric to database for easy querying:
+                db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
+                db_connection.commit()
                 
             if model_test_run:
                 break
@@ -424,8 +431,6 @@ for method_name in methods:
     print("-----------------------------------------------")
     #find best preprocessing and method hyperparameters:
 
-    #Some SQL query:
-    
     best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
     
     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
@@ -464,10 +469,12 @@ for method_name in methods:
     PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, model_name, preprocessing_hash)
     avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, model_name, preprocessing_hash)
     avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, model_name, preprocessing_hash)
-    
+
     full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
+    full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
+    full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
     
-    if testing_overwrite or not os.path.exists(full_metric_path):
+    if testing_overwrite or not os.path.exists(full_metric_path) or not os.path.exists(full_table_path) or not os.path.exists(full_minmax_path):
         
         y_test_scores_dfs, y_test_predictions_dfs = model.transform_predict(X_test_dfs_preprocessed, y_test_dfs_preprocessed, label_filters_for_all_cutoffs_test, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=testing_overwrite, verbose=verbose)
 
@@ -481,16 +488,9 @@ for method_name in methods:
             PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std = calculate_bootstrap_stats(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta, bootstrap_iterations=bootstrap_iterations)
             
         if not dry_run:
-            #save_dataframe_list(y_test_scores_dfs, test_file_names, os.path.join(scores_path, "stations"), overwrite=testing_overwrite)
-            #save_dataframe_list(y_test_predictions_dfs, test_file_names, os.path.join(predictions_path, "stations"), overwrite=testing_overwrite)
-            
             save_metric(metric, fscore_path, hyperparameter_hash)
             save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
             save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
-            
-            #save metric to database for easy querying:
-            db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
-            db_connection.commit()
             
             if bootstrap_validation:
                 save_table(PRF_mean_table, PRF_mean_table_path, hyperparameter_hash)
@@ -520,6 +520,11 @@ for method_name in methods:
             print("bootstrapped F"+str(beta))
             print("{0:.4f}".format(avg_fbeta_mean)+"±"+"{0:.4f}".format(avg_fbeta_std))
             
+    if not dry_run:
+        #save metric to database for easy querying:
+        db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
+        db_connection.commit()
+        
     if model_test_run:
         break
 
