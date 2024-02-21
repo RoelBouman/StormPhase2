@@ -863,9 +863,14 @@ class DoubleThresholdBinarySegmentation(BinarySegmentation, DoubleThresholdMetho
         
 class SaveableEnsemble(SaveableModel):
     
-    def load_model(self):
+    def get_full_model_path(self):
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        os.makedirs(method_path, exist_ok=True)
         full_path = os.path.join(method_path, self.filename)
+        return full_path
+    
+    def load_model(self):
+        full_path = self.get_full_model_path()
         f = open(full_path, 'rb')
         tmp_dict = pickle.load(f)
         f.close()      
@@ -1068,16 +1073,57 @@ class StackEnsemble(SaveableEnsemble):
 
 
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
-        self._scores = []
-        temp_scores = []
-        self._predictions = []
-        for model in self.models:
-            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit, dry_run, verbose)
-            temp_scores.append(scores)
-            self._predictions.append(predictions)
+        #X_dfs needs at least "diff" column
+        #y_dfs needs at least "label" column
         
-        self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
-        return(self._scores, self._combine_predictions(self._predictions))
+        
+        #Get paths:
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
+        
+        scores_folder = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        
+        if not dry_run:
+            os.makedirs(scores_folder, exist_ok=True)
+            os.makedirs(predictions_folder, exist_ok=True)
+        
+        scores_path = os.path.join(scores_folder, "scores.pickle")
+        predictions_path = os.path.join(predictions_folder, "predictions.pickle")
+        
+        #Get scores
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+            
+            if verbose:
+                print("Scores/Prediction/Model already exist, reloading")
+            
+            with open(scores_path, 'rb') as handle:
+                scores = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                predictions = pickle.load(handle)
+            self.load_model()
+        
+        else:
+            
+            _scores = []
+            _predictions = []
+            for model in self.models:
+                temp_scores, temp_predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit, dry_run, verbose)
+                _scores.append(temp_scores)
+                _predictions.append(temp_predictions)
+            
+            scores = [pd.concat([scores[i] for scores in _scores], axis=1) for i in range(len(_scores[0]))]
+            predictions = self._combine_predictions(_predictions)
+    
+            
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(scores, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(predictions, handle)
+                self.save_model()
+            
+        return scores, predictions
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
         
@@ -1099,13 +1145,15 @@ class StackEnsemble(SaveableEnsemble):
         
         return model_string
     
-    def save_model(self, overwrite=True):
-        # for model in self.models:
-        #     model.save_model(overwrite)
-        
+    def get_full_model_path(self):
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         os.makedirs(method_path, exist_ok=True)
         full_path = os.path.join(method_path, self.filename)
+        return full_path
+    
+    def save_model(self, overwrite=True):
+        
+        full_path = self.get_full_model_path()
         
         if not os.path.exists(full_path) or overwrite:
             f = open(full_path, 'wb')
