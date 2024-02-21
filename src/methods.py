@@ -8,6 +8,8 @@ import os
 import pickle
 from hashlib import sha256
 
+from numba import njit
+
 from sklearn.preprocessing import RobustScaler
 from sklearn.metrics import precision_recall_curve
 from sklearn.metrics._ranking import _binary_clf_curve
@@ -134,6 +136,9 @@ class DoubleThresholdMethod:
         #calculate optimal thresholds (negative threshold needs to be set to be negative)
         self.optimal_negative_threshold = -self.negative_thresholds[max_score_indices[1]]
         self.optimal_positive_threshold = self.positive_thresholds[max_score_indices[0]]
+        
+        #Calculate for compatibility later:
+        self.optimal_threshold = (self.optimal_negative_threshold, self.optimal_positive_threshold)
         
     def _calculate_grid_scores(self, false_positive_grid, true_positive_grid, false_negative_grid, used_cutoffs):
         
@@ -488,24 +493,139 @@ class IsolationForest(ScoreCalculator):
         model_string = str(hyperparam_dict).encode("utf-8")
         
         return model_string
-    
-class BinarySegmentation(ScoreCalculator):
-    
-    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
-        super().__init__()
+
+@njit
+def _data_to_score(signal, bkps, reference_point_value):
+    y_score = np.zeros(len(signal), dtype=np.float64)
+    prev_bkp = 0
+    segment_means = []
+            
+    for bkp in bkps:
+        segment = signal[prev_bkp:bkp] # define a segment between two breakpoints
+        segment_mean = np.mean(segment)
         
-        self.score_calculation_method_name = "BinarySegmentation"
+        segment_means.append(segment_mean)
         
+        # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
+        y_score[prev_bkp:bkp] = reference_point_value - segment_mean   
+        
+        prev_bkp = bkp
+    
+    return y_score, segment_means
+
+class BinarySegmentationBreakpointCalculator():
+    
+    def __init__(self, beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
-        self.penalty = penalty        
-        self.used_cutoffs = used_cutoffs
+        self.penalty = penalty
         self.params = params
         self.reference_point = reference_point
         
         # define Binseg model
         self.model = rpt.Binseg(**params)
+    
+    def get_breakpoints(self, signal):
+        """
+        Find and return the breakpoints in a given dataframe
+
+        Parameters
+        ----------
+        signal : dataframe
+            the dataframe in which the breakpoints must be found
+        
+        Returns
+        -------
+        list of integers
+            the integers represent the positions of the breakpoints found, always includes len(signal)
+
+        """
+        
+        # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
+        if self.penalty == 'lin':
+            n = len(signal)
+            penalty = n * self.beta
+        elif self.penalty == 'fused_lasso':
+            penalty = self.fused_lasso_penalty(signal, self.beta)
+        else:
+            # if no correct penalty selected, raise exception
+            raise Exception("Incorrect penalty")
+            
+        bkps = self.model.fit_predict(signal, pen = penalty)
+        
+        return bkps
+        
+    def fused_lasso_penalty(self, signal, beta):
+        mean = np.mean(signal)
+        tot_sum = np.sum(np.abs(signal - mean))
+        
+        return beta * tot_sum
+    
+    
+    def calculate_reference_point_value(self, signal, bkps, reference_point):
+        
+        if reference_point.lower() == "mean":
+            ref_point = np.mean(signal) # calculate mean of all values in timeseries
+        elif reference_point.lower() == "median":
+            ref_point = np.median(signal)
+        elif reference_point.lower() == "longest_mean" or reference_point.lower() == "longest_median": #compare to longest segment mean
+            prev_bkp = 0
+            longest_segment_length = 0
+            for bkp in bkps:
+                segment_length = bkp-prev_bkp
+                if segment_length > longest_segment_length:
+                    first_bkp_longest_segment = prev_bkp
+                    last_bkp_longest_segment = bkp
+                    longest_segment_length = segment_length
+                prev_bkp = bkp
+            if reference_point.lower() == "longest_mean":
+                ref_point = np.mean(signal[first_bkp_longest_segment:last_bkp_longest_segment])
+            elif reference_point.lower() == "longest_median":
+                ref_point = np.median(signal[first_bkp_longest_segment:last_bkp_longest_segment])
+                
+        else:
+            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
+            
+            
+        return ref_point
+    
+    def data_to_score(self, signal, bkps, reference_point):
+        
+        self.reference_point_value = self.calculate_reference_point_value(signal, bkps, reference_point)
+        
+        return _data_to_score(signal, bkps, self.reference_point_value)
+    
+    def get_breakpoints_string(self):
+        hyperparam_dict = {}
+        hyperparam_dict["beta"] = self.beta
+        hyperparam_dict["quantiles"] = self.quantiles
+        hyperparam_dict["scaling"] = self.scaling
+        hyperparam_dict["penalty"] = self.penalty
+        hyperparam_dict["params"] = self.params
+        model_string = str(hyperparam_dict).encode("utf-8")
+        
+        return model_string
+    
+    def get_breakpoints_hash(self):
+        breakpoints_string = self.get_breakpoints_string()
+        
+        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
+        breakpoints_hash = sha256(breakpoints_string).hexdigest()
+        
+        return breakpoints_hash
+
+
+class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator):
+    
+    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
+        super().__init__()
+        BinarySegmentationBreakpointCalculator.__init__(self, beta=beta, quantiles=quantiles, penalty=penalty, scaling=scaling, reference_point=reference_point, **params)
+        
+        self.score_calculation_method_name = "BinarySegmentation"
+        
+        self.used_cutoffs = used_cutoffs
+
         
     def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
         #X_dfs needs at least "diff" column
@@ -521,6 +641,7 @@ class BinarySegmentation(ScoreCalculator):
         scores_folder = os.path.join(base_scores_path, score_calculator_name, hyperparameter_hash)
         predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
         breakpoints_folder = os.path.join(base_intermediates_path, score_calculator_name, breakpoints_hash)
+        segment_means_folder = os.path.join(base_intermediates_path, score_calculator_name, breakpoints_hash)
         
         if not dry_run:
             os.makedirs(scores_folder, exist_ok=True)
@@ -530,6 +651,7 @@ class BinarySegmentation(ScoreCalculator):
         scores_path = os.path.join(scores_folder, "scores.pickle")
         predictions_path = os.path.join(predictions_folder, str(self.used_cutoffs)+ ".pickle")
         breakpoints_path = os.path.join(breakpoints_folder, "breakpoints.pickle")
+        segment_means_path = os.path.join(segment_means_folder, "segment_means.pickle")
         
         #Get scores
         if os.path.exists(scores_path) and not overwrite:
@@ -539,10 +661,10 @@ class BinarySegmentation(ScoreCalculator):
             
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
+            with open(segment_means_path, 'rb') as handle:
+                self.segment_means_per_station = pickle.load(handle)
                 
         else:
-            
-            
             if self.scaling:
                 scaler = RobustScaler(quantile_range=self.quantiles)
             
@@ -552,7 +674,7 @@ class BinarySegmentation(ScoreCalculator):
                 signal = X_df["diff"].values.reshape(-1,1)
                 
                 if self.scaling:
-                    signal = scaler.fit_transform(signal)
+                    signal = scaler.fit_transform(signal).astype(np.float64).squeeze()
                 signals.append(signal)
                 
             #load breakpoints if they exist, otherwise calculate them
@@ -562,24 +684,30 @@ class BinarySegmentation(ScoreCalculator):
                     print("Breakpoints already exist, reloading")
                     
                 with open(breakpoints_path, 'rb') as handle:
-                    breakpoints_per_station = pickle.load(handle)
+                    self.breakpoints_per_station = pickle.load(handle)
             else:
-                breakpoints_per_station = []
+                self.breakpoints_per_station = []
                 for signal in signals:
-                    breakpoints_per_station.append(self.get_breakpoints(signal))
+                    self.breakpoints_per_station.append(self.get_breakpoints(signal))
                 
                 if not dry_run:
                     with open(breakpoints_path, 'wb') as handle:
-                        pickle.dump(breakpoints_per_station, handle)
+                        pickle.dump(self.breakpoints_per_station, handle)
             
             #Finally: calculate scores
             y_scores_dfs = []
-            for bkps, signal in zip(breakpoints_per_station, signals):
-                y_scores_dfs.append(pd.DataFrame(self.data_to_score(signal, bkps, self.reference_point)))
+            self.segment_means_per_station = []
+            for bkps, signal in zip(self.breakpoints_per_station, signals):
+                scores, segment_means = self.data_to_score(signal, bkps, self.reference_point)
+                y_scores_dfs.append(pd.DataFrame(scores))
+                self.segment_means_per_station.append(segment_means)
             
             if not dry_run:
                 with open(scores_path, 'wb') as handle:
                     pickle.dump(y_scores_dfs, handle)
+                with open(segment_means_path, 'wb') as handle:
+                    pickle.dump(self.segment_means_per_station, handle)
+                
             
         #Get predictions from scores, load model if it exists, if not recalculate
         if os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
@@ -605,103 +733,11 @@ class BinarySegmentation(ScoreCalculator):
                     
         return y_scores_dfs, y_prediction_dfs
     
-    def get_breakpoints(self, signal):
-        """
-        Find and return the breakpoints in a given dataframe
-
-        Parameters
-        ----------
-        df : dataframe
-            the dataframe in which the breakpoints must be found
-        
-        Returns
-        -------
-        list of integers
-            the integers represent the positions of the breakpoints found, always includes len(df)
-
-        """
-        
-        # decide the penalty https://arxiv.org/pdf/1801.00718.pdf
-        if self.penalty == 'lin':
-            n = len(signal)
-            penalty = n * self.beta
-        elif self.penalty == 'fused_lasso':
-            penalty = self.fused_lasso_penalty(signal, self.beta)
-        else:
-            # if no correct penalty selected, raise exception
-            raise Exception("Incorrect penalty")
-            
-        bkps = self.model.fit_predict(signal, pen = penalty)
-        
-        return bkps
     
     def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose):
         
         return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
     
-    def fused_lasso_penalty(self, signal, beta):
-        mean = np.mean(signal)
-        tot_sum = np.sum(np.abs(signal - mean))
-        
-        return beta * tot_sum
-    
-    def data_to_score(self, df, bkps, reference_point):
-        y_score = np.zeros(len(df))
-        
-        if reference_point.lower() == "mean":
-            ref_point = np.mean(df) # calculate mean of all values in timeseries
-        elif reference_point.lower() == "median":
-            ref_point = np.median(df)
-        elif reference_point.lower() == "longest_mean" or reference_point.lower() == "longest_median": #compare to longest segment mean
-            prev_bkp = 0
-            longest_segment_length = 0
-            for bkp in bkps:
-                segment_length = bkp-prev_bkp
-                if segment_length > longest_segment_length:
-                    first_bkp_longest_segment = prev_bkp
-                    last_bkp_longest_segment = bkp
-                    longest_segment_length = segment_length
-                prev_bkp = bkp
-            if reference_point.lower() == "longest_mean":
-                ref_point = np.mean(df[first_bkp_longest_segment:last_bkp_longest_segment])
-            elif reference_point.lower() == "longest_median":
-                ref_point = np.median(df[first_bkp_longest_segment:last_bkp_longest_segment])
-                
-        else:
-            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
-        self.reference_point_value = ref_point
-        
-        prev_bkp = 0
-                
-        for bkp in bkps:
-            segment = df[prev_bkp:bkp] # define a segment between two breakpoints
-            segment_mean = np.mean(segment)
-            
-            # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
-            y_score[prev_bkp:bkp] = ref_point - segment_mean   
-            
-            prev_bkp = bkp
-        
-        return y_score            
-    
-    def get_breakpoints_string(self):
-        hyperparam_dict = {}
-        hyperparam_dict["beta"] = self.beta
-        hyperparam_dict["quantiles"] = self.quantiles
-        hyperparam_dict["scaling"] = self.scaling
-        hyperparam_dict["penalty"] = self.penalty
-        hyperparam_dict["params"] = self.params
-        model_string = str(hyperparam_dict).encode("utf-8")
-        
-        return model_string
-    
-    def get_breakpoints_hash(self):
-        breakpoints_string = self.get_breakpoints_string()
-        
-        #hash model_string as it can surpass character limit. This also circumvents illegal characters in pathnames for certains OSes
-        breakpoints_hash = sha256(breakpoints_string).hexdigest()
-        
-        return breakpoints_hash
     
     def get_model_string(self):
         hyperparam_dict = {}
@@ -714,6 +750,8 @@ class BinarySegmentation(ScoreCalculator):
         model_string = str(hyperparam_dict).encode("utf-8")
         
         return model_string
+    
+
         
 class SaveableModel(ABC):
     
@@ -833,6 +871,183 @@ class SaveableEnsemble(SaveableModel):
         f.close()      
         self.__dict__.update(tmp_dict) 
         
+        
+        
+def single_threshold_function(value, threshold):
+    return np.abs(value) >= threshold
+    
+def double_threshold_function(value, thresholds):
+    negative_threshold = thresholds[0]
+    positive_threshold = thresholds[1]
+    return np.logical_or(value < negative_threshold, value >= positive_threshold)
+
+class SequentialEnsemble(SaveableEnsemble):
+    
+    def __init__(self, base_models_path, preprocessing_hash, segmentation_method, anomaly_detection_method, method_hyperparameter_dict_list, cutoffs_per_method):
+
+        self.is_ensemble = True
+        
+        self.method_hyperparameter_list = method_hyperparameter_dict_list
+        self.cutoffs_per_method = cutoffs_per_method
+        self.preprocessing_hash = preprocessing_hash
+        
+        self.segmentation_method = segmentation_method(base_models_path, preprocessing_hash, **method_hyperparameter_dict_list[0], used_cutoffs=cutoffs_per_method[0])
+        self.anomaly_detection_method = anomaly_detection_method(base_models_path, preprocessing_hash, **method_hyperparameter_dict_list[1], used_cutoffs=cutoffs_per_method[1])
+        #self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
+        
+        self.method_name = "Sequential-"+self.segmentation_method.method_name+"+"+self.anomaly_detection_method.method_name
+        
+        if self.segmentation_method.threshold_optimization_method == "DoubleThreshold":
+            self.threshold_function = double_threshold_function
+        elif self.segmentation_method.threshold_optimization_method == "SingleThreshold":
+            self.threshold_function = single_threshold_function
+        else:
+            raise ValueError("Segmentation method is not a {'DoubleThreshold', 'SingleThreshold'} method")
+            
+        super().__init__(base_models_path, preprocessing_hash)
+    
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
+        #X_dfs needs at least "diff" column
+        #y_dfs needs at least "label" column
+        
+        
+        #Get paths:
+        model_name = self.method_name
+        hyperparameter_hash = self.get_hyperparameter_hash()
+        
+        scores_folder = os.path.join(base_scores_path, model_name, hyperparameter_hash)
+        predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
+        
+        if not dry_run:
+            os.makedirs(scores_folder, exist_ok=True)
+            os.makedirs(predictions_folder, exist_ok=True)
+        
+        scores_path = os.path.join(scores_folder, "scores.pickle")
+        predictions_path = os.path.join(predictions_folder, "predictions.pickle")
+        
+        #Get scores
+        if os.path.exists(scores_path) and os.path.exists(predictions_path) and os.path.exists(self.get_full_model_path()) and not overwrite:
+            
+            if verbose:
+                print("Scores/Prediction/Model already exist, reloading")
+            
+            with open(scores_path, 'rb') as handle:
+                final_scores = pickle.load(handle)
+            with open(predictions_path, 'rb') as handle:
+                final_predictions = pickle.load(handle)
+            self.load_model()
+        
+        else:
+            #First fit segmenter based on used_cutoffs for segmentation_method:
+            y_scores_dfs_segmenter, y_prediction_dfs_segmenter = self.segmentation_method.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit, dry_run, verbose)
+            
+            #After initial fit, find segments which are not predicted as 1
+            segments_to_anomaly_detector_indices = []
+            signal_segments_to_anomaly_detector = []
+            label_segments_to_anomaly_detector = []
+            label_filter_segments_to_anomaly_detector = []
+            
+            for X_df, y_df, label_filters, y_prediction_df, segment_means, breakpoints in zip(X_dfs, y_dfs, label_filters_for_all_cutoffs, y_prediction_dfs_segmenter, self.segmentation_method.segment_means_per_station, self.segmentation_method.breakpoints_per_station):
+                prev_bkp = 0
+                anomalous_segment_indices = []
+                anomalous_segment_signal = []
+                anomalous_segment_labels = []
+                anomalous_segment_label_filters = []
+                
+                signal = X_df["diff"].to_frame()
+                labels = y_df["label"].to_frame()
+                
+                for segment_mean, bkp in zip(segment_means, breakpoints):
+                    #Save segment to later pas to anomaly detection method:
+                    if not self.threshold_function(segment_mean, self.segmentation_method.optimal_threshold):
+                        signal_segment = signal[prev_bkp:bkp] # define a segment between two breakpoints
+                        label_segment = labels[prev_bkp:bkp]                    
+                        label_filter_segment = {k:v[prev_bkp:bkp] for k,v in label_filters.items()}
+                        
+                        anomalous_segment_indices.append((prev_bkp,bkp))
+                        anomalous_segment_signal.append(signal_segment)
+                        anomalous_segment_labels.append(label_segment)
+                        anomalous_segment_label_filters.append(label_filter_segment)
+                    
+                    prev_bkp = bkp
+                    
+                signal_segments_to_anomaly_detector.append(anomalous_segment_signal)
+                label_segments_to_anomaly_detector.append(anomalous_segment_labels)
+                segments_to_anomaly_detector_indices.append(anomalous_segment_indices)
+                label_filter_segments_to_anomaly_detector.append(anomalous_segment_label_filters)
+            # for each of these segments, apply anomaly detection method to get scores
+            # Optimize thresholds for scores of these segments based on used cutoffs for anomaly detection method
+            # Obtain predictions per segment
+            
+            #Before passing to AD method, flatten list of list of dfs to list of dfs
+            #We need to keep track of the original station the df belongs to, so we can properly reassign predicted labels later on
+            subsignal_df_index = [[i]*len(sublist) for i, sublist in enumerate(signal_segments_to_anomaly_detector)]
+            
+            subsignal_df_index = [segment for segment_list in subsignal_df_index for segment in segment_list]
+            signal_segments_to_anomaly_detector = [segment for segment_list in signal_segments_to_anomaly_detector for segment in segment_list]
+            label_segments_to_anomaly_detector = [segment for segment_list in label_segments_to_anomaly_detector for segment in segment_list]
+            segments_to_anomaly_detector_indices = [segment for segment_list in segments_to_anomaly_detector_indices for segment in segment_list]
+            label_filter_segments_to_anomaly_detector = [segment for segment_list in label_filter_segments_to_anomaly_detector for segment in segment_list]
+            
+            AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path = os.path.join(base_scores_path, "Sequential_AD_part"), os.path.join(base_predictions_path, "Sequential_AD_part"), os.path.join(base_intermediates_path, "Sequential_AD_part")
+            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite, fit, dry_run, verbose)
+            
+            #Recombine predictions of segmenter with predictions of AD method in order to get final predictions
+            final_predictions = y_prediction_dfs_segmenter
+            
+            final_ad_scores = []
+            #initialize dfs 
+            for score_df in y_scores_dfs_segmenter:
+                temp_df = score_df.copy(deep=True)
+                temp_df.iloc[:] = np.nan
+                final_ad_scores.append(temp_df)
+            
+            for df_index, ad_score, ad_prediction, segment_indices in zip(subsignal_df_index, ad_scores, ad_predictions, segments_to_anomaly_detector_indices):
+                final_predictions[df_index].iloc[segment_indices[0]:segment_indices[1]] = ad_prediction
+                final_ad_scores[df_index].iloc[segment_indices[0]:segment_indices[1]] = ad_score
+            
+            final_scores = [pd.concat([segmenter_score.squeeze(), ad_score.squeeze()], axis=1, keys=[self.segmentation_method.method_name, self.anomaly_detection_method.method_name]) for segmenter_score, ad_score in zip(y_scores_dfs_segmenter, final_ad_scores)]        #Scores should be list of matrices/dfs, with each column indicating the method used for production of said scores
+            
+            if not dry_run:
+                with open(scores_path, 'wb') as handle:
+                    pickle.dump(final_scores, handle)
+                with open(predictions_path, 'wb') as handle:
+                    pickle.dump(final_predictions, handle)
+                self.save_model()
+            
+        return final_scores, final_predictions
+        
+    
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
+        
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
+        
+    def get_model_string(self):
+        
+        model_string = str(self.method_hyperparameter_list).encode("utf-8")
+        
+        return model_string
+    
+    def save_model(self, overwrite=True):
+        #for model in self.models:
+        #    model.save_model(overwrite)
+        
+        method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
+        os.makedirs(method_path, exist_ok=True)
+        full_path = os.path.join(method_path, self.filename)
+        
+        if not os.path.exists(full_path) or overwrite:
+            f = open(full_path, 'wb')
+            pickle.dump(self.__dict__, f, 2)
+            f.close()
+            
+    
+    def report_thresholds(self):
+        models = [self.segmentation_method, self.anomaly_detection_method]
+        for model in models:
+            print(model.method_name)
+            model.report_thresholds()
+    
 class StackEnsemble(SaveableEnsemble):
     
     def __init__(self, base_models_path, preprocessing_hash, method_classes, method_hyperparameter_dict_list, cutoffs_per_method):
@@ -851,22 +1066,22 @@ class StackEnsemble(SaveableEnsemble):
         
         super().__init__(base_models_path, preprocessing_hash)
 
-        
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False):
+
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
         self._scores = []
         temp_scores = []
         self._predictions = []
         for model in self.models:
-            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, overwrite, fit, dry_run)
+            scores, predictions = model.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit, dry_run, verbose)
             temp_scores.append(scores)
             self._predictions.append(predictions)
         
         self._scores = [pd.concat([scores[i] for scores in temp_scores], axis=1) for i in range(len(temp_scores[0]))]
         return(self._scores, self._combine_predictions(self._predictions))
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
         
     def _combine_predictions(self, prediction_list):
         combined_predictions = []
@@ -885,8 +1100,8 @@ class StackEnsemble(SaveableEnsemble):
         return model_string
     
     def save_model(self, overwrite=True):
-        for model in self.models:
-            model.save_model(overwrite)
+        # for model in self.models:
+        #     model.save_model(overwrite)
         
         method_path = os.path.join(self.base_models_path, self.method_name, self.preprocessing_hash)
         os.makedirs(method_path, exist_ok=True)
