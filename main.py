@@ -167,18 +167,18 @@ Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detecti
 #%% define methods:
 
 
-methods = {#"SingleThresholdIF":SingleThresholdIsolationForest,
-            #"SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            #"SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
-             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-           #  "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            #"Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
-             #"DoubleThresholdBS":DoubleThresholdBinarySegmentation,
-             #"Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-             #"SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-             #"SequentialTest":SequentialEnsemble
+methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
+           "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+           "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+           "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
+           "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
+           "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+           "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+           "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl,
+           "DoubleThresholdBS":DoubleThresholdBinarySegmentation,
+           "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+           "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+           "SequentialTest":SequentialEnsemble
 
            }
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
