@@ -996,8 +996,9 @@ class SequentialEnsemble(SaveableEnsemble):
             segments_to_anomaly_detector_indices = [segment for segment_list in segments_to_anomaly_detector_indices for segment in segment_list]
             label_filter_segments_to_anomaly_detector = [segment for segment_list in label_filter_segments_to_anomaly_detector for segment in segment_list]
             
+            #Prediction paths don't -need- to be set like this. Most importantly: AD calculation is always unique, as every input breakpoint set is assumed to be unique, so both dry_run and overwrite are manually set to True (possibly overwrite is not 100% needed)
             AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path = os.path.join(base_scores_path, "Sequential_AD_part"), os.path.join(base_predictions_path, "Sequential_AD_part"), os.path.join(base_intermediates_path, "Sequential_AD_part")
-            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite, fit, dry_run, verbose)
+            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite=True, fit=fit, dry_run=True, verbose=verbose)
             
             #Recombine predictions of segmenter with predictions of AD method in order to get final predictions
             final_predictions = y_prediction_dfs_segmenter
