@@ -515,7 +515,7 @@ def _data_to_score(signal, bkps, reference_point_value):
 
 class BinarySegmentationBreakpointCalculator():
     
-    def __init__(self, beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
+    def __init__(self, beta=0.12, quantiles=(10,90), penalty="L1", scaling=True, reference_point="median", **params):
         self.beta = beta
         self.quantiles = quantiles
         self.scaling = scaling
@@ -546,7 +546,7 @@ class BinarySegmentationBreakpointCalculator():
         if self.penalty == 'lin':
             n = len(signal)
             penalty = n * self.beta
-        elif self.penalty == 'fused_lasso':
+        elif self.penalty == 'L1':
             penalty = self.fused_lasso_penalty(signal, self.beta)
         else:
             # if no correct penalty selected, raise exception
@@ -618,7 +618,7 @@ class BinarySegmentationBreakpointCalculator():
 
 class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator):
     
-    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="fused_lasso", scaling=True, reference_point="median", **params):
+    def __init__(self, used_cutoffs=[(0, 24), (24, 288), (288, 4032), (4032, np.inf)], beta=0.12, quantiles=(10,90), penalty="L1", scaling=True, reference_point="median", **params):
         super().__init__()
         BinarySegmentationBreakpointCalculator.__init__(self, beta=beta, quantiles=quantiles, penalty=penalty, scaling=scaling, reference_point=reference_point, **params)
         
