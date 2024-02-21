@@ -22,7 +22,7 @@ from src.methods import NaiveStackEnsemble
 from src.methods import SequentialEnsemble
 
 from src.preprocess import preprocess_per_batch_and_write
-from src.io_functions import save_dataframe_list, save_metric, save_table, save_minmax_stats
+from src.io_functions import save_metric, save_table, save_minmax_stats
 from src.io_functions import load_batch, load_metric, load_table, load_minmax_stats
 from src.evaluation import cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table, calculate_bootstrap_stats
 
@@ -126,13 +126,13 @@ SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[[Singl
                                                         "method_hyperparameter_dict_list":ensemble_method_hyperparameter_dict_list, 
                                                         "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
-DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters
+DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 DoubleThresholdBS_DoubleThresholdSPC_hyperparameters["method_classes"] = [[DoubleThresholdBinarySegmentation, DoubleThresholdStatisticalProcessControl]]
 
-DoubleThresholdBS_SingleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters
+DoubleThresholdBS_SingleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 DoubleThresholdBS_SingleThresholdSPC_hyperparameters["method_classes"] = [[DoubleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]]
 
-SingleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters
+SingleThresholdBS_DoubleThresholdSPC_hyperparameters = SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 SingleThresholdBS_DoubleThresholdSPC_hyperparameters["method_classes"] = [[SingleThresholdBinarySegmentation, DoubleThresholdStatisticalProcessControl]]
 
 
@@ -140,13 +140,13 @@ Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"method_classes":[
                                                               "method_hyperparameter_dict_list":ensemble_method_hyperparameter_dict_list, 
                                                               "all_cutoffs":[all_cutoffs]}
 
-Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Naive_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters["method_classes"] = [[DoubleThresholdBinarySegmentation, DoubleThresholdStatisticalProcessControl]]
 
-Naive_DoubleThresholdBS_SingleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Naive_DoubleThresholdBS_SingleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Naive_DoubleThresholdBS_SingleThresholdSPC_hyperparameters["method_classes"] = [[DoubleThresholdBinarySegmentation, SingleThresholdStatisticalProcessControl]]
 
-Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Naive_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["method_classes"] = [[SingleThresholdBinarySegmentation, DoubleThresholdStatisticalProcessControl]]
 
 Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"segmentation_method":[SingleThresholdBinarySegmentation], 
@@ -155,14 +155,14 @@ Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"segmentation
                                                                                                        list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], 
                                                                    "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
-Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters["segmentation_method"] = [DoubleThresholdBinarySegmentation]
 Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detection_method"] = [DoubleThresholdStatisticalProcessControl]
 
-Sequential_DoubleThresholdBS_SingleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Sequential_DoubleThresholdBS_SingleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Sequential_DoubleThresholdBS_SingleThresholdSPC_hyperparameters["segmentation_method"] = [DoubleThresholdBinarySegmentation]
 
-Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters
+Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
 Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detection_method"] = [DoubleThresholdStatisticalProcessControl]
 #%% define methods:
 
@@ -264,7 +264,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
             minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
             
-            full_model_path = os.path.join(model_folder, model_name, preprocessing_hash, hyperparameter_hash_filename)
+            full_model_path = model.get_full_model_path()
             full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
             full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
             full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
