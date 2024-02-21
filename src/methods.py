@@ -654,7 +654,7 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
         segment_means_path = os.path.join(segment_means_folder, "segment_means.pickle")
         
         #Get scores
-        if os.path.exists(scores_path) and not overwrite:
+        if os.path.exists(scores_path) and os.path.exists(breakpoints_path) and os.path.exists(segment_means_path) and not overwrite:
             
             if verbose:
                 print("Scores already exist, reloading")
@@ -663,6 +663,8 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
                 y_scores_dfs = pickle.load(handle)
             with open(segment_means_path, 'rb') as handle:
                 self.segment_means_per_station = pickle.load(handle)
+            with open(breakpoints_path, 'rb') as handle:
+                self.breakpoints_per_station = pickle.load(handle)
                 
         else:
             if self.scaling:
