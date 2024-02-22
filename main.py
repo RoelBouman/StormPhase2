@@ -52,7 +52,7 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = True 
+training_overwrite = False 
 validation_overwrite = False
 testing_overwrite = False
 
@@ -167,27 +167,27 @@ Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detecti
 #%% define methods:
 
 
-methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
-            # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
             
-            # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-            # "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+            "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+            "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             
             "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             # 
             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-            # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-            # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+            "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
             
-            # "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
-            # "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble
+            "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
+            "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble
             }
 
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
@@ -395,7 +395,8 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
                 minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
-                        
+            model.report_thresholds()
+            
             if report_metrics_and_stats:
                 print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
                 
@@ -519,6 +520,7 @@ for method_name in methods:
             avg_fbeta_mean = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
             avg_fbeta_std = load_metric(avg_fbeta_std_path, hyperparameter_hash)
     
+    model.report_thresholds()
     
     if report_metrics_and_stats:
         print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
