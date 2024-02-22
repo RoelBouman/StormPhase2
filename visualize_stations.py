@@ -21,14 +21,14 @@ intermediates_folder = os.path.join("intermediates", dataset)
 preprocessed_folder = "preprocessed_data_csvs"
 preprocessing_type = "basic"
 
-preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)]}
+preprocessing_hyperparameters =  {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [False]}
 
 preprocessing_hyperparameter_string = str(list(ParameterGrid(preprocessing_hyperparameters))[0])
 
 preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
 
 #%% define runtime variables
-plot_station_IDs = ["019"]
+plot_station_IDs = ['041', '042', '043', '086', '087', '089', '090', '091', '092', '17', '23', '24', '96', '97']
 n_xlabels = 10
 
 
@@ -57,7 +57,7 @@ for station_ID in plot_station_IDs:
     X_preprocessed_df = pd.read_csv(os.path.join(intermediates_folder, preprocessed_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
     
     fig = plt.figure(figsize=(30,16)) # add DPI=300+ in case some missing points don't show up'    
-    plt.title("Station: " + station_ID, fontsize=60)
+    plt.title("Station: " + station_ID + " ( "+station_dataset_dict[station_ID]+" )", fontsize=60)
     gs = GridSpec(10, 1, figure=fig)
     
     #S/BU original plot:
