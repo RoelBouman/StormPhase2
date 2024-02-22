@@ -26,7 +26,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 #%%
 
-dry_run = True
+dry_run = False
 
 #%%
 
@@ -56,7 +56,7 @@ def split_series(series, counts=np.zeros((3,))):
 if dataset == "route_data":
     station_exclude_list = [25, 106, 130, 190] #106 has already been deleted beforehand due to being an invalid file
 elif dataset == "OS_data":
-    station_exclude_list = []
+    station_exclude_list = ["090"]
 else:
     station_exclude_list = []
     
@@ -71,7 +71,7 @@ filtered_X_dfs, filtered_y_dfs, filtered_file_names = zip(*filtered_data)
 
 filtered_X_dfs, filtered_y_dfs, filtered_file_names = list(filtered_X_dfs), list(filtered_y_dfs), list(filtered_file_names)
 
-all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)]}
+all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [False]}
 
 preprocessing_hyperparameters = list(ParameterGrid(all_preprocessing_hyperparameters))[0]
 

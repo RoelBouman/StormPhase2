@@ -55,7 +55,7 @@ def get_event_lengths(y_df):
             if event_started:
                 
                 #Event ends
-                if y_df["label"][i] == 0:
+                if y_df["label"][i] != 1:
                     event_end_index = i #not inclusive
                     
                     lengths[event_start_index:event_end_index] = event_end_index-event_start_index
@@ -65,7 +65,7 @@ def get_event_lengths(y_df):
                     pass
             else:
                 #Event starts
-                if y_df["label"][i] == 1: #now defined that events only start at 1, but don't end at 4/5.
+                if y_df["label"][i] == 1:
                     event_start_index = i
                     event_started = True
                 #Event has not started:
