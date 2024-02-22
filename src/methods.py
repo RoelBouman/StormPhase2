@@ -372,6 +372,8 @@ class StatisticalProcessControl(ScoreCalculator):
         else:
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
+            else: #If not fit, ensure thresholds are still correctly optimized for used_cutoffs
+                self.calculate_and_set_thresholds(self.used_cutoffs)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
@@ -453,7 +455,9 @@ class IsolationForest(ScoreCalculator):
 
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
-                
+            else: #If not fit, ensure thresholds are still correctly optimized for used_cutoffs
+                self.calculate_and_set_thresholds(self.used_cutoffs)
+        
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
             if not dry_run:
@@ -724,6 +728,8 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
             
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
+            else: #If not fit, ensure thresholds are still correctly optimized for used_cutoffs
+                self.calculate_and_set_thresholds(self.used_cutoffs)
                 
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
@@ -1032,7 +1038,7 @@ class SequentialEnsemble(SaveableEnsemble):
         
     def get_model_string(self):
         
-        model_string = str(self.method_hyperparameter_list).encode("utf-8")
+        model_string = (str(self.method_hyperparameter_list) + str(self.cutoffs_per_method)).encode("utf-8")
         
         return model_string
     
@@ -1144,7 +1150,7 @@ class StackEnsemble(SaveableEnsemble):
     
     def get_model_string(self):
         
-        model_string = str(self.method_hyperparameter_dicts).encode("utf-8")
+        model_string = (str(self.method_hyperparameter_dicts)+ str(self.cutoffs_per_method)).encode("utf-8")
         
         return model_string
     

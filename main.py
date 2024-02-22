@@ -52,7 +52,7 @@ write_csv_intermediates = True
 
 preprocessing_overwrite = False #if set to True, overwrite previous preprocessed data
 
-training_overwrite = False 
+training_overwrite = True 
 validation_overwrite = False
 testing_overwrite = False
 
@@ -167,27 +167,28 @@ Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detecti
 #%% define methods:
 
 
-methods = {"SingleThresholdIF":SingleThresholdIsolationForest,
-            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
+            # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
             
-            "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-            "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+            # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+            # "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             
             "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
-            
+            # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            # "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
+            # 
             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-            "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-            "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+            # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+            # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
             
-            "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
-            "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble}
+            # "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
+            # "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            # "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            # "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble
+            }
 
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "SingleThresholdSPC":SingleThresholdSPC_hyperparameters, 
@@ -430,8 +431,16 @@ for method_name in methods:
     print("Now Testing: " + method_name)
     print("-----------------------------------------------")
     #find best preprocessing and method hyperparameters:
+    best_model_entry = db_cursor.execute("""
+    SELECT e.* 
+    FROM experiment_results e 
+    WHERE e.metric = (
+        SELECT MAX(metric)
+        FROM experiment_results
+        WHERE method = (?) AND which_split = (?)
+    ) AND e.method = (?)
+""", (method_name, "Validation", method_name))
 
-    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
     
     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
     
@@ -525,6 +534,4 @@ for method_name in methods:
         db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters), jsonpickle.encode(hyperparameters), metric))
         db_connection.commit()
         
-    if model_test_run:
-        break
 
