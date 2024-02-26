@@ -115,23 +115,23 @@ class DoubleThresholdMethod:
     
     def calculate_and_set_thresholds(self, used_cutoffs):
         
-        self.false_positive_grid = {}
-        self.true_positive_grid = {}
-        self.false_negative_grid = {}
+        false_positive_grid = {}
+        true_positive_grid = {}
+        false_negative_grid = {}
         
         for cutoffs in used_cutoffs:
             fp_grid_1, fp_grid_2 = np.meshgrid(self.lower_false_positives[str(cutoffs)] , self.upper_false_positives[str(cutoffs)] )
-            self.false_positive_grid[str(cutoffs)]  = fp_grid_1 + fp_grid_2
+            false_positive_grid[str(cutoffs)]  = fp_grid_1 + fp_grid_2
             
             tp_grid_1, tp_grid_2 = np.meshgrid(self.lower_true_positives[str(cutoffs)] , self.upper_true_positives[str(cutoffs)] )
-            self.true_positive_grid[str(cutoffs)]  = tp_grid_1 + tp_grid_2
+            true_positive_grid[str(cutoffs)]  = tp_grid_1 + tp_grid_2
             
             fn_grid_1, fn_grid_2 = np.meshgrid(self.lower_false_negatives[str(cutoffs)] , self.upper_false_negatives[str(cutoffs)] )
-            self.false_negative_grid[str(cutoffs)]  = fn_grid_1 + fn_grid_2
+            false_negative_grid[str(cutoffs)]  = fn_grid_1 + fn_grid_2
             
-        self.scores = self._calculate_grid_scores(self.false_positive_grid, self.true_positive_grid, self.false_negative_grid, used_cutoffs)
+        grid_scores = self._calculate_grid_scores(false_positive_grid, true_positive_grid, false_negative_grid, used_cutoffs)
         
-        max_score_indices = self._find_max_score_indices_for_cutoffs(self.scores, used_cutoffs)
+        max_score_indices = self._find_max_score_indices_for_cutoffs(grid_scores, used_cutoffs)
         
         #calculate optimal thresholds (negative threshold needs to be set to be negative)
         self.optimal_negative_threshold = -self.negative_thresholds[max_score_indices[1]]
