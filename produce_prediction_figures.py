@@ -1,11 +1,11 @@
 #%% package loading
 import os
-#import pickle
+import pickle
 import jsonpickle
 import sqlite3
 
 import pandas as pd
-#import numpy as np
+import numpy as np
 
 from hashlib import sha256
 
@@ -50,6 +50,8 @@ validation_name = "Validation"
 
 all_dataset_names = [train_name, test_name, validation_name]
 
+all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
+
 #%% connect to database
 
 DBFILE = dataset+"_experiment_results.db"
@@ -62,9 +64,11 @@ db_cursor = db_connection.cursor()
 
 station_IDs = ["1","041"]
 
-train_IDs = os.listdir(os.path.join(data_folder, "Train", "X"))
-test_IDs = os.listdir(os.path.join(data_folder, "Test", "X"))
-validation_IDs = os.listdir(os.path.join(data_folder, "Validation", "X"))
+train_IDs = sorted(os.listdir(os.path.join(data_folder, "Train", "X")))
+test_IDs = sorted(os.listdir(os.path.join(data_folder, "Test", "X")))
+validation_IDs = sorted(os.listdir(os.path.join(data_folder, "Validation", "X")))
+
+station_ID_dict = {"Train":train_IDs, "Test":test_IDs, "Validation":validation_IDs}
 
 all_station_IDs = train_IDs + test_IDs + validation_IDs
 
@@ -78,7 +82,7 @@ station_dataset_dict.update(validation_ID_dict)
 
 #%% choose HP
 
-use_best_model = False
+use_best_model = True
 method_name = "SingleThresholdBS"
 
 # if use_best_model is False, use these
@@ -139,16 +143,42 @@ for station_ID in station_IDs:
 
 model_name = model.method_name
 
+
+
+pred_df_dict = {}
+for dataset_name in all_dataset_names:
+    base_predictions_path = os.path.join(predictions_folder, station_dataset_dict[station_ID])
+    predictions_path = os.path.join(base_predictions_path, preprocessing_hash, model_name, hyperparameter_hash, str(all_cutoffs)+".pickle")
+        
+    
+    with open(predictions_path, 'rb') as handle:
+        all_pred_dfs = pickle.load(handle)
+    
+    temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_pred_dfs)}
+    pred_df_dict.update(temp_dict)
+    
+    
+y_pred_dfs = []
+
+
+# scores_df_dict = {}
+# for dataset_name in all_dataset_names:
+#     base_scores_path = os.path.join(score_folder, station_dataset_dict[station_ID])
+#     scores_path = os.path.join(base_scores_path, preprocessing_hash, model.score_calculation_method_name, hyperparameter_hash,"scores.pickle")
+        
+    
+#     with open(scores_path, 'rb') as handle:
+#         all_scores_dfs = pickle.load(handle)
+    
+#     temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_scores_dfs)}
+#     scores_df_dict.update(temp_dict)
+    
+    
 y_pred_dfs = []
 
 for station_ID in station_IDs:
     
-    base_predictions_path = os.path.join(predictions_folder, station_dataset_dict[station_ID])
-    predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
-        
-    y_df = pd.read_csv(os.path.join(predictions_path, "stations", station_ID + ".csv"))
-    
-    y_pred_dfs.append(y_df)
+    y_pred_dfs.append(pred_df_dict[station_ID])
  
 #%% plot the predictions
 
