@@ -603,9 +603,9 @@ class BinarySegmentationBreakpointCalculator():
     
     def data_to_score(self, signal, bkps, reference_point):
         
-        self.reference_point_value = self.calculate_reference_point_value(signal, bkps, reference_point)
+        reference_point_value = self.calculate_reference_point_value(signal, bkps, reference_point)
         
-        return _data_to_score(signal, bkps, self.reference_point_value)
+        return _data_to_score(signal, bkps, reference_point_value)
     
     def get_breakpoints_string(self):
         hyperparam_dict = {}
