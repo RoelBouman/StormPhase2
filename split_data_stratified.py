@@ -56,7 +56,7 @@ def split_series(series, counts=np.zeros((3,))):
 if dataset == "route_data":
     station_exclude_list = [25, 106, 130, 190] #106 has already been deleted beforehand due to being an invalid file
 elif dataset == "OS_data":
-    station_exclude_list = ["090"]
+    station_exclude_list = [] #90?
 else:
     station_exclude_list = []
     
@@ -134,7 +134,7 @@ for smallest_category in sorted_categories:
         
     print(counts)
     #print(len(stations_in_category_with_events))
-    (train_stations, val_stations, test_stations) = split_series(stations_in_category_with_events, counts)
+    (train_stations, test_stations, val_stations) = split_series(stations_in_category_with_events, counts)
     all_train_stations  += list(train_stations)
     all_val_stations += list(val_stations)
     all_test_stations += list(test_stations)
@@ -154,7 +154,7 @@ stations_in_category_with_events_index = remaining_normalized_lengths_df.index
 stations_in_category_with_events = pd.Series(np.ones(len(stations_in_category_with_events_index)), index=stations_in_category_with_events_index)
 
 counts = np.array([len(all_train_stations), len(all_val_stations), len(all_test_stations)])
-(train_stations, val_stations, test_stations) = split_series(stations_in_category_with_events, counts)
+(train_stations, test_stations, val_stations) = split_series(stations_in_category_with_events, counts)
 all_train_stations  += list(train_stations)
 all_val_stations += list(val_stations)
 all_test_stations += list(test_stations)
