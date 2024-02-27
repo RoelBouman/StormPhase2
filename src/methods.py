@@ -369,6 +369,12 @@ class StatisticalProcessControl(ScoreCalculator):
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
+            #Set loaded model to correct thresholds
+            if fit:
+                self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
+            else: #If not fit, ensure thresholds are still correctly optimized for used_cutoffs
+                self.calculate_and_set_thresholds(self.used_cutoffs)
+            
         else:
             if fit:
                 self.optimize_thresholds(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, self.used_cutoffs)
@@ -436,6 +442,7 @@ class IsolationForest(ScoreCalculator):
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
+            self.calculate_and_set_thresholds(self.used_cutoffs)
         else:
             y_scores_dfs = []
                 
@@ -666,9 +673,9 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
             with open(scores_path, 'rb') as handle:
                 y_scores_dfs = pickle.load(handle)
             with open(segment_means_path, 'rb') as handle:
-                self.segment_means_per_station = pickle.load(handle)
+                segment_means_per_station = pickle.load(handle)
             with open(breakpoints_path, 'rb') as handle:
-                self.breakpoints_per_station = pickle.load(handle)
+                breakpoints_per_station = pickle.load(handle)
                 
         else:
             if self.scaling:
@@ -690,29 +697,29 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
                     print("Breakpoints already exist, reloading")
                     
                 with open(breakpoints_path, 'rb') as handle:
-                    self.breakpoints_per_station = pickle.load(handle)
+                    breakpoints_per_station = pickle.load(handle)
             else:
-                self.breakpoints_per_station = []
+                breakpoints_per_station = []
                 for signal in signals:
-                    self.breakpoints_per_station.append(self.get_breakpoints(signal))
+                    breakpoints_per_station.append(self.get_breakpoints(signal))
                 
                 if not dry_run:
                     with open(breakpoints_path, 'wb') as handle:
-                        pickle.dump(self.breakpoints_per_station, handle)
+                        pickle.dump(breakpoints_per_station, handle)
             
             #Finally: calculate scores
             y_scores_dfs = []
-            self.segment_means_per_station = []
-            for bkps, signal in zip(self.breakpoints_per_station, signals):
+            segment_means_per_station = []
+            for bkps, signal in zip(breakpoints_per_station, signals):
                 scores, segment_means = self.data_to_score(signal, bkps, self.reference_point)
                 y_scores_dfs.append(pd.DataFrame(scores))
-                self.segment_means_per_station.append(segment_means)
+                segment_means_per_station.append(segment_means)
             
             if not dry_run:
                 with open(scores_path, 'wb') as handle:
                     pickle.dump(y_scores_dfs, handle)
                 with open(segment_means_path, 'wb') as handle:
-                    pickle.dump(self.segment_means_per_station, handle)
+                    pickle.dump(segment_means_per_station, handle)
                 
             
         #Get predictions from scores, load model if it exists, if not recalculate
@@ -723,7 +730,7 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
             with open(predictions_path, 'rb') as handle:
                 y_prediction_dfs = pickle.load(handle)
             self.load_model()
-            
+            self.calculate_and_set_thresholds(self.used_cutoffs)
         else:
             
             if fit:
@@ -739,6 +746,10 @@ class BinarySegmentation(ScoreCalculator, BinarySegmentationBreakpointCalculator
                 if fit:
                     self.save_model()
                     
+        #Save segment means and breakpoints after model reloading to ensure correct ones are reloaded
+        self.segment_means_per_station = segment_means_per_station
+        self.breakpoints_per_station = breakpoints_per_station
+        
         return y_scores_dfs, y_prediction_dfs
     
     
@@ -905,7 +916,10 @@ class SequentialEnsemble(SaveableEnsemble):
         self.preprocessing_hash = preprocessing_hash
         
         self.segmentation_method = segmentation_method(base_models_path, preprocessing_hash, **method_hyperparameter_dict_list[0], used_cutoffs=cutoffs_per_method[0])
-        self.anomaly_detection_method = anomaly_detection_method(base_models_path, preprocessing_hash, **method_hyperparameter_dict_list[1], used_cutoffs=cutoffs_per_method[1])
+        
+        base_AD_model_path = os.path.join(base_models_path, "Sequential_AD_part", self.segmentation_method.method_name, self.segmentation_method.get_breakpoints_hash())
+        
+        self.anomaly_detection_method = anomaly_detection_method(base_AD_model_path, preprocessing_hash, **method_hyperparameter_dict_list[1], used_cutoffs=cutoffs_per_method[1])
         #self.models = [method(base_models_path, preprocessing_hash, **hyperparameters, used_cutoffs=used_cutoffs) for method, hyperparameters, used_cutoffs in zip(method_classes, method_hyperparameter_dict_list, self.cutoffs_per_method)]
         
         self.method_name = "Sequential-"+self.segmentation_method.method_name+"+"+self.anomaly_detection_method.method_name
@@ -972,11 +986,16 @@ class SequentialEnsemble(SaveableEnsemble):
                 
                 for segment_mean, bkp in zip(segment_means, breakpoints):
                     #Save segment to later pas to anomaly detection method:
+                    if bkp > len(signal):
+                        raise RuntimeError("Breakpoint value is higher than signal length. This might be due to incorrect model reloading.")
+                            
                     if not self.threshold_function(segment_mean, self.segmentation_method.optimal_threshold):
                         signal_segment = signal[prev_bkp:bkp] # define a segment between two breakpoints
                         label_segment = labels[prev_bkp:bkp]                    
                         label_filter_segment = {k:v[prev_bkp:bkp] for k,v in label_filters.items()}
                         
+                        if len(signal_segment) == 0:
+                            pass
                         anomalous_segment_indices.append((prev_bkp,bkp))
                         anomalous_segment_signal.append(signal_segment)
                         anomalous_segment_labels.append(label_segment)
@@ -1002,9 +1021,10 @@ class SequentialEnsemble(SaveableEnsemble):
             segments_to_anomaly_detector_indices = [segment for segment_list in segments_to_anomaly_detector_indices for segment in segment_list]
             label_filter_segments_to_anomaly_detector = [segment for segment_list in label_filter_segments_to_anomaly_detector for segment in segment_list]
             
-            #Prediction paths don't -need- to be set like this. Most importantly: AD calculation is always unique, as every input breakpoint set is assumed to be unique, so both dry_run and overwrite are manually set to True (possibly overwrite is not 100% needed)
-            AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path = os.path.join(base_scores_path, "Sequential_AD_part"), os.path.join(base_predictions_path, "Sequential_AD_part"), os.path.join(base_intermediates_path, "Sequential_AD_part")
-            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite=True, fit=fit, dry_run=True, verbose=verbose)
+            #Prediction paths don't -need- to be set like this. Most importantly: AD calculation is always unique, as every input breakpoint set is assumed to be unique
+            unique_segmenter_identifier_path = os.path.join(self.segmentation_method.method_name, self.segmentation_method.get_hyperparameter_hash())
+            AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path = os.path.join(base_scores_path, "Sequential_AD_part", unique_segmenter_identifier_path), os.path.join(base_predictions_path, "Sequential_AD_part",unique_segmenter_identifier_path), os.path.join(base_intermediates_path, "Sequential_AD_part", unique_segmenter_identifier_path)
+            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite=overwrite, fit=fit, dry_run=dry_run, verbose=verbose)
             
             #Recombine predictions of segmenter with predictions of AD method in order to get final predictions
             final_predictions = y_prediction_dfs_segmenter
