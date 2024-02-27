@@ -914,6 +914,7 @@ class SequentialEnsemble(SaveableEnsemble):
         self.method_hyperparameter_list = method_hyperparameter_dict_list
         self.cutoffs_per_method = cutoffs_per_method
         self.preprocessing_hash = preprocessing_hash
+        self.method_classes = [segmentation_method, anomaly_detection_method]
         
         self.segmentation_method = segmentation_method(base_models_path, preprocessing_hash, **method_hyperparameter_dict_list[0], used_cutoffs=cutoffs_per_method[0])
         
@@ -1058,7 +1059,7 @@ class SequentialEnsemble(SaveableEnsemble):
         
     def get_model_string(self):
         
-        model_string = (str(self.method_hyperparameter_list) + str(self.cutoffs_per_method)).encode("utf-8")
+        model_string = (str(self.method_classes) + str(self.method_hyperparameter_list) + str(self.cutoffs_per_method)).encode("utf-8")
         
         return model_string
     
@@ -1170,7 +1171,7 @@ class StackEnsemble(SaveableEnsemble):
     
     def get_model_string(self):
         
-        model_string = (str(self.method_hyperparameter_dicts)+ str(self.cutoffs_per_method)).encode("utf-8")
+        model_string = (str(self.method_classes) + str(self.method_hyperparameter_dicts)+ str(self.cutoffs_per_method)).encode("utf-8")
         
         return model_string
     
