@@ -517,8 +517,8 @@ def _data_to_score(signal, bkps, reference_point_value):
         
         segment_means.append(segment_mean)
         
-        # for all values in segment, set its score to th difference between the total mean and the mean of the segment its in
-        y_score[prev_bkp:bkp] = reference_point_value - segment_mean   
+        # for all values in segment, set its score to the difference between the segment mean and the ref point value
+        y_score[prev_bkp:bkp] = segment_mean - reference_point_value
         
         prev_bkp = bkp
     
