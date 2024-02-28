@@ -379,7 +379,8 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
         gs = GridSpec(5, 1, figure=fig)
     
     #Diff plot:    
-    bkps = model.get_breakpoints(X_df["diff"].values.reshape(-1,1))
+    signal = X_df["diff"].values.reshape(-1,1)
+    bkps = model.get_breakpoints(signal)
     
     ax1 = fig.add_subplot(gs[:4,:])
     plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1)
@@ -392,7 +393,7 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
         plt.ylabel("Difference vector", fontsize=25)
     
     # plot reference point and thresholds
-    ref_point_value = model.reference_point_value
+    ref_point_value = model.calculate_reference_point_value(signal, bkps, model.reference_point)
     plt.axhline(y=ref_point_value, color='orange', linestyle='-', linewidth=2, label = "Reference Point: " + model.reference_point)
     plt.axhline(y=ref_point_value + lower_threshold, color='black', linestyle='dashed', label = "threshold")
     plt.axhline(y=ref_point_value + upper_threshold, color='black', linestyle='dashed')
