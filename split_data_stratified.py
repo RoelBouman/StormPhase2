@@ -26,7 +26,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 #%%
 
-dry_run = False
+dry_run = True
 
 #%%
 
