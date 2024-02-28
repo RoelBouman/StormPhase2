@@ -613,6 +613,7 @@ class BinarySegmentationBreakpointCalculator():
         hyperparam_dict["quantiles"] = self.quantiles
         hyperparam_dict["scaling"] = self.scaling
         hyperparam_dict["penalty"] = self.penalty
+        hyperparam_dict["reference_point"] = self.reference_point
         hyperparam_dict["params"] = self.params
         model_string = str(hyperparam_dict).encode("utf-8")
         
