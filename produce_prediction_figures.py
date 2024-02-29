@@ -62,7 +62,11 @@ db_cursor = db_connection.cursor()
 
 #%% choose station IDs
 
-station_IDs = ["1","041"]
+# plot_station_IDs = ['041.csv', '087.csv', '091.csv', '24.csv', '043.csv', '090.csv', '23.csv', '97.csv', '042.csv', '089.csv', '17.csv', '96.csv']
+plot_station_IDs = ['043.csv']
+
+station_IDs = [station_ID.replace(".csv", "") for station_ID in plot_station_IDs]
+#station_IDs = ["1","041"]
 
 train_IDs = sorted(os.listdir(os.path.join(data_folder, "Train", "X")))
 test_IDs = sorted(os.listdir(os.path.join(data_folder, "Test", "X")))
@@ -83,7 +87,7 @@ station_dataset_dict.update(validation_ID_dict)
 #%% choose HP
 
 use_best_model = True
-method_name = "SingleThresholdBS"
+method_name = "DoubleThresholdBS"
 
 # if use_best_model is False, use these
 preprocessing_hyperparameters = {'lin_fit_quantiles': (10, 90), 'subsequent_nr': 5}
@@ -150,37 +154,34 @@ pred_df_dict = {}
 for dataset_name in all_dataset_names:
     base_predictions_path = os.path.join(predictions_folder, dataset_name)
     predictions_path = os.path.join(base_predictions_path, preprocessing_hash, model_name, hyperparameter_hash, str(all_cutoffs)+".pickle")
-        
     
     with open(predictions_path, 'rb') as handle:
         all_pred_dfs = pickle.load(handle)
-    
     temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_pred_dfs)}
     pred_df_dict.update(temp_dict)
     
     
-y_pred_dfs = []
 
-
-# scores_df_dict = {}
-# for dataset_name in all_dataset_names:
-#     base_scores_path = os.path.join(score_folder, station_dataset_dict[station_ID])
-#     scores_path = os.path.join(base_scores_path, preprocessing_hash, model.score_calculation_method_name, hyperparameter_hash,"scores.pickle")
+scores_df_dict = {}
+for dataset_name in all_dataset_names:
+    base_scores_path = os.path.join(score_folder, dataset_name)
+    scores_path = os.path.join(base_scores_path, preprocessing_hash, model.score_calculation_method_name, hyperparameter_hash,"scores.pickle")
         
     
-#     with open(scores_path, 'rb') as handle:
-#         all_scores_dfs = pickle.load(handle)
+    with open(scores_path, 'rb') as handle:
+        all_scores_dfs = pickle.load(handle)
     
-#     temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_scores_dfs)}
-#     scores_df_dict.update(temp_dict)
+    temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_scores_dfs)}
+    scores_df_dict.update(temp_dict)
     
     
 y_pred_dfs = []
-
+y_scores_dfs = []
 for station_ID in station_IDs:
     
     y_pred_dfs.append(pred_df_dict[station_ID])
+    y_scores_dfs.append(scores_df_dict[station_ID])
  
-#%% plot the predictions
 
+#%% plot the predictions
 plot_predictions(X_dfs, y_dfs, y_pred_dfs, station_IDs, model, show_IF_scores=True, show_TP_FP_FN=True, opacity_TP=0.6, pretty_plot=True, which_stations = range(0, len(station_IDs)))
