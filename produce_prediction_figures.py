@@ -14,11 +14,11 @@ import seaborn as sns
 from src.plot_functions import plot_predictions
 
 from src.methods import SingleThresholdStatisticalProcessControl
-#from src.methods import DoubleThresholdStatisticalProcessControl
+from src.methods import DoubleThresholdStatisticalProcessControl
 from src.methods import SingleThresholdIsolationForest
 
 from src.methods import SingleThresholdBinarySegmentation
-#from src.methods import DoubleThresholdBinarySegmentation
+from src.methods import DoubleThresholdBinarySegmentation
 
 from src.evaluation import f_beta
 
@@ -116,7 +116,8 @@ def score_function(precision, recall):
 
 #model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
 #model = SingleThresholdIsolationForest(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
-model = SingleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+# model = SingleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+model = DoubleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
 
 # get hash (if not using best model) for prediction loading
 hyperparameter_hash = model.get_hyperparameter_hash()
@@ -147,7 +148,7 @@ model_name = model.method_name
 
 pred_df_dict = {}
 for dataset_name in all_dataset_names:
-    base_predictions_path = os.path.join(predictions_folder, station_dataset_dict[station_ID])
+    base_predictions_path = os.path.join(predictions_folder, dataset_name)
     predictions_path = os.path.join(base_predictions_path, preprocessing_hash, model_name, hyperparameter_hash, str(all_cutoffs)+".pickle")
         
     
