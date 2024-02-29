@@ -23,7 +23,8 @@ from hashlib import sha256
 
 
 from src.plot_functions import plot_S_original, plot_BU_original, plot_predictions
-from src.io_functions import load_table, load_batch, load_dataframe_list
+from src.io_functions import load_table, load_batch, load_dataframe_list, load_metric
+from src.reporting_functions import bootstrap_stats_to_printable
 
 from src.methods import SingleThresholdStatisticalProcessControl
 from src.methods import DoubleThresholdStatisticalProcessControl
@@ -371,8 +372,54 @@ methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble
             }
 
+name_abbreviations = { 
+    "SingleThresholdIF": "ST-IF",
+    "SingleThresholdBS": "ST-BS",
+    "SingleThresholdSPC": "ST-SPC",
+    "DoubleThresholdBS": "DT-BS",
+    "DoubleThresholdSPC": "DT-SPC",
+    "Naive-SingleThresholdBS+SingleThresholdSPC": "Naive ST-BS+ST-SPC",
+    "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive DT-BS+DT-SPC",
+    "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive ST-BS+DT-SPC",
+    "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive DT-BS+ST-SPC",
+    "SingleThresholdBS+SingleThresholdSPC": "DOC ST-BS+ST-SPC",
+    "DoubleThresholdBS+DoubleThresholdSPC": "DOC DT-BS+DT-SPC",
+    "SingleThresholdBS+DoubleThresholdSPC": "DOC ST-BS+DT-SPC",
+    "DoubleThresholdBS+SingleThresholdSPC": "DOC DT-BS+ST-SPC",
+    "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq ST-BS+ST-SPC",
+    "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq DT-BS+DT-SPC",
+    "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq ST-BS+DT-SPC",
+    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq DT-BS+ST-SPC"
+}
+
+method_groups = { 
+    "SingleThresholdIF": "base",
+    "SingleThresholdBS": "base",
+    "SingleThresholdSPC": "base",
+    "DoubleThresholdBS": "base",
+    "DoubleThresholdSPC": "base",
+    "Naive-SingleThresholdBS+SingleThresholdSPC": "Naive",
+    "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive",
+    "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive",
+    "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive",
+    "SingleThresholdBS+SingleThresholdSPC": "DOC",
+    "DoubleThresholdBS+DoubleThresholdSPC": "DOC",
+    "SingleThresholdBS+DoubleThresholdSPC": "DOC",
+    "DoubleThresholdBS+SingleThresholdSPC": "DOC",
+    "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq",
+    "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq",
+    "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq",
+    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq"
+}
+
 best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
+
+PRF_mean_table_per_method = {}
+PRF_std_table_per_method = {}
+avg_fbeta_mean_per_method = {}
+avg_fbeta_std_per_method = {}
+
 for method_name in methods:
     
     #find best preprocessing and method hyperparameters:
@@ -387,12 +434,34 @@ for method_name in methods:
 """, (method_name, "Validation", method_name))
 
     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
-    print(hyperparameter_hash)
+
     best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle, keys=True)
     best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle, keys=True)
 
-    model_name = model.method_name
-    PRF_mean_table_path = os.path.join(metric_folder, "PRF_mean_table", which_split, model_name, preprocessing_hash)
-    PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, model_name, preprocessing_hash)
-    avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, model_name, preprocessing_hash)
-    avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, model_name, preprocessing_hash)
+    PRF_mean_table_path = os.path.join(metric_folder, "PRF_mean_table", which_split, method_name, preprocessing_hash)
+    PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, method_name, preprocessing_hash)
+    avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, method_name, preprocessing_hash)
+    avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, method_name, preprocessing_hash)
+    
+    PRF_mean_table_per_method[method_name] = load_table(PRF_mean_table_path, hyperparameter_hash)
+    PRF_std_table_per_method[method_name] = load_table(PRF_std_table_path, hyperparameter_hash)
+    avg_fbeta_mean_per_method[method_name] = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
+    avg_fbeta_std_per_method[method_name] = load_metric(avg_fbeta_std_path, hyperparameter_hash)
+    
+bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(method_groups)], axis=1)
+bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class"]
+
+bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=bootstrapped_Fscore, x=bootstrapped_Fscore.index, y=bootstrapped_Fscore['F1.5 average'], hue="Method class")
+plt.errorbar(x=bootstrapped_Fscore.index, y=bootstrapped_Fscore['F1.5 average'], yerr=bootstrapped_Fscore["F1.5 stdev"], fmt="none", c="k", capsize=5)
+plt.xticks(rotation=90)
+
+# Adding labels and title
+plt.xlabel('Method')
+plt.ylabel('F1.5 Score (Average)')
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "bootstrap_results.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "bootstrap_results.png"), format="png")
+plt.show()
