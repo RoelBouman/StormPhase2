@@ -19,7 +19,6 @@ result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
 
 preprocessed_folder = "preprocessed_data_csvs"
-preprocessing_type = "basic"
 
 preprocessing_hyperparameters =  {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [False]}
 
@@ -27,8 +26,10 @@ preprocessing_hyperparameter_string = str(list(ParameterGrid(preprocessing_hyper
 
 preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
 
-#%% define runtime variables
-plot_station_IDs = ['041', '042', '043', '086', '087', '089', '090', '091', '092', '17', '23', '24', '96', '97']
+#%% define runtime 
+#plot_station_IDs = ['041.csv', '087.csv', '091.csv', '24.csv', "090.csv", '043.csv', '23.csv', '97.csv', '042.csv', '089.csv', '17.csv', '96.csv']
+#plot_station_IDs = [station_ID.replace(".csv", "") for station_ID in plot_station_IDs]
+plot_station_IDs = ["090"]
 n_xlabels = 10
 
 
