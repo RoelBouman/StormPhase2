@@ -19,14 +19,18 @@ raw_data_folder = "raw_data"
 processed_data_folder = "data"
 
 
+
 dataset = "OS_data" #alternatively: route_data
 intermediates_folder = os.path.join(raw_data_folder, dataset+"_preprocessed")
+table_folder = os.path.join("Tables", dataset)
 
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 #%%
 
 dry_run = True
+
+make_table = True
 
 #%%
 
@@ -154,7 +158,7 @@ stations_in_category_with_events_index = remaining_normalized_lengths_df.index
 stations_in_category_with_events = pd.Series(np.ones(len(stations_in_category_with_events_index)), index=stations_in_category_with_events_index)
 
 counts = np.array([len(all_train_stations), len(all_val_stations), len(all_test_stations)])
-(train_stations, test_stations, val_stations) = split_series(stations_in_category_with_events, counts)
+(train_stations, val_stations, test_stations) = split_series(stations_in_category_with_events, counts)
 all_train_stations  += list(train_stations)
 all_val_stations += list(val_stations)
 all_test_stations += list(test_stations)
@@ -165,6 +169,20 @@ print("Events in Train, Val, Test:")
 for stations in (all_train_stations, all_val_stations, all_test_stations):
     print(normalized_lengths_df.loc[stations].sum())
     
+    
+#%% Make table of event length distribution per split:
+event_length_distribution_table = pd.DataFrame(dtype=np.int32)
+if make_table:
+    for stations, split_name in zip((all_train_stations, all_val_stations, all_test_stations), ("Train", "Validation", "Test")):
+        event_length_distribution_table[split_name] = normalized_lengths_df.loc[stations].sum()
+        
+    event_length_distribution_table = event_length_distribution_table.transpose()
+    
+    cutoff_replacement_dict = {"(0, 24)":"1-24", "(24, 288)":"25-288","(288, 4032)":"288-4032", "(4032, inf)":"4033 and longer"}
+    
+    event_length_distribution_table.rename(columns=cutoff_replacement_dict, inplace=True)
+    
+    event_length_distribution_table.applymap("{0:.0f}".format).to_latex(buf=os.path.join(table_folder, "event_length_distribution_table.tex"), escape=False, multirow=True)
 #%% Save data to folder based on calculated split:
     
 if not dry_run:
