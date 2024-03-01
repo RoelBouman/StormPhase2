@@ -934,7 +934,7 @@ class SequentialEnsemble(SaveableEnsemble):
             
         super().__init__(base_models_path, preprocessing_hash)
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False, save_results=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -946,7 +946,7 @@ class SequentialEnsemble(SaveableEnsemble):
         scores_folder = os.path.join(base_scores_path, model_name, hyperparameter_hash)
         predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
         
-        if not dry_run:
+        if not dry_run and save_results:
             os.makedirs(scores_folder, exist_ok=True)
             os.makedirs(predictions_folder, exist_ok=True)
         
@@ -1044,18 +1044,19 @@ class SequentialEnsemble(SaveableEnsemble):
             final_scores = [pd.concat([segmenter_score.squeeze(), ad_score.squeeze()], axis=1, keys=[self.segmentation_method.method_name, self.anomaly_detection_method.method_name]) for segmenter_score, ad_score in zip(y_scores_dfs_segmenter, final_ad_scores)]        #Scores should be list of matrices/dfs, with each column indicating the method used for production of said scores
             
             if not dry_run:
-                with open(scores_path, 'wb') as handle:
-                    pickle.dump(final_scores, handle)
-                with open(predictions_path, 'wb') as handle:
-                    pickle.dump(final_predictions, handle)
+                if save_results:
+                    with open(scores_path, 'wb') as handle:
+                        pickle.dump(final_scores, handle)
+                    with open(predictions_path, 'wb') as handle:
+                        pickle.dump(final_predictions, handle)
                 self.save_model()
             
         return final_scores, final_predictions
         
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False, save_results=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose, save_results=save_results)
         
     def get_model_string(self):
         
@@ -1102,7 +1103,7 @@ class StackEnsemble(SaveableEnsemble):
         super().__init__(base_models_path, preprocessing_hash)
 
 
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite=False, fit=True, dry_run=False, verbose=False, save_results=False):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -1114,7 +1115,7 @@ class StackEnsemble(SaveableEnsemble):
         scores_folder = os.path.join(base_scores_path, model_name, hyperparameter_hash)
         predictions_folder = os.path.join(base_predictions_path, model_name, hyperparameter_hash)
         
-        if not dry_run:
+        if not dry_run and save_results:
             os.makedirs(scores_folder, exist_ok=True)
             os.makedirs(predictions_folder, exist_ok=True)
         
@@ -1147,17 +1148,18 @@ class StackEnsemble(SaveableEnsemble):
     
             
             if not dry_run:
-                with open(scores_path, 'wb') as handle:
-                    pickle.dump(scores, handle)
-                with open(predictions_path, 'wb') as handle:
-                    pickle.dump(predictions, handle)
+                if save_results:
+                    with open(scores_path, 'wb') as handle:
+                        pickle.dump(scores, handle)
+                    with open(predictions_path, 'wb') as handle:
+                        pickle.dump(predictions, handle)
                 self.save_model()
             
         return scores, predictions
     
-    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False):
+    def transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, verbose=False, save_results=False):
         
-        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose)
+        return self.fit_transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=False, verbose=verbose, save_results=save_results)
         
     def _combine_predictions(self, prediction_list):
         combined_predictions = []
