@@ -63,7 +63,8 @@ dry_run = False
 
 verbose = False
 
-model_test_run = True #Only run 1 hyperparameter setting per model type if True
+model_test_run = False #Only run 1 hyperparameter setting per model type if True
+
 
 #%% set up database
 
@@ -91,7 +92,7 @@ SingleThresholdIF_hyperparameters_no_scaling = [{"n_estimators": [1000],
                                                  "scaling":[False], 
                                                  "score_function_kwargs":[{"beta":beta}]}]
 
-SingleThresholdIF_hyperparameters_scaling = [{"n_estimators": [10000], 
+SingleThresholdIF_hyperparameters_scaling = [{"n_estimators": [1000], 
                                               "forest_per_station":[False], 
                                               "scaling":[True], 
                                               "quantiles":[(10,90), (15, 85), (20,80)], 
@@ -111,7 +112,7 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0
                                      "quantiles": [(10,90), (15, 85), (20,80)], 
                                      "scaling": [True], 
                                      "penalty": ['L1'], 
-                                     "reference_point":["mean", "median", "longest_median", "longest_mean"], 
+                                     "reference_point":["mean", "median", "longest_median", "longest_mean"],
                                      "score_function_kwargs":[{"beta":beta}]}
 
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
@@ -151,8 +152,10 @@ Naive_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["method_classes"] = [
 
 Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters = {"segmentation_method":[SingleThresholdBinarySegmentation], 
                                                                    "anomaly_detection_method":[SingleThresholdStatisticalProcessControl], 
-                                                                   "method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters))[2],
-                                                                                                       list(ParameterGrid(SingleThresholdSPC_hyperparameters))[0]]], 
+                                                                   #"method_hyperparameter_dict_list":[[list(ParameterGrid(SingleThresholdBS_hyperparameters)),
+                                                                  #                                     list(ParameterGrid(SingleThresholdSPC_hyperparameters))]], 
+                                                                   "method_hyperparameter_dict_list":ensemble_method_hyperparameter_dict_list, 
+
                                                                    "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
 Sequential_DoubleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
@@ -166,7 +169,6 @@ Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters = Sequential_Sin
 Sequential_SingleThresholdBS_DoubleThresholdSPC_hyperparameters["anomaly_detection_method"] = [DoubleThresholdStatisticalProcessControl]
 #%% define methods:
 
-
 methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             "SingleThresholdBS":SingleThresholdBinarySegmentation, 
             "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
@@ -178,7 +180,7 @@ methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
             "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
             "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
-            # 
+            
             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
             "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
@@ -413,7 +415,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
 # Preprocess Test data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
-
 which_split = "Test"
 print("-----------------------------------------------")
 print("Split: Test")
