@@ -326,7 +326,7 @@ class StatisticalProcessControl(ScoreCalculator):
         self.quantiles = quantiles
         self.used_cutoffs = used_cutoffs
     
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False, save_predictions=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -384,8 +384,9 @@ class StatisticalProcessControl(ScoreCalculator):
             y_prediction_dfs = self.predict_from_scores_dfs(y_scores_dfs)
             
             if not dry_run:
-                with open(predictions_path, 'wb') as handle:
-                    pickle.dump(y_prediction_dfs, handle)
+                if save_predictions:
+                    with open(predictions_path, 'wb') as handle:
+                        pickle.dump(y_prediction_dfs, handle)
                 if fit:
                     self.save_model()
                     
@@ -418,7 +419,7 @@ class IsolationForest(ScoreCalculator):
         # define IsolationForest model
         self.model = IF(**params)
         
-    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False):
+    def fit_transform_predict(self, X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path, base_predictions_path, base_intermediates_path, overwrite, fit=True, dry_run=False, verbose=False, save_predictions=True):
         #X_dfs needs at least "diff" column
         #y_dfs needs at least "label" column
         
@@ -470,8 +471,9 @@ class IsolationForest(ScoreCalculator):
             if not dry_run:
                 with open(scores_path, 'wb') as handle:
                     pickle.dump(y_scores_dfs, handle)
-                with open(predictions_path, 'wb') as handle:
-                    pickle.dump(y_prediction_dfs, handle)
+                if save_predictions:
+                    with open(predictions_path, 'wb') as handle:
+                        pickle.dump(y_prediction_dfs, handle)
                 if fit:
                     self.save_model()
         
@@ -1025,7 +1027,7 @@ class SequentialEnsemble(SaveableEnsemble):
             #Prediction paths don't -need- to be set like this. Most importantly: AD calculation is always unique, as every input breakpoint set is assumed to be unique
             unique_segmenter_identifier_path = os.path.join(self.segmentation_method.method_name, self.segmentation_method.get_hyperparameter_hash())
             AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path = os.path.join(base_scores_path, "Sequential_AD_part", unique_segmenter_identifier_path), os.path.join(base_predictions_path, "Sequential_AD_part",unique_segmenter_identifier_path), os.path.join(base_intermediates_path, "Sequential_AD_part", unique_segmenter_identifier_path)
-            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite=overwrite, fit=fit, dry_run=dry_run, verbose=verbose)
+            ad_scores, ad_predictions = self.anomaly_detection_method.fit_transform_predict(signal_segments_to_anomaly_detector, label_segments_to_anomaly_detector, label_filter_segments_to_anomaly_detector, AD_base_scores_path, AD_base_predictions_path, AD_base_intermediates_path, overwrite=overwrite, fit=fit, dry_run=dry_run, verbose=verbose, save_predictions=False)
             
             #Recombine predictions of segmenter with predictions of AD method in order to get final predictions
             final_predictions = y_prediction_dfs_segmenter
