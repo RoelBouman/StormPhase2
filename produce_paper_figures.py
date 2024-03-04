@@ -196,8 +196,6 @@ db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_res
 hyperparameters = jsonpickle.loads(db_result)
 
 
-# plt.rcParams['text.usetex'] = True
-
 from src.evaluation import f_beta
 from src.methods import SingleThresholdStatisticalProcessControl
 beta = 1.5
@@ -230,120 +228,7 @@ plt.savefig(os.path.join(figure_folder, "threshold_optimization.pdf"), format="p
 plt.savefig(os.path.join(figure_folder, "threshold_optimization.png"), format="png")
 plt.show()
 
-# plt.rcParams['text.usetex'] = False
-#%% summarize results on test set for each method
-#show for each method:
-    # validation average F1.5
-    # validation F1.5 for each cutoff/category
-    # validation average ROC/AUC (optional?)
-    # best preprocessing hyperparameters (optional?)
-    # best hyperparameters (optional?)
 
-# #TODO: Technically, we shouldn't select MAX(metric) from Validation, but those hashes where MAX(metric) in Test (if we do 1 run over all hyperparameters, this is moot, but if we keep updating this might spell trouble)
-# validation_results = db_cursor.execute("SELECT method, preprocessing_hyperparameters, method_hyperparameters, MAX(metric), preprocessing_hash, hyperparameter_hash FROM experiment_results WHERE which_split='Test' GROUP BY method").fetchall()
-# validation_results_and_metadata_df = pd.DataFrame(validation_results)
-# validation_results_and_metadata_df.columns = ["Method", "Preprocessing Hyperparameters", "Method Hyperparameters", "Average F1.5", "preprocessing_hash", "hyperparameter_hash"]
-# best_hyperparameter_df = validation_results_and_metadata_df.iloc[:,:3]
-# best_hyperparameter_df.set_index("Method", inplace=True)
-
-# for i in range(best_hyperparameter_df.shape[0]):
-#     #Treat ensembles differently:
-    
-#     hyperparameters = jsonpickle.loads(best_hyperparameter_df["Method Hyperparameters"].iloc[i])
-#     if "method_classes" in hyperparameters: #if dict has method_classes, the method is an ensemble method
-#         method_dict = hyperparameters
-#         hyperparameter_strings = []
-#         for method, hyperparameters in zip(method_dict["method_classes"], method_dict["method_hyperparameter_dict_list"]):
-#             method_name = method("temp","temp").method_name
-#             hyperparameter_strings.append(method_name + ":" + str(hyperparameters))
-#         best_hyperparameter_df["Method Hyperparameters"].iloc[i] = "\n".join(hyperparameter_strings)
-#     else:
-#         hyperparameters.pop("used_cutoffs", None)
-#         best_hyperparameter_df["Method Hyperparameters"].iloc[i] = str(hyperparameters)
-#     preprocessing_hyperparameters = jsonpickle.loads(best_hyperparameter_df["Preprocessing Hyperparameters"].iloc[i])
-#     best_hyperparameter_df["Preprocessing Hyperparameters"].iloc[i] = str(preprocessing_hyperparameters)
-    
-# with pd.option_context("display.max_colwidth", None):
-#     best_hyperparameter_df.to_latex(buf=os.path.join(table_folder, "best_hyperparameters.tex"), multirow=True)
-
-# #extended results:
-# full_validation_results = []
-# for i, row in validation_results_and_metadata_df.iterrows():
-#     #load PRFAUC table:
-#     method_name = row["Method"]
-#     preprocessing_hash = row["preprocessing_hash"]
-#     hyperparameter_hash = row["hyperparameter_hash"]
-#     PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", "Validation", method_name, preprocessing_hash)
-#     PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
-#     PRFAUC_table.loc["Average", :] = PRFAUC_table.mean()
-    
-#     index = [PRFAUC_table.index, [method_name]]
-#     index = pd.MultiIndex.from_product([[method_name], PRFAUC_table.index], names=["Method", "Length category"])
-    
-#     PRFAUC_table.index = index
-    
-#     full_validation_results.append(PRFAUC_table)
-#     #df_entry = 
-# full_validation_results_df = pd.concat(full_validation_results).round(3)
-# full_validation_results_df.rename(cutoff_replacement_dict, inplace=True)
-# full_validation_results_df.rename(columns={"precision":"Precision", "recall":"Recall","ROC/AUC":"AUC"}, inplace=True)
-
-
-# full_validation_results_df.to_latex(buf=os.path.join(table_folder, "full_validation_results.tex"), multirow=True)
-
-#%% Visualize/tabularize segmentation results of different methods
-# methods = {"SingleThresholdSPC":SingleThresholdStatisticalProcessControl, "SingleThresholdIF":SingleThresholdIsolationForest}
-
-# preprocessing_overwrite=False 
-# write_csv_intermediates=False
-
-# which_split = "Validation"
-# print("Split: Validation")
-# X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
-# val_file_names = X_val_files
-
-# best_hyperparameters = {}
-# best_preprocessing_hyperparameters = {}
-# for method_name in methods:
-#     print("Now plotting: " + method_name)
-#     #find best preprocessing and method hyperparameters:
-
-#     #Some SQL query:
-    
-#     best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Test"))
-    
-#     (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
-    
-#     best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle)
-#     best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle)
-
-#     preprocessing_hyperparameters = best_preprocessing_hyperparameters[method_name]
-#     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
-#     preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
-    
-#     X_dfs_preprocessed, y_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths = preprocess_per_batch_and_write(X_val_dfs, y_val_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, val_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash)
-
- 
-#     hyperparameters = best_hyperparameters[method_name] 
-#     hyperparameter_string = str(hyperparameters)
-    
-#     model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters, score_function=score_function)
-#     model_name = model.method_name
-#     hyperparameter_hash = model.get_hyperparameter_hash()
-#     hyperparameter_hash_filename = model.get_filename()
-    
-#     base_scores_path = os.path.join(score_folder, which_split)
-#     base_predictions_path = os.path.join(predictions_folder, which_split)
-#     scores_path = os.path.join(base_scores_path, model_name, preprocessing_hash, hyperparameter_hash)
-#     predictions_path = os.path.join(base_predictions_path, model_name, preprocessing_hash, hyperparameter_hash)
-    
-#     y_pred_dfs, _ = load_dataframe_list(predictions_path)
-#     y_score_dfs, _ = load_dataframe_list(scores_path)
- 
-#     plt.figure()
-#     plot_predictions(X_dfs_preprocessed, y_pred_dfs, val_file_names, model, pretty_plot=True, n_stations=1)
-#     plt.savefig(os.path.join(figure_folder, method_name+"_predictions.pdf"), format="pdf")
-#     plt.savefig(os.path.join(figure_folder, method_name+"_predictions.png"), format="png")
 
 #%% Bar plot of bootstrapping results on test:
 
@@ -393,23 +278,23 @@ name_abbreviations = {
 }
 
 method_groups = { 
-    "SingleThresholdIF": "base",
-    "SingleThresholdBS": "base",
-    "SingleThresholdSPC": "base",
-    "DoubleThresholdBS": "base",
-    "DoubleThresholdSPC": "base",
-    "Naive-SingleThresholdBS+SingleThresholdSPC": "Naive",
-    "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive",
-    "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive",
-    "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive",
-    "SingleThresholdBS+SingleThresholdSPC": "DOC",
-    "DoubleThresholdBS+DoubleThresholdSPC": "DOC",
-    "SingleThresholdBS+DoubleThresholdSPC": "DOC",
-    "DoubleThresholdBS+SingleThresholdSPC": "DOC",
-    "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq",
-    "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq",
-    "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq",
-    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq"
+    "SingleThresholdIF": "IF",
+    "SingleThresholdBS": "BS",
+    "SingleThresholdSPC": "SPC",
+    "DoubleThresholdBS": "BS",
+    "DoubleThresholdSPC": "SPC",
+    "Naive-SingleThresholdBS+SingleThresholdSPC": "Naive BS+SPC",
+    "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive BS+SPC",
+    "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive BS+SPC",
+    "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive BS+SPC",
+    "SingleThresholdBS+SingleThresholdSPC": "DOC BS+SPC",
+    "DoubleThresholdBS+DoubleThresholdSPC": "DOC BS+SPC",
+    "SingleThresholdBS+DoubleThresholdSPC": "DOC BS+SPC",
+    "DoubleThresholdBS+SingleThresholdSPC": "DOC BS+SPC",
+    "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq BS+SPC",
+    "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
+    "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
+    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq BS+SPC"
 }
 
 best_hyperparameters = {}
@@ -419,6 +304,8 @@ PRF_mean_table_per_method = {}
 PRF_std_table_per_method = {}
 avg_fbeta_mean_per_method = {}
 avg_fbeta_std_per_method = {}
+
+validation_fbeta_per_method = {}
 
 for method_name in methods:
     
@@ -433,7 +320,7 @@ for method_name in methods:
     ) AND e.method = (?)
 """, (method_name, "Validation", method_name))
 
-    (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, _) = next(best_model_entry)
+    (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, validation_metric) = next(best_model_entry)
 
     best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle, keys=True)
     best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle, keys=True)
@@ -448,14 +335,25 @@ for method_name in methods:
     avg_fbeta_mean_per_method[method_name] = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
     avg_fbeta_std_per_method[method_name] = load_metric(avg_fbeta_std_path, hyperparameter_hash)
     
-bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(method_groups)], axis=1)
-bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class"]
+    validation_fbeta_per_method[method_name] = validation_metric
+    
+#Make plot of average F score
+ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
+category_names = {method_name:"Average" for method_name in methods}
+bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
 
 bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
 
+bootstrapped_Fscore = bootstrapped_Fscore.dropna(subset=['Validation F1.5'])
+idx_max = bootstrapped_Fscore.groupby('Method class')['Validation F1.5'].idxmax()
+# Select the rows with the maximal 'Validation F1.5' for each 'Method class'
+average_max_rows = bootstrapped_Fscore.loc[idx_max]
+average_max_rows.sort_values(by="Ordering", inplace=True)
+
 plt.figure(figsize=(10,6))
-sns.barplot(data=bootstrapped_Fscore, x=bootstrapped_Fscore.index, y=bootstrapped_Fscore['F1.5 average'], hue="Method class")
-plt.errorbar(x=bootstrapped_Fscore.index, y=bootstrapped_Fscore['F1.5 average'], yerr=bootstrapped_Fscore["F1.5 stdev"], fmt="none", c="k", capsize=5)
+sns.barplot(data=average_max_rows, x=average_max_rows["Method class"], y=average_max_rows['F1.5 average'], hue="Method class", legend=False)
+plt.errorbar(x=average_max_rows["Method class"], y=average_max_rows['F1.5 average'], yerr=average_max_rows["F1.5 stdev"], fmt="none", c="k", capsize=20)
 plt.xticks(rotation=90)
 
 # Adding labels and title
@@ -464,4 +362,53 @@ plt.ylabel('F1.5 Score (Average)')
 plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "bootstrap_results.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "bootstrap_results.png"), format="png")
+plt.show()
+
+#Make plot of F score per category:
+#%%
+base_plot_df = pd.DataFrame()
+for cutoffs in all_cutoffs:
+    category = str(cutoffs)
+    fbetas = {method_name:PRF_mean_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
+    fbeta_stds = {method_name:PRF_std_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
+    category_names = {method_name:category for method_name in methods}
+    ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
+    bootstrapped_Fscore = pd.concat([pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+    bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+    
+    bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
+    
+    bootstrapped_Fscore = bootstrapped_Fscore.dropna(subset=['Validation F1.5'])
+    idx_max = bootstrapped_Fscore.groupby('Method class')['Validation F1.5'].idxmax()
+    # Select the rows with the maximal 'Validation F1.5' for each 'Method class'
+    max_rows = bootstrapped_Fscore.loc[idx_max]
+    max_rows.sort_values(by="Ordering", inplace=True)
+
+    base_plot_df = pd.concat([base_plot_df, max_rows])
+base_plot_df = pd.concat([base_plot_df, average_max_rows])
+
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['F1.5 average'], hue="Length category")
+
+ax = plt.gca()
+bars = ax.patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+
+plt.errorbar(x=bar_centers[:len(base_plot_df['F1.5 average'])], y=base_plot_df['F1.5 average'], yerr=base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
+
+
+plt.xticks(rotation=90)
+
+# Adding labels and title
+plt.xlabel('Method')
+plt.ylabel('F1.5 Score (Average)')
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.png"), format="png")
+ax = plt.gca()
+xticks = ax.get_xticks()
+
 plt.show()
