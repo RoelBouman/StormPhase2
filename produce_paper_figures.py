@@ -69,7 +69,7 @@ all_dataset_names = [train_name, validation_name, test_name]
 
 #%% connect to database
 
-DBFILE = dataset+"_experiment_results.db"
+DBFILE = dataset+"_experiment_results_copy.db" #TODO: remove _copy part
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
