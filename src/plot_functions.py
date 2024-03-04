@@ -331,7 +331,6 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     plt.xlabel("Date", fontsize=25)
     
     fig.tight_layout()
-    plt.show()
     
 def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
@@ -428,7 +427,6 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     plt.xlabel("Date", fontsize=25)
     
     fig.tight_layout()
-    plt.show()
 
 
 def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
@@ -527,7 +525,6 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_sco
     plt.xlabel("Date", fontsize=25)
     
     fig.tight_layout()
-    plt.show()
     
 def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_IF_scores = True, show_TP_FP_FN = True, opacity_TP = 0.3, pretty_plot = False, which_stations = None, n_stations = 3):
     """
@@ -566,40 +563,48 @@ def plot_predictions(X_dfs, y_dfs, predictions, dfs_files, model, show_IF_scores
     for station in which_stations:
         X_df = X_dfs[station]
         y_df = y_dfs[station]
-        preds = predictions[station]
+        y_pred_df = predictions[station]
         file = dfs_files[station]
         
-        # find model used
-        match model.method_name:
-            
-            case "SingleThresholdSPC" :
-                threshold = model.optimal_threshold
-                scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, y_df, preds, threshold, file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
-            
-            case "DoubleThresholdSPC" :
-                threshold = model.optimal_threshold
-                scaled_df = scale_diff_data(X_df, model.quantiles)
-                plot_SP(scaled_df, y_df, preds, threshold, file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+        plot_single_prediction(X_df, y_df, y_pred_df, file, model, show_IF_scores = show_IF_scores, show_TP_FP_FN = show_TP_FP_FN, opacity_TP = opacity_TP, pretty_plot = pretty_plot)
+        plt.show()
         
-            case "SingleThresholdBS" :
-                threshold = model.optimal_threshold
-                if model.scaling:
-                    X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+        
+def plot_single_prediction(X_df, y_df, y_pred_df, df_file, model, show_IF_scores = True, show_TP_FP_FN = True, opacity_TP = 0.3, pretty_plot = False):
+
+    
+    # find model used
+    match model.method_name:
+        
+        case "SingleThresholdSPC" :
+            threshold = model.optimal_threshold
+            scaled_df = scale_diff_data(X_df, model.quantiles)
+            plot_SP(scaled_df, y_df, y_pred_df, threshold, df_file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+        
+        case "DoubleThresholdSPC" :
+            threshold = model.optimal_threshold
+            scaled_df = scale_diff_data(X_df, model.quantiles)
+            plot_SP(scaled_df, y_df, y_pred_df, threshold, df_file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+    
+        case "SingleThresholdBS" :
+            threshold = model.optimal_threshold
+            if model.scaling:
+                X_df = scale_diff_data(X_df, model.quantiles)
+            plot_BS(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+        
+        case "DoubleThresholdBS" :
+            threshold = model.optimal_threshold
+            if model.scaling:
+                X_df = scale_diff_data(X_df, model.quantiles)
+            plot_BS(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+        
+        case "SingleThresholdIF" :
+            threshold = model.optimal_threshold
+            if model.scaling:
+                X_df = scale_diff_data(X_df, model.quantiles)
+            plot_IF(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
             
-            case "DoubleThresholdBS" :
-                threshold = model.optimal_threshold
-                if model.scaling:
-                    X_df = scale_diff_data(X_df, model.quantiles)
-                plot_BS(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
-            
-            case "SingleThresholdIF" :
-                threshold = model.optimal_threshold
-                if model.scaling:
-                    X_df = scale_diff_data(X_df, model.quantiles)
-                plot_IF(X_df, y_df, preds, threshold, file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
-                
+
 def scale_diff_data(df, quantiles):
     """
     Scale the "diff" column of a dataframe and return a changed copy
