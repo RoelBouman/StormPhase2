@@ -371,7 +371,7 @@ for cutoffs in all_cutoffs:
     category = str(cutoffs)
     fbetas = {method_name:PRF_mean_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
     fbeta_stds = {method_name:PRF_std_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
-    category_names = {method_name:category for method_name in methods}
+    category_names = {method_name:cutoff_replacement_dict[category] for method_name in methods}
     ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
     bootstrapped_Fscore = pd.concat([pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
     bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
@@ -396,7 +396,7 @@ bars = ax.patches
 
 # Calculate the x-values of the center of each bar
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
-
+#Only get the first X bar centers, after that are dummy values
 plt.errorbar(x=bar_centers[:len(base_plot_df['F1.5 average'])], y=base_plot_df['F1.5 average'], yerr=base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
 
 
@@ -408,7 +408,5 @@ plt.ylabel('F1.5 Score (Average)')
 plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.png"), format="png")
-ax = plt.gca()
-xticks = ax.get_xticks()
 
 plt.show()
