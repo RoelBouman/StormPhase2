@@ -27,14 +27,85 @@ from src.methods import DoubleThresholdBinarySegmentation
 # from src.methods import NaiveStackEnsemble
 from src.methods import SequentialEnsemble
 
+
+from src.preprocess import preprocess_per_batch_and_write
+
 from src.evaluation import f_beta
 
 sns.set()
 
 #%% Define user parameters:
 # choose station IDs per method:
-station_IDs_per_method = {"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
+# station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
+#                           #"SingleThresholdSPC":["17.csv"],
+#                           "Sequential-SingleThresholdBS+SingleThresholdSPC":["17.csv"],
+#                           }
+
+station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
+                          #"SingleThresholdSPC":["17.csv"],
+                          "Sequential-SingleThresholdBS+SingleThresholdSPC":['0.csv',
+                           '001.csv',
+                           '004.csv',
+                           '007.csv',
+                           '010.csv',
+                           '014.csv',
+                           '018.csv',
+                           '028.csv',
+                           '031.csv',
+                           '036.csv',
+                           '039.csv',
+                           '042.csv',
+                           '044.csv',
+                           '048.csv',
+                           '052.csv',
+                           '057.csv',
+                           '060.csv',
+                           '064.csv',
+                           '067.csv',
+                           '068.csv',
+                           '070.csv',
+                           '076.csv',
+                           '078.csv',
+                           '079.csv',
+                           '082.csv',
+                           '086.csv',
+                           '089.csv',
+                           '092.csv',
+                           '10.csv',
+                           '14.csv',
+                           '17.csv',
+                           '18.csv',
+                           '21.csv',
+                           '27.csv',
+                           '29.csv',
+                           '34.csv',
+                           '4.csv',
+                           '44.csv',
+                           '49.csv',
+                           '53.csv',
+                           '56.csv',
+                           '58.csv',
+                           '59.csv',
+                           '60.csv',
+                           '61.csv',
+                           '65.csv',
+                           '71.csv',
+                           '75.csv',
+                           '77.csv',
+                           '80.csv',
+                           '82.csv',
+                           '85.csv',
+                           '86.csv',
+                           '87.csv',
+                           '90.csv',
+                           '92.csv',
+                           '95.csv',
+                           '96.csv',
+                           '98.csv',
+                           '99.csv'],
                           }
+
+
 #%% Data loading
 
 dataset = "OS_data" #alternatively: route_data
@@ -53,7 +124,8 @@ score_folder = os.path.join(result_folder, "scores")
 predictions_folder = os.path.join(result_folder, "predictions")
 metric_folder = os.path.join(result_folder, "metrics")
 
-preprocessed_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs")
+preprocessed_X_folder = os.path.join(intermediates_folder, "preprocessed_data_csvs")
+label_filter_folder = os.path.join(intermediates_folder, "label_filters_per_cutoff_csvs")
 
 train_name = "Train"
 test_name = "Test"
@@ -74,8 +146,6 @@ db_cursor = db_connection.cursor()
 #%% Set other plotting parameters
 
 beta = 1.5
-def score_function(precision, recall):
-    return f_beta(precision, recall, beta)
 
 model_dict = {  "SingleThresholdIF":SingleThresholdIsolationForest,
                 "SingleThresholdBS":SingleThresholdBinarySegmentation, 
@@ -84,26 +154,12 @@ model_dict = {  "SingleThresholdIF":SingleThresholdIsolationForest,
                 "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
                 "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
                 
-                # "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-                # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-                # "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-                # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
-                
-                # "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-                # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-                # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-                # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
                 
                 "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
                 "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
                 "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
                 "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
                 
-                # "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
-                # "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
-                    
-                # "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
-                # "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
                 
                 "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
                 "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
@@ -138,20 +194,35 @@ for method_name in station_IDs_per_method:
     # use your own hyperparameters
     # use best model hyperparameters
     
-    best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
-    (preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
+    # best_model_entry = db_cursor.execute("SELECT e.* FROM experiment_results e WHERE e.metric = (SELECT MAX(metric)FROM experiment_results WHERE method = (?) AND which_split = (?))", (method_name, "Validation"))
+    # (preprocessing_hash, hyperparameter_hash, _, _, _, _, _) = next(best_model_entry)
     
-    db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
-    model_hyperparameters = jsonpickle.loads(db_result)
+    # db_result = db_cursor.execute("SELECT method_hyperparameters FROM experiment_results WHERE preprocessing_hash='{}' AND hyperparameter_hash='{}'".format(preprocessing_hash, hyperparameter_hash)).fetchone()[0]
+    # model_hyperparameters = jsonpickle.loads(db_result)
     
+    best_model_entry = db_cursor.execute("""
+    SELECT e.* 
+    FROM experiment_results e 
+    WHERE e.metric = (
+        SELECT MAX(metric)
+        FROM experiment_results
+        WHERE method = (?) AND which_split = (?)
+    ) AND e.method = (?)
+""", (method_name, "Validation", method_name))
+
+    (preprocessing_hash, hyperparameter_hash, _, _, preprocessing_hyperparameter_string_pickle, hyperparameter_string_pickle, validation_metric) = next(best_model_entry)
+
+    model_hyperparameters = jsonpickle.decode(hyperparameter_string_pickle, keys=True)
+    preprocessing_hyperparameters = jsonpickle.decode(preprocessing_hyperparameter_string_pickle, keys=True)
+
     
     #%% load model
     
-    model = model_dict[method_name]
+    model = model_dict[method_name](model_folder, preprocessing_hash, **model_hyperparameters)
     #model = SingleThresholdStatisticalProcessControl(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
     #model = SingleThresholdIsolationForest(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
     # model = SingleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
-    model = DoubleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
+    # model = DoubleThresholdBinarySegmentation(model_folder, preprocessing_hash, **model_hyperparameters, score_function=score_function)
     
     # get hash (if not using best model) for prediction loading
     hyperparameter_hash = model.get_hyperparameter_hash()
@@ -161,7 +232,7 @@ for method_name in station_IDs_per_method:
     X_dfs = []
     
     for station_ID in station_IDs:
-        X_df = pd.read_csv(os.path.join(preprocessed_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
+        X_df = pd.read_csv(os.path.join(preprocessed_X_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
         
         X_dfs.append(X_df)
     
@@ -173,6 +244,15 @@ for method_name in station_IDs_per_method:
         y_df = pd.read_csv(os.path.join(data_folder, station_dataset_dict[station_ID], "y", station_ID + ".csv"))
         
         y_dfs.append(y_df)
+        
+    #%% load label_filters
+    
+    label_filters_for_all_cutoffs = []
+    
+    for station_ID in station_IDs:
+        label_filter_for_all_cutoffs = pd.read_csv(os.path.join(label_filter_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
+        
+        label_filters_for_all_cutoffs.append(label_filter_for_all_cutoffs)
     
     #%% load predictions
     
@@ -181,36 +261,44 @@ for method_name in station_IDs_per_method:
     
     
     pred_df_dict = {}
-    for dataset_name in all_dataset_names:
-        base_predictions_path = os.path.join(predictions_folder, dataset_name)
-        predictions_path = os.path.join(base_predictions_path, preprocessing_hash, model_name, hyperparameter_hash, str(all_cutoffs)+".pickle")
+    scores_df_dict = {}
+    try:
+        for dataset_name in all_dataset_names:
+            base_predictions_path = os.path.join(predictions_folder, dataset_name)
+            predictions_path = os.path.join(base_predictions_path, preprocessing_hash, model_name, hyperparameter_hash, str(all_cutoffs)+".pickle")
         
-        with open(predictions_path, 'rb') as handle:
-            all_pred_dfs = pickle.load(handle)
-        temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_pred_dfs)}
+            with open(predictions_path, 'rb') as handle:
+                all_pred_dfs = pickle.load(handle)
+            temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_pred_dfs)}
+    
+            pred_df_dict.update(temp_dict)
+        
+    except FileNotFoundError:
+        print("Results can't be reloaded, recalculating explicitly:")
+        # base_scores_path = os.path.join(score_folder, dataset_name)
+        # base_predictions_path = os.path.join(predictions_folder, dataset_name)
+        # base_intermediates_path = os.path.join(intermediates_folder, dataset_name)
+        
+        # scores_path = os.path.join(base_scores_path, preprocessing_hash)
+        # predictions_path = os.path.join(base_predictions_path, preprocessing_hash)
+        # intermediates_path = os.path.join(base_intermediates_path, preprocessing_hash)
+        
+        
+        scores_path = "temp"
+        predictions_path = "temp"
+        intermediates_path = "temp"
+        
+        #X_dfs_preprocessed, y_dfs_preprocessed, label_filters_for_all_cutoffs, event_lengths = preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, dataset_name, False, False, file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, True, False)
+
+        _, all_pred_dfs = model.transform_predict(X_dfs, y_dfs, label_filters_for_all_cutoffs, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=False, verbose=False, dry_run=True)
+        temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_IDs, all_pred_dfs)}
         pred_df_dict.update(temp_dict)
         
         
-    
-    scores_df_dict = {}
-    for dataset_name in all_dataset_names:
-        base_scores_path = os.path.join(score_folder, dataset_name)
-        scores_path = os.path.join(base_scores_path, preprocessing_hash, model.score_calculation_method_name, hyperparameter_hash,"scores.pickle")
-            
-        
-        with open(scores_path, 'rb') as handle:
-            all_scores_dfs = pickle.load(handle)
-        
-        temp_dict = {ID.replace(".csv",""):df for ID, df in zip(station_ID_dict[dataset_name], all_scores_dfs)}
-        scores_df_dict.update(temp_dict)
-        
-        
     y_pred_dfs = []
-    y_scores_dfs = []
     for station_ID in station_IDs:
         
         y_pred_dfs.append(pred_df_dict[station_ID])
-        y_scores_dfs.append(scores_df_dict[station_ID])
      
     
     #%% plot the predictions
@@ -232,5 +320,5 @@ for method_name in station_IDs_per_method:
         file = station_IDs[station]
         
         plot_single_prediction(X_df, y_df, y_pred_df, file, model, show_IF_scores = show_IF_scores, show_TP_FP_FN = show_TP_FP_FN, opacity_TP = opacity_TP, pretty_plot = pretty_plot)
-        
+        plt.title(station)
         plt.show()

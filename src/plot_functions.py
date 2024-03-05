@@ -253,7 +253,7 @@ def prepare_threshold_data(x, y, upper_threshold, lower_threshold):
     return x, y
     
     
-def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
+def plot_SP(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the statistical profiling method,
     overlay the difference vector with thresholds and colour appropriately
@@ -280,7 +280,7 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
         indicates whether to print the plot without title and predictions
 
     """
-    
+    threshold = model.optimal_threshold
     # check if doublethresholding was used
     if type(threshold) is tuple:
         lower_threshold, upper_threshold = threshold
@@ -332,7 +332,7 @@ def plot_SP(X_df, y_df, preds, threshold, file, model_string, show_TP_FP_FN, opa
     
     fig.tight_layout()
     
-def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
+def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the binary segmentation method, 
     overlay difference vector with thresholds, breakpoints and reference point,
@@ -362,7 +362,7 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
         indicates whether to print the plot without title and predictions
 
     """
-    
+    threshold = model.optimal_threshold
     # check if doublethresholding was used
     if type(threshold) is tuple:
         lower_threshold, upper_threshold = threshold
@@ -427,9 +427,130 @@ def plot_BS(X_df, y_df, preds, threshold, file, model, model_string, show_TP_FP_
     plt.xlabel("Date", fontsize=25)
     
     fig.tight_layout()
+    
+def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity_TP):
+    """
+    Plot the sequential BS + SPC  method, 
+    overlay difference vector with thresholds, breakpoints and reference point,
+    colour predictions outside threshold appropriately
+
+    Parameters
+    ----------
+    X_df : dataframe
+        dataframe to be plotted
+    y_df : dataframe
+        dataframe containing the real labels
+    preds : dataframe
+        dataframe containing the predictions (0 or 1)
+    threshold : int or tuple
+        threshold that decides which values are classified as outliers
+    file : string
+        filename of the dataframe
+    model : a SaveableModel object
+        current model
+    model_string : string
+        string representation of the current model
+    show_TP_FP_FN : boolean
+        indicates whether to colour the background according to TP,FP and FN
+    opacity_TP : float between 0 and 1
+        represents the opacity of the background colour for th TP,FP,FN colouring
+
+    """
+    BS_threshold = model.segmentation_method.optimal_threshold
+    # check if doublethresholding was used
+    if type(BS_threshold) is tuple:
+        lower_threshold, upper_threshold = BS_threshold
+    else: 
+        lower_threshold, upper_threshold = -BS_threshold, BS_threshold
+     
+    fig = plt.figure(figsize=(30,16))  
+    
+
+    gs = GridSpec(4, 1, figure=fig)
+
+    
+    #Diff plot:    
+    signal = X_df["diff"].values.reshape(-1,1)
+    bkps = model.segmentation_method.get_breakpoints(signal)
+    
+    ax1 = fig.add_subplot(gs[:4,:])
+    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1)
+    sns.set_theme()
+
+    plt.yticks(fontsize=20)
+    if model.segmentation_method.scaling:
+        plt.ylabel("Scaled difference vector", fontsize=25)
+    else:
+        plt.ylabel("Difference vector", fontsize=25)
+    
+    # plot reference point and thresholds
+    ref_point_value = model.segmentation_method.calculate_reference_point_value(signal, bkps, model.segmentation_method.reference_point)
+
+        
+    prev_bkp = 0
+    
+    # plot the means of each segment
+    for bkp in bkps:
+        segment = X_df['diff'][prev_bkp:bkp] # define a segment between two breakpoints
+        segment_mean = np.mean(segment)
+        
+        #If segment is classified as anomalous according to BS:
+        if model.threshold_function(segment_mean, model.segmentation_method.optimal_threshold):
+            plt.axhline(y=segment_mean, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='r', linestyle='-', linewidth=2, label = 'Mean over segment')
+            
+            plt.axhline(y=ref_point_value, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='orange', linestyle='-', linewidth=2, label = "BS Reference Point: " + model.segmentation_method.reference_point)
+            plt.axhline(y=ref_point_value + lower_threshold, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='black', linestyle='dashed', label = "BS threshold")
+            plt.axhline(y=ref_point_value + upper_threshold, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='black', linestyle='dashed')
+        else: #if segment is left to SPC anomaly detection
+            
+            SPC_threshold = model.anomaly_detection_method.optimal_threshold
+            if model.anomaly_detection_method.threshold_optimization_method == "DoubleThreshold":
+                SPC_lower_threshold = SPC_threshold[0]
+                SPC_upper_threshold = SPC_threshold[1]
+            else:
+                SPC_lower_threshold = -SPC_threshold
+                SPC_upper_threshold = SPC_threshold
+                
+            # fit Robust scaler on segment
+            scaler = RobustScaler(quantile_range=model.anomaly_detection_method.quantiles)
+            scaler.fit(segment.values.reshape(-1,1))
+            res = scaler.inverse_transform(np.array([SPC_lower_threshold, SPC_upper_threshold, 0]).reshape(-1,1))
+            plot_lower_threshold, plot_upper_threshold, plot_reference = res[0], res[1], res[2]
+            
+            # plot SPC middle:
+            plt.axhline(y=plot_reference, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='purple', linestyle='-', linewidth=2, label = "SPC Reference Point")
+
+            
+            # plot thresholds
+            threshold_handle = plt.axhline(y=plot_lower_threshold, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='black', linestyle='dotted', label = "SPC threshold")
+            plt.axhline(y=plot_upper_threshold, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='black', linestyle='dotted')
+            
+            # helper to add red colour to legend
+            red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
+            
+            plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+        
+        prev_bkp = bkp
+    
+    # stop repeating labels for legend
+    handles, labels = plt.gca().get_legend_handles_labels()
+    by_label = dict(zip(labels, handles))
+    plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+    
+    
+    ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
+    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    plt.xlim((0, len(X_df)))
+    plt.xlabel("Date", fontsize=25)
+    
+    # Now add SPC predictions:
+    # Loop over predictions (explicitly make them first)
+    # For each prediction, plot only over area to which it corresponds
+    
+    fig.tight_layout()
 
 
-def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
+def plot_IF(X_df, y_df, preds, file, model, model_string, show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot):
     """
     Plot the isolation forest method
 
@@ -459,7 +580,8 @@ def plot_IF(X_df, y_df, preds, threshold, file, model, model_string, show_IF_sco
         indicates whether to print the plot without title and predictions
 
     """
-     
+    threshold = model.optimal_threshold
+    
     fig = plt.figure(figsize=(30,16))
     
     # decide plot size dependent on whether to include IF scores and predictions/title
@@ -577,34 +699,35 @@ def plot_single_prediction(X_df, y_df, y_pred_df, df_file, model, show_IF_scores
     match model.method_name:
         
         case "SingleThresholdSPC" :
-            threshold = model.optimal_threshold
             scaled_df = scale_diff_data(X_df, model.quantiles)
-            plot_SP(scaled_df, y_df, y_pred_df, threshold, df_file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+            plot_SP(scaled_df, y_df, y_pred_df, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
         
         case "DoubleThresholdSPC" :
-            threshold = model.optimal_threshold
             scaled_df = scale_diff_data(X_df, model.quantiles)
-            plot_SP(scaled_df, y_df, y_pred_df, threshold, df_file, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+            plot_SP(scaled_df, y_df, y_pred_df, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
     
         case "SingleThresholdBS" :
-            threshold = model.optimal_threshold
             if model.scaling:
                 X_df = scale_diff_data(X_df, model.quantiles)
             plot_BS(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
         
         case "DoubleThresholdBS" :
-            threshold = model.optimal_threshold
             if model.scaling:
                 X_df = scale_diff_data(X_df, model.quantiles)
-            plot_BS(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
+            plot_BS(X_df, y_df, y_pred_df, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP, pretty_plot)
         
         case "SingleThresholdIF" :
-            threshold = model.optimal_threshold
             if model.scaling:
                 X_df = scale_diff_data(X_df, model.quantiles)
-            plot_IF(X_df, y_df, y_pred_df, threshold, df_file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
+            plot_IF(X_df, y_df, y_pred_df, df_file, model, str(model.get_model_string()), show_IF_scores, show_TP_FP_FN, opacity_TP, pretty_plot)
             
-
+        case _ :
+            if "Sequential" in model.method_name :
+                if model.segmentation_method.scaling:
+                    X_df = scale_diff_data(X_df, model.segmentation_method.quantiles)
+                plot_Sequential_BS_SPC(X_df, y_df, y_pred_df, df_file, model, str(model.get_model_string()), show_TP_FP_FN, opacity_TP)
+            else:
+                raise ValueError(model.method_name + "is not a recognized method to be plotted")
 def scale_diff_data(df, quantiles):
     """
     Scale the "diff" column of a dataframe and return a changed copy
