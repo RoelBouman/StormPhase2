@@ -76,7 +76,7 @@ db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn'
 db_cursor = db_connection.cursor()
 
 #%% replace cutoff by category:
-cutoff_replacement_dict = {"(0, 24)":"1-24", "(24, 288)":"25-288","(288, 4032)":"288-4032", "(4032, inf)":"4033 and longer"}
+cutoff_replacement_dict = {"(0, 24)":"15m-8h", "(24, 288)":"8h-3d","(288, 4032)":"3d-42d", "(4032, inf)":"42d and longer"}
 
 #%% Visualize/tabularize input data and preprocessing
 
@@ -246,10 +246,17 @@ methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
             "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             
+            #"Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+                
             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
             "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
             "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            
+            "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
+ 
             
             "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
             "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
@@ -267,10 +274,16 @@ name_abbreviations = {
     "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive DT-BS+DT-SPC",
     "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive ST-BS+DT-SPC",
     "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive DT-BS+ST-SPC",
+    "Naive-SingleThresholdBS+SingleThresholdIF": "Naive ST-BS+ST-IF",
+    "Naive-DoubleThresholdBS+SingleThresholdIF": "Naive DT-BS+ST-IF",
+    
     "SingleThresholdBS+SingleThresholdSPC": "DOC ST-BS+ST-SPC",
     "DoubleThresholdBS+DoubleThresholdSPC": "DOC DT-BS+DT-SPC",
     "SingleThresholdBS+DoubleThresholdSPC": "DOC ST-BS+DT-SPC",
     "DoubleThresholdBS+SingleThresholdSPC": "DOC DT-BS+ST-SPC",
+    "SingleThresholdBS+SingleThresholdIF": "DOC ST-BS+ST-IF",
+    "DoubleThresholdBS+SingleThresholdIF": "DOC DT-BS+ST-IF",
+    
     "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq ST-BS+ST-SPC",
     "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq DT-BS+DT-SPC",
     "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq ST-BS+DT-SPC",
@@ -283,14 +296,21 @@ method_groups = {
     "SingleThresholdSPC": "SPC",
     "DoubleThresholdBS": "BS",
     "DoubleThresholdSPC": "SPC",
+    
     "Naive-SingleThresholdBS+SingleThresholdSPC": "Naive BS+SPC",
     "Naive-DoubleThresholdBS+DoubleThresholdSPC": "Naive BS+SPC",
     "Naive-SingleThresholdBS+DoubleThresholdSPC": "Naive BS+SPC",
     "Naive-DoubleThresholdBS+SingleThresholdSPC": "Naive BS+SPC",
+    "Naive-SingleThresholdBS+SingleThresholdIF": "Naive BS+IF",
+    "Naive-DoubleThresholdBS+SingleThresholdIF": "Naive BS+IF",
+    
     "SingleThresholdBS+SingleThresholdSPC": "DOC BS+SPC",
     "DoubleThresholdBS+DoubleThresholdSPC": "DOC BS+SPC",
     "SingleThresholdBS+DoubleThresholdSPC": "DOC BS+SPC",
     "DoubleThresholdBS+SingleThresholdSPC": "DOC BS+SPC",
+    "SingleThresholdBS+SingleThresholdIF": "DOC BS+IF",
+    "DoubleThresholdBS+SingleThresholdIF": "DOC BS+IF",
+    
     "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq BS+SPC",
     "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
     "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
@@ -364,8 +384,8 @@ plt.savefig(os.path.join(figure_folder, "bootstrap_results.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "bootstrap_results.png"), format="png")
 plt.show()
 
-#Make plot of F score per category:
-#%%
+
+#%%Make plot of F score per category:
 base_plot_df = pd.DataFrame()
 for cutoffs in all_cutoffs:
     category = str(cutoffs)
@@ -408,5 +428,52 @@ plt.ylabel('F1.5 Score (Average)')
 plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.png"), format="png")
+
+plt.show()
+
+#%% Plot recall per category:
+    
+base_plot_df = pd.DataFrame()
+for cutoffs in all_cutoffs:
+    category = str(cutoffs)
+    recalls = {method_name:PRF_mean_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
+    recall_stds = {method_name:PRF_std_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
+    category_names = {method_name:cutoff_replacement_dict[category] for method_name in methods}
+    ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
+    bootstrapped_Fscore = pd.concat([pd.Series(recalls), pd.Series(recall_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+    bootstrapped_Fscore.columns = ["Recall average", "Recall stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+    
+    bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
+    
+    bootstrapped_Fscore = bootstrapped_Fscore.dropna(subset=['Validation F1.5'])
+    idx_max = bootstrapped_Fscore.groupby('Method class')['Validation F1.5'].idxmax()
+    # Select the rows with the maximal 'Validation F1.5' for each 'Method class'
+    max_rows = bootstrapped_Fscore.loc[idx_max]
+    max_rows.sort_values(by="Ordering", inplace=True)
+
+    base_plot_df = pd.concat([base_plot_df, max_rows])
+#base_plot_df = pd.concat([base_plot_df, average_max_rows])
+
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Recall average'], hue="Length category")
+
+ax = plt.gca()
+bars = ax.patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+#Only get the first X bar centers, after that are dummy values
+plt.errorbar(x=bar_centers[:len(base_plot_df['Recall average'])], y=base_plot_df['Recall average'], yerr=base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
+
+
+plt.xticks(rotation=90)
+
+# Adding labels and title
+plt.xlabel('Method')
+plt.ylabel('Recall (Average)')
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.png"), format="png")
 
 plt.show()
