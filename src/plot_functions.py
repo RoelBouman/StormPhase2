@@ -11,6 +11,8 @@ import pandas as pd
 import numpy as np
 from matplotlib.gridspec import GridSpec
 
+import matplotlib as mpl
+
 from sklearn.preprocessing import RobustScaler
 
 
@@ -40,7 +42,7 @@ def plot_labels(df, **kwargs):
     #plt.imshow((df["label"]==5).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")
     plt.plot(df["label"], **kwargs)
 
-def plot_TP_FP_FN(y_df, preds, opacity, ax):
+def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20):
     """
     Colour the background of the plot according to the true and false positives, and the false negatives
 
@@ -73,23 +75,24 @@ def plot_TP_FP_FN(y_df, preds, opacity, ax):
     FN_index = np.where(FN == 1)[0]
     
     # use the indexes to colour the background using vertical lines
-    for i in TP_index:
-        ax.axvline(i, color='g', linewidth=3, alpha=opacity)
     for i in FP_index:
-        ax.axvline(i, color='y', linewidth=3, alpha=opacity)
+        ax.axvline(i, color='y', linewidth=2, alpha=opacity)
     for i in FN_index:
-        ax.axvline(i, color='c', linewidth=3, alpha=opacity)
+        ax.axvline(i, color='c', linewidth=2, alpha=opacity)
+    for i in TP_index:
+        ax.axvline(i, color='g', linewidth=2, alpha=opacity)
+
     
     # create handles for the legend
     TP_handle = mpatches.Patch(color='g', label='True Positive')
     FP_handle = mpatches.Patch(color='y', label='False Positive')
     FN_handle = mpatches.Patch(color='c', label='False Negative')
     
-    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=20, loc="upper left", bbox_to_anchor=(1.01, 1))
+    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=legend_fontsize, loc="upper left", bbox_to_anchor=(1.01, 1))
 
     ax.add_artist(legend1)
 
-def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, **kwargs):
+def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_fontsize=20, **kwargs):
     """
     Adapted from rpt.display for our purposes
     (https://dev.ipol.im/~truong/ruptures-docs/build/html/_modules/ruptures/show/display.html)
@@ -97,7 +100,7 @@ def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, **kwargs):
     """
     # colour background according to TP,FP,FN
     if show_TP_FP_FN:
-        plot_TP_FP_FN(y_df, preds, opacity, ax)
+        plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize)
     
     ax.plot(signal, **kwargs)
     
@@ -428,6 +431,10 @@ def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     
     fig.tight_layout()
     
+    # font = {'family' : 'normal',
+    #     'weight' : 'bold',
+    #     'size'   : 22}
+    
 def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity_TP):
     """
     Plot the sequential BS + SPC  method, 
@@ -474,14 +481,14 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
     bkps = model.segmentation_method.get_breakpoints(signal)
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1)
+    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1, legend_fontsize=25)
     sns.set_theme()
 
     plt.yticks(fontsize=20)
     if model.segmentation_method.scaling:
-        plt.ylabel("Scaled difference vector", fontsize=25)
+        plt.ylabel("Scaled difference vector", fontsize=35)
     else:
-        plt.ylabel("Difference vector", fontsize=25)
+        plt.ylabel("Difference vector", fontsize=35)
     
     # plot reference point and thresholds
     ref_point_value = model.segmentation_method.calculate_reference_point_value(signal, bkps, model.segmentation_method.reference_point)
@@ -518,7 +525,7 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
             plot_lower_threshold, plot_upper_threshold, plot_reference = res[0], res[1], res[2]
             
             # plot SPC middle:
-            plt.axhline(y=plot_reference, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='purple', linestyle='-', linewidth=2, label = "SPC Reference Point")
+            plt.axhline(y=plot_reference, xmin=prev_bkp / len(X_df['diff']), xmax=bkp/len(X_df['diff']), color='purple', linestyle='-', linewidth=2, label = "SPC segment median")
 
             
             # plot thresholds
@@ -528,24 +535,21 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
             # helper to add red colour to legend
             red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
             
-            plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+            plt.legend(handles=[threshold_handle, red_handle], fontsize=25, loc="lower left", bbox_to_anchor=(1.01, 0))
         
         prev_bkp = bkp
     
     # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+    plt.legend(by_label.values(), by_label.keys(), fontsize=25, loc="lower left", bbox_to_anchor=(1.01, 0))
     
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=25)
     plt.xlim((0, len(X_df)))
-    plt.xlabel("Date", fontsize=25)
+    plt.xlabel("Date", fontsize=35)
     
-    # Now add SPC predictions:
-    # Loop over predictions (explicitly make them first)
-    # For each prediction, plot only over area to which it corresponds
     
     fig.tight_layout()
 
