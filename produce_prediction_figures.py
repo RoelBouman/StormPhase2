@@ -42,67 +42,67 @@ sns.set()
 #                           }
 
 station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
-                          #"SingleThresholdSPC":["17.csv"],
-                          "Sequential-SingleThresholdBS+SingleThresholdSPC":['0.csv',
-                           '001.csv',
-                           '004.csv',
-                           '007.csv',
-                           '010.csv',
-                           '014.csv',
-                           '018.csv',
-                           '028.csv',
-                           '031.csv',
-                           '036.csv',
-                           '039.csv',
-                           '042.csv',
-                           '044.csv',
-                           '048.csv',
-                           '052.csv',
-                           '057.csv',
-                           '060.csv',
-                           '064.csv',
-                           '067.csv',
-                           '068.csv',
-                           '070.csv',
-                           '076.csv',
-                           '078.csv',
-                           '079.csv',
-                           '082.csv',
-                           '086.csv',
-                           '089.csv',
-                           '092.csv',
-                           '10.csv',
-                           '14.csv',
-                           '17.csv',
-                           '18.csv',
-                           '21.csv',
-                           '27.csv',
-                           '29.csv',
-                           '34.csv',
-                           '4.csv',
-                           '44.csv',
-                           '49.csv',
-                           '53.csv',
-                           '56.csv',
-                           '58.csv',
-                           '59.csv',
-                           '60.csv',
-                           '61.csv',
-                           '65.csv',
-                           '71.csv',
-                           '75.csv',
-                           '77.csv',
-                           '80.csv',
-                           '82.csv',
-                           '85.csv',
-                           '86.csv',
-                           '87.csv',
-                           '90.csv',
-                           '92.csv',
-                           '95.csv',
-                           '96.csv',
-                           '98.csv',
-                           '99.csv'],
+                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
+                          # "Sequential-SingleThresholdBS+SingleThresholdSPC":['0.csv',
+                          #  '001.csv',
+                          #  '004.csv',
+                          #  '007.csv',
+                          #  '010.csv',
+                          #  '014.csv',
+                          #  '018.csv',
+                          #  '028.csv',
+                          #  '031.csv',
+                          #  '036.csv',
+                          #  '039.csv',
+                          #  '042.csv',
+                          #  '044.csv',
+                          #  '048.csv',
+                          #  '052.csv',
+                          #  '057.csv',
+                          #  '060.csv',
+                          #  '064.csv',
+                          #  '067.csv',
+                          #  '068.csv',
+                          #  '070.csv',
+                          #  '076.csv',
+                          #  '078.csv',
+                          #  '079.csv',
+                          #  '082.csv',
+                          #  '086.csv',
+                          #  '089.csv',
+                          #  '092.csv',
+                          #  '10.csv',
+                          #  '14.csv',
+                          #  '17.csv',
+                          #  '18.csv',
+                          #  '21.csv',
+                          #  '27.csv',
+                          #  '29.csv',
+                          #  '34.csv',
+                          #  '4.csv',
+                          #  '44.csv',
+                          #  '49.csv',
+                          #  '53.csv',
+                          #  '56.csv',
+                          #  '58.csv',
+                          #  '59.csv',
+                          #  '60.csv',
+                          #  '61.csv',
+                          #  '65.csv',
+                          #  '71.csv',
+                          #  '75.csv',
+                          #  '77.csv',
+                          #  '80.csv',
+                          #  '82.csv',
+                          #  '85.csv',
+                          #  '86.csv',
+                          #  '87.csv',
+                          #  '90.csv',
+                          #  '92.csv',
+                          #  '95.csv',
+                          #  '96.csv',
+                          #  '98.csv',
+                          #  '99.csv'],
                           }
 
 
@@ -114,8 +114,8 @@ result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
 model_folder = os.path.join("saved_models", dataset)
 
-table_folder = "Tables"
-figure_folder = "Figures"
+table_folder = os.path.join("Tables", dataset)
+figure_folder = os.path.join("Figures", dataset)
 
 os.makedirs(table_folder, exist_ok=True)
 os.makedirs(figure_folder, exist_ok=True)
@@ -320,5 +320,10 @@ for method_name in station_IDs_per_method:
         file = station_IDs[station]
         
         plot_single_prediction(X_df, y_df, y_pred_df, file, model, show_IF_scores = show_IF_scores, show_TP_FP_FN = show_TP_FP_FN, opacity_TP = opacity_TP, pretty_plot = pretty_plot)
-        plt.title(station)
+        
+        base_plot_path = os.path.join(figure_folder, "prediction_plots", method_name)
+        os.makedirs(base_plot_path, exist_ok=True)
+        plt.savefig(os.path.join(base_plot_path, station_IDs[station]  + ".png"), format="png")
+        plt.savefig(os.path.join(base_plot_path, station_IDs[station]  + ".pdf"), format="pdf")
+        
         plt.show()
