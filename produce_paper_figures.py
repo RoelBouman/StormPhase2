@@ -246,7 +246,7 @@ methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
             "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             
-            #"Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
             "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
                 
             "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
