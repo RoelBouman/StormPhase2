@@ -43,7 +43,7 @@ metric_folder = os.path.join(result_folder, "metrics")
 all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 beta = 1.5
-report_metrics_and_stats = True
+report_metrics_and_stats = False
 
 remove_missing = True
 
@@ -183,7 +183,7 @@ DoubleThresholdBS_SingleThresholdIF_hyperparameters = SingleThresholdBS_SingleTh
 DoubleThresholdBS_SingleThresholdIF_hyperparameters["method_classes"] = [[DoubleThresholdBinarySegmentation, SingleThresholdIsolationForest]]
 
 #IF naive ensembles:
-Naive_SingleThresholdBS_SingleThresholdIF_hyperparameters = {"method_classes":[[DoubleThresholdBinarySegmentation, SingleThresholdIsolationForest]], 
+Naive_SingleThresholdBS_SingleThresholdIF_hyperparameters = {"method_classes":[[SingleThresholdBinarySegmentation, SingleThresholdIsolationForest]], 
                                                               "method_hyperparameter_dict_list":scaling_IF_ensemble_method_hyperparameter_dict_list, 
                                                               "all_cutoffs":[all_cutoffs]}
 
@@ -201,13 +201,13 @@ Sequential_SingleThresholdBS_SingleThresholdIF_hyperparameters = {"segmentation_
 
                                                                    "cutoffs_per_method":[[all_cutoffs[2:], all_cutoffs[:2]]]}
 
-Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdSPC_hyperparameters.copy()
+Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters = Sequential_SingleThresholdBS_SingleThresholdIF_hyperparameters.copy()
 Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters["segmentation_method"] = [DoubleThresholdBinarySegmentation]
     
 
 #%% define methods:
 
-methods = { # "SingleThresholdIF":SingleThresholdIsolationForest,
+methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
             # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
             # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
             
@@ -235,7 +235,7 @@ methods = { # "SingleThresholdIF":SingleThresholdIsolationForest,
             # "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
             # "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
             
-            "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
+            # "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
             "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
             }
 
@@ -267,8 +267,8 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        "SingleThresholdBS+SingleThresholdIF":SingleThresholdBS_SingleThresholdIF_hyperparameters,
                        "DoubleThresholdBS+SingleThresholdIF":DoubleThresholdBS_SingleThresholdIF_hyperparameters,
                        
-                       "Sequential-SingleThresholdBS+SingleThresholdIF":Sequential_SingleThresholdBS_SingleThresholdIF_hyperparameters,
-                       "Sequential-DoubleThresholdBS+SingleThresholdIF":Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters,
+                        "Sequential-SingleThresholdBS+SingleThresholdIF":Sequential_SingleThresholdBS_SingleThresholdIF_hyperparameters,
+                        "Sequential-DoubleThresholdBS+SingleThresholdIF":Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters,
                        
                        }
 
