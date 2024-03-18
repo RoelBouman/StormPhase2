@@ -69,7 +69,7 @@ all_dataset_names = [train_name, validation_name, test_name]
 
 #%% connect to database
 
-DBFILE = dataset+"_experiment_results_copy.db" #TODO: remove _copy part
+DBFILE = dataset+"_experiment_results.db" #TODO: remove _copy part
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
@@ -81,7 +81,7 @@ cutoff_replacement_dict = {"(0, 24)":"15m-8h", "(24, 288)":"8h-3d","(288, 4032)"
 #%% Visualize/tabularize input data and preprocessing
 
 #measurement_example.pdf
-station_ID = "019"
+station_ID = "001"
 
 n_xlabels = 10
 
@@ -110,6 +110,9 @@ plt.title("Station: " + station_ID, fontsize=60)
 plot_S_original(X_df, label="S original")
 plot_BU_original(X_df, label="BU original")
 
+plt.axhline(y=np.max(X_df["S_original"]), color='black', linestyle='dashed', label="Maximum load")
+plt.axhline(y=np.min(X_df["S_original"]), color='black', linestyle='dotted', label="Minimum load")
+
 plt.legend(fontsize=30)
 
 plt.yticks(fontsize=30)
@@ -124,7 +127,8 @@ plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "measurement_example.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "measurement_example.png"), format="png")
 plt.show()
-#event_length_distribution.pdf, event_length_stats.tex
+
+#%%event_length_distribution.pdf, event_length_stats.tex
 #Show as histogram and stats table
 lengths = {}
 for split_name in all_dataset_names:
@@ -256,12 +260,14 @@ methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
             
             "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
             "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
- 
             
             "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
             "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
             "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble
+            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
+            
+            "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
+            "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
             }
 
 name_abbreviations = { 
@@ -287,7 +293,9 @@ name_abbreviations = {
     "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq ST-BS+ST-SPC",
     "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq DT-BS+DT-SPC",
     "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq ST-BS+DT-SPC",
-    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq DT-BS+ST-SPC"
+    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq DT-BS+ST-SPC",
+    "Sequential-SingleThresholdBS+SingleThresholdIF":"Seq ST-BS+ST-IF", 
+    "Sequential-DoubleThresholdBS+SingleThresholdIF":"Seq DT-BS+ST-IF",
 }
 
 method_groups = { 
@@ -314,7 +322,9 @@ method_groups = {
     "Sequential-SingleThresholdBS+SingleThresholdSPC": "Seq BS+SPC",
     "Sequential-DoubleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
     "Sequential-SingleThresholdBS+DoubleThresholdSPC": "Seq BS+SPC",
-    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq BS+SPC"
+    "Sequential-DoubleThresholdBS+SingleThresholdSPC": "Seq BS+SPC",
+    "Sequential-SingleThresholdBS+SingleThresholdIF": "Seq BS+IF", 
+    "Sequential-DoubleThresholdBS+SingleThresholdIF": "Seq BS+IF",
 }
 
 best_hyperparameters = {}

@@ -42,7 +42,7 @@ def plot_labels(df, **kwargs):
     #plt.imshow((df["label"]==5).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")
     plt.plot(df["label"], **kwargs)
 
-def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20):
+def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1)):
     """
     Colour the background of the plot according to the true and false positives, and the false negatives
 
@@ -88,11 +88,11 @@ def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20):
     FP_handle = mpatches.Patch(color='y', label='False Positive')
     FN_handle = mpatches.Patch(color='c', label='False Negative')
     
-    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=legend_fontsize, loc="upper left", bbox_to_anchor=(1.01, 1))
+    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=legend_fontsize, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor)
 
     ax.add_artist(legend1)
 
-def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_fontsize=20, **kwargs):
+def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_fontsize=20, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1), **kwargs):
     """
     Adapted from rpt.display for our purposes
     (https://dev.ipol.im/~truong/ruptures-docs/build/html/_modules/ruptures/show/display.html)
@@ -100,7 +100,7 @@ def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_font
     """
     # colour background according to TP,FP,FN
     if show_TP_FP_FN:
-        plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize)
+        plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize, legend_loc, legend_bbox_to_anchor)
     
     ax.plot(signal, **kwargs)
     
@@ -481,7 +481,7 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
     bkps = model.segmentation_method.get_breakpoints(signal)
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1, legend_fontsize=25)
+    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1, legend_fontsize=25, legend_loc="lower left", legend_bbox_to_anchor=(0, 0))
     sns.set_theme()
 
     plt.yticks(fontsize=20)
@@ -535,14 +535,14 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
             # helper to add red colour to legend
             red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
             
-            plt.legend(handles=[threshold_handle, red_handle], fontsize=25, loc="lower left", bbox_to_anchor=(1.01, 0))
+            plt.legend(handles=[threshold_handle, red_handle], fontsize=25, loc="upper left", bbox_to_anchor=(0, 1))
         
         prev_bkp = bkp
     
     # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), fontsize=25, loc="lower left", bbox_to_anchor=(1.01, 0))
+    plt.legend(by_label.values(), by_label.keys(), fontsize=25, loc="upper left", bbox_to_anchor=(0, 1))
     
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
