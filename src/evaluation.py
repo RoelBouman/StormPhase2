@@ -61,6 +61,7 @@ def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
     
     X_mins, X_pred_mins = [], []
     X_maxs, X_pred_maxs = [], []
+    X_mins_no_filter, X_maxs_no_filter = [], []
     
     for X_df, y_df, y_pred_df in zip(X_dfs, y_dfs, y_pred_dfs):
         X_normal = X_df[y_df["label"]==0][load_column]
@@ -69,28 +70,39 @@ def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
         X_mins.append(X_normal.min())
         X_maxs.append(X_normal.max())
 
-        X_pred_mins.append(X_pred_normal.min())
-        X_pred_maxs.append(X_pred_normal.max())
+        #When entire station is filtered, manually set min and max to 0:
+        X_pred_min = X_pred_normal.min()
+        if np.isnan(X_pred_min):
+            X_pred_min = 0
+            
+        X_pred_max = X_pred_normal.max()
+        if np.isnan(X_pred_max):
+            X_pred_max = 0
+            
+        X_pred_mins.append(X_pred_min)
+        X_pred_maxs.append(X_pred_max)
         
-    return X_mins, X_maxs, X_pred_mins, X_pred_maxs
+        X_mins_no_filter.append(X_df[load_column].min())
+        X_maxs_no_filter.append(X_df[load_column].max())
+        
+    return X_mins, X_maxs, X_pred_mins, X_pred_maxs, X_mins_no_filter, X_maxs_no_filter
 
 
-def calculate_signed_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
-    X_mins, X_maxs, X_pred_mins, X_pred_maxs = calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column)
+def calculate_signed_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original", eps=np.finfo(float).eps):
+    X_mins, X_maxs, X_pred_mins, X_pred_maxs, X_mins_no_filter, X_maxs_no_filter = calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column)
     
     min_differences = [X_min - X_pred_min for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
     max_differences = [X_max - X_pred_max for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
     
-    has_negative_load = [X_min < 0 for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
+    has_negative_load = [X_min < 0 for X_min in X_mins]
     
-    relative_min_differences = [(min_difference)/(X_min) for X_min, min_difference in zip(X_mins, min_differences)]
-    relative_max_differences = [(max_difference)/(X_max) for X_max, max_difference in zip(X_maxs, max_differences)]
+    relative_min_differences = [(min_difference)/(X_min+eps) for X_min, min_difference in zip(X_mins, min_differences)]
+    relative_max_differences = [(max_difference)/(X_max+eps) for X_max, max_difference in zip(X_maxs, max_differences)]
     
-    minmax_stats = min_differences, max_differences, relative_min_differences, relative_max_differences, X_mins, X_pred_mins, X_maxs, X_pred_maxs, has_negative_load
+    minmax_stats = min_differences, max_differences, relative_min_differences, relative_max_differences, X_mins, X_pred_mins, X_maxs, X_pred_maxs, has_negative_load, X_mins_no_filter, X_maxs_no_filter
     stats_df = pd.DataFrame(minmax_stats).T
-    stats_df.columns = "min_differences", "max_differences", "relative_min_differences", "relative_max_differences", "X_mins", "X_pred_mins", "X_maxs", "X_pred_maxs", "has_negative_load"
+    stats_df.columns = "min_differences", "max_differences", "relative_min_differences", "relative_max_differences", "X_mins", "X_pred_mins", "X_maxs", "X_pred_maxs", "has_negative_load", "X_mins_no_filter", "X_maxs_no_filter"
     
-
     return stats_df
 
 @njit(parallel=True)
