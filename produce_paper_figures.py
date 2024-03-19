@@ -519,7 +519,7 @@ acceptable_margin = 10 #percentage the predictions need to be in
 
 plt.figure()
 sns.scatterplot(data=best_df, x="X_maxs", y="X_pred_maxs")
-plt.xlabel("True maximum load (kW)")
+plt.xlabel("Ground truth maximum load (kW)")
 plt.ylabel("Predicted maximum load (kW)")
 plt.show()
 
@@ -529,7 +529,7 @@ percentage_acceptable_max = np.sum(np.abs(best_df["max_differences"]/best_df["X_
 min_best_df = best_df.loc[best_df["has_negative_load"]]
 plt.figure()
 sns.scatterplot(data=min_best_df, x="X_mins", y="X_pred_mins")
-plt.xlabel("True minimum load (kW)")
+plt.xlabel("Ground truth minimum load (kW)")
 plt.ylabel("Predicted minimum load (kW)")
 plt.show()
 
@@ -542,13 +542,13 @@ print("")
 print("The minimum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_min))
 print("The minimum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_min))
 
-plt.figure()
-sns.histplot(data=-best_df, x="max_differences", bins=50)
-plt.xlabel("Maximum load estimate error (kW)")
-plt.show()
+# plt.figure()
+# sns.histplot(data=-best_df, x="max_differences", bins=50)
+# plt.xlabel("Maximum load estimate error (kW)")
+# plt.show()
 
-plt.figure()
-sns.histplot(data=min_best_df, x="min_differences", bins=50)
-plt.xlabel("Minimum load estimate error (kW)")
-plt.show()
+# plt.figure()
+# sns.histplot(data=min_best_df, x="min_differences", bins=50)
+# plt.xlabel("Minimum load estimate error (kW)")
+# plt.show()
 
