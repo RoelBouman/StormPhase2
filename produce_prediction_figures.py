@@ -137,7 +137,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 #%% connect to database
 
-DBFILE = dataset+"_experiment_results_copy.db" #TODO: remove copy
+DBFILE = dataset+"_experiment_results.db" #TODO: remove copy
 database_exists = os.path.exists(DBFILE)
 
 db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn't exist
