@@ -19,12 +19,10 @@ import numpy as np
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-from hashlib import sha256
 
 
-from src.plot_functions import plot_S_original, plot_BU_original, plot_predictions
-from src.io_functions import load_table, load_batch, load_dataframe_list, load_metric
-from src.reporting_functions import bootstrap_stats_to_printable
+from src.plot_functions import plot_S_original, plot_BU_original
+from src.io_functions import load_table, load_metric, load_minmax_stats
 
 from src.methods import SingleThresholdStatisticalProcessControl
 from src.methods import DoubleThresholdStatisticalProcessControl
@@ -37,7 +35,6 @@ from src.methods import StackEnsemble
 from src.methods import NaiveStackEnsemble
 from src.methods import SequentialEnsemble
 
-from src.preprocess import preprocess_per_batch_and_write
 
 sns.set()
 
@@ -201,7 +198,7 @@ hyperparameters = jsonpickle.loads(db_result)
 
 
 from src.evaluation import f_beta
-from src.methods import SingleThresholdStatisticalProcessControl
+
 beta = 1.5
 def score_function(precision, recall):
     return f_beta(precision, recall, beta)
@@ -337,6 +334,8 @@ avg_fbeta_std_per_method = {}
 
 validation_fbeta_per_method = {}
 
+minmax_stats_per_method = {}
+
 for method_name in methods:
     
     #find best preprocessing and method hyperparameters:
@@ -359,11 +358,13 @@ for method_name in methods:
     PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, method_name, preprocessing_hash)
     avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, method_name, preprocessing_hash)
     avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, method_name, preprocessing_hash)
+    minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name, preprocessing_hash)
     
     PRF_mean_table_per_method[method_name] = load_table(PRF_mean_table_path, hyperparameter_hash)
     PRF_std_table_per_method[method_name] = load_table(PRF_std_table_path, hyperparameter_hash)
     avg_fbeta_mean_per_method[method_name] = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
     avg_fbeta_std_per_method[method_name] = load_metric(avg_fbeta_std_path, hyperparameter_hash)
+    minmax_stats_per_method[method_name] = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
     
     validation_fbeta_per_method[method_name] = validation_metric
     
@@ -487,3 +488,67 @@ plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.p
 plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.png"), format="png")
 
 plt.show()
+
+#%% visualize minmax stats
+from bidict import bidict
+#subset dict so we only get stats for best performing method on validation:
+    
+ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
+category_names = {method_name:"Average" for method_name in methods}
+bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+
+bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
+
+bootstrapped_Fscore = bootstrapped_Fscore.dropna(subset=['Validation F1.5'])
+idx_max = bootstrapped_Fscore.groupby('Method class')['Validation F1.5'].idxmax()
+# Select the rows with the maximal 'Validation F1.5' for each 'Method class'
+average_max_rows = bootstrapped_Fscore.loc[idx_max]
+average_max_rows.sort_values(by="Ordering", inplace=True)
+
+best_minmax_dict = {}
+
+abbrev_bidict = bidict(name_abbreviations)
+
+for method_name in list(average_max_rows["Method class"].index):
+    best_minmax_dict[method_groups[abbrev_bidict.inverse[method_name]]] = minmax_stats_per_method[abbrev_bidict.inverse[method_name]]
+    
+best_df = best_minmax_dict[method_groups[abbrev_bidict.inverse[bootstrapped_Fscore["Validation F1.5"].idxmax()]]]
+
+acceptable_margin = 10 #percentage the predictions need to be in
+
+plt.figure()
+sns.scatterplot(data=best_df, x="X_maxs", y="X_pred_maxs")
+plt.xlabel("True maximum load (kW)")
+plt.ylabel("Predicted maximum load (kW)")
+plt.show()
+
+percentage_perfect_max = np.sum(best_df["X_maxs"] == best_df["X_pred_maxs"])/best_df.shape[0]*100
+percentage_acceptable_max = np.sum(np.abs(best_df["max_differences"]/best_df["X_maxs"]*100) < acceptable_margin)/best_df.shape[0]*100
+
+min_best_df = best_df.loc[best_df["has_negative_load"]]
+plt.figure()
+sns.scatterplot(data=min_best_df, x="X_mins", y="X_pred_mins")
+plt.xlabel("True minimum load (kW)")
+plt.ylabel("Predicted minimum load (kW)")
+plt.show()
+
+percentage_perfect_min = np.sum(min_best_df["X_mins"] == min_best_df["X_pred_mins"])/best_df.shape[0]*100
+percentage_acceptable_min = np.sum(np.abs(min_best_df["min_differences"]/min_best_df["X_mins"]*100) < acceptable_margin)/min_best_df.shape[0]*100
+
+print("The maximum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_max))
+print("The maximum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_max))
+print("")
+print("The minimum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_min))
+print("The minimum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_min))
+
+plt.figure()
+sns.histplot(data=-best_df, x="max_differences", bins=50)
+plt.xlabel("Maximum load estimate error (kW)")
+plt.show()
+
+plt.figure()
+sns.histplot(data=min_best_df, x="min_differences", bins=50)
+plt.xlabel("Minimum load estimate error (kW)")
+plt.show()
+

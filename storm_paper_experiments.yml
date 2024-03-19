@@ -11,3 +11,4 @@ dependencies:
   - ruptures
   - jinja2
   - numba
+  - bidict

@@ -76,16 +76,13 @@ def load_table(table_path, hyperparameter_string):
 
 def save_minmax_stats(minmax_stats, metric_path, hyperparameter_string):
     os.makedirs(metric_path, exist_ok=True)    
-    stats_df = pd.DataFrame(minmax_stats).T
-    
-    stats_df.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=False, header=False)
+
+    minmax_stats.to_csv(os.path.join(metric_path, hyperparameter_string+".csv"), index=False, header=True)
     
 def load_minmax_stats(minmax_stats_path, hyperparameter_string):
-    stats_df = pd.read_csv(os.path.join(minmax_stats_path, hyperparameter_string+".csv"), header=None)
+    stats_df = pd.read_csv(os.path.join(minmax_stats_path, hyperparameter_string+".csv"))
 
-    absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = stats_df.iloc[:,0].tolist(), stats_df.iloc[:,1].tolist(), stats_df.iloc[:,2].tolist(), stats_df.iloc[:,3].tolist()
-    
-    return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
+    return stats_df
 
 
 def print_count_nan(df, column=None):

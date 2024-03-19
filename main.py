@@ -22,8 +22,8 @@ from src.methods import SequentialEnsemble
 
 from src.preprocess import preprocess_per_batch_and_write
 from src.io_functions import save_metric, save_table, save_minmax_stats
-from src.io_functions import load_batch, load_metric, load_table, load_minmax_stats
-from src.evaluation import cutoff_averaged_f_beta, calculate_unsigned_absolute_and_relative_stats, calculate_PRFAUC_table, calculate_bootstrap_stats
+from src.io_functions import load_batch, load_metric, load_table
+from src.evaluation import cutoff_averaged_f_beta, calculate_signed_and_relative_stats, calculate_PRFAUC_table, calculate_bootstrap_stats
 
 
 from src.reporting_functions import print_metrics_and_stats, bootstrap_stats_to_printable
@@ -207,35 +207,35 @@ Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters["segmentation_met
 
 #%% define methods:
 
-methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
-            # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
             
-            # "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-            # "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+            "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
+            "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             
-            # "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
-            # "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
+            "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             
-            # "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-            # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-            # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
+            "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+            "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
             
-            # "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
-            # "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
+            "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
             
-            # "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
-            # "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
                 
-            # "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
-            # "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
+            "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
             
-            # "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
+            "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
             "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
             }
 
@@ -335,8 +335,8 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     
                 metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
                 
-                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
-                absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+                minmax_stats = calculate_signed_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
+                # absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
                 PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
                 
                 if not dry_run:
@@ -350,7 +350,6 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
                 PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
-                minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
                 #check if loaded model has saved thresholds for correct optimization cutoff set:
                 #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
@@ -363,7 +362,7 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
             model.report_thresholds()
                         
             if report_metrics_and_stats:
-                print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+                print_metrics_and_stats(metric, PRFAUC_table)
                 
             if not dry_run:
                 #save metric to database for easy querying:
@@ -439,8 +438,8 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
     
                 metric = cutoff_averaged_f_beta(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
-                minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
-                absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+                minmax_stats = calculate_signed_and_relative_stats(X_val_dfs_preprocessed, y_val_dfs_preprocessed, y_val_predictions_dfs, load_column="S_original")
+                #absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
                 PRFAUC_table = calculate_PRFAUC_table(y_val_dfs_preprocessed, y_val_predictions_dfs, label_filters_for_all_cutoffs_val, beta)
                 
                 if not dry_run:
@@ -452,12 +451,11 @@ for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
                 print("Model already evaluated, loading results instead:")
                 metric = load_metric(fscore_path, hyperparameter_hash)
                 PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
-                minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
                 
             model.report_thresholds()
             
             if report_metrics_and_stats:
-                print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+                print_metrics_and_stats(metric, PRFAUC_table)
                 
             if not dry_run:
                 #save metric to database for easy querying:
@@ -548,8 +546,8 @@ for method_name in methods:
 
         metric = cutoff_averaged_f_beta(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
-        minmax_stats = calculate_unsigned_absolute_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
-        absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+        minmax_stats = calculate_signed_and_relative_stats(X_test_dfs_preprocessed, y_test_dfs_preprocessed, y_test_predictions_dfs, load_column="S_original")
+        # absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
         PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
         if bootstrap_validation:
@@ -570,7 +568,6 @@ for method_name in methods:
         print("Model already evaluated, loading results instead:")
         metric = load_metric(fscore_path, hyperparameter_hash)
         PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
-        minmax_stats = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
     
         if bootstrap_validation:
             PRF_mean_table = load_table(PRF_mean_table_path, hyperparameter_hash)
@@ -581,7 +578,7 @@ for method_name in methods:
     model.report_thresholds()
     
     if report_metrics_and_stats:
-        print_metrics_and_stats(metric, minmax_stats, PRFAUC_table)
+        print_metrics_and_stats(metric, PRFAUC_table)
         
         if bootstrap_validation:
             print("Bootstrap results:")

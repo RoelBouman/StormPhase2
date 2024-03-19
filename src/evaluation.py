@@ -75,16 +75,23 @@ def calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
     return X_mins, X_maxs, X_pred_mins, X_pred_maxs
 
 
-def calculate_unsigned_absolute_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
+def calculate_signed_and_relative_stats(X_dfs, y_dfs, y_pred_dfs, load_column="S_original"):
     X_mins, X_maxs, X_pred_mins, X_pred_maxs = calculate_minmax_stats(X_dfs, y_dfs, y_pred_dfs, load_column)
     
-    absolute_min_differences = [np.abs(X_min - X_pred_min) for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
-    absolute_max_differences = [np.abs(X_max - X_pred_max) for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
+    min_differences = [X_min - X_pred_min for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
+    max_differences = [X_max - X_pred_max for X_max, X_pred_max in zip(X_maxs, X_pred_maxs)]
     
-    relative_min_differences = [(absolute_min_difference)/(X_max-X_min) for X_min, X_max, absolute_min_difference in zip(X_mins, X_maxs, absolute_min_differences)]
-    relative_max_differences = [(absolute_max_difference)/(X_max-X_min) for X_min, X_max, absolute_max_difference in zip(X_mins, X_maxs, absolute_max_differences)]
+    has_negative_load = [X_min < 0 and X_pred_min < 0 for X_min, X_pred_min in zip(X_mins, X_pred_mins)]
+    
+    relative_min_differences = [(min_difference)/(X_min) for X_min, min_difference in zip(X_mins, min_differences)]
+    relative_max_differences = [(max_difference)/(X_max) for X_max, max_difference in zip(X_maxs, max_differences)]
+    
+    minmax_stats = min_differences, max_differences, relative_min_differences, relative_max_differences, X_mins, X_pred_mins, X_maxs, X_pred_maxs, has_negative_load
+    stats_df = pd.DataFrame(minmax_stats).T
+    stats_df.columns = "min_differences", "max_differences", "relative_min_differences", "relative_max_differences", "X_mins", "X_pred_mins", "X_maxs", "X_pred_maxs", "has_negative_load"
+    
 
-    return absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences
+    return stats_df
 
 @njit(parallel=True)
 def bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta, eps=np.finfo(float).eps):
