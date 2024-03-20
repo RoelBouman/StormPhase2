@@ -513,28 +513,124 @@ abbrev_bidict = bidict(name_abbreviations)
 for method_name in list(average_max_rows["Method class"].index):
     best_minmax_dict[method_groups[abbrev_bidict.inverse[method_name]]] = minmax_stats_per_method[abbrev_bidict.inverse[method_name]]
     
-best_df = best_minmax_dict[method_groups[abbrev_bidict.inverse[bootstrapped_Fscore["Validation F1.5"].idxmax()]]]
+    
+    
+
+Seq_best_df = best_minmax_dict["Seq BS+SPC"]
+BS_best_df = best_minmax_dict["BS"]
+SPC_best_df = best_minmax_dict["SPC"]
+
+# Creating a 2x2 subplot grid
+fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+
+# Plotting each dataframe on a separate subplot
+
+#For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
+sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_maxs_no_filter", ax=axes[0, 0])
+axes[0, 0].set_xlim(left=0)
+axes[0, 0].set_ylim(bottom=-1000)
+axes[0, 0].set_xlabel("Ground truth maximum load (kW)")
+axes[0, 0].set_ylabel("Predicted maximum load (kW)")
+axes[0, 0].set_aspect('equal', adjustable='box')
+axes[0, 0].set_title("Unfiltered")
+
+sns.scatterplot(data=BS_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[0, 1])
+axes[0, 1].set_xlim(left=0)
+axes[0, 1].set_ylim(bottom=-1000)
+axes[0, 1].set_xlabel("Ground truth maximum load (kW)")
+axes[0, 1].set_ylabel("Predicted maximum load (kW)")
+axes[0, 1].set_aspect('equal', adjustable='box')
+axes[0, 1].set_title("BS")
+
+sns.scatterplot(data=SPC_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 0])
+axes[1, 0].set_xlim(left=0)
+axes[1, 0].set_ylim(bottom=-1000)
+axes[1, 0].set_xlabel("Ground truth maximum load (kW)")
+axes[1, 0].set_ylabel("Predicted maximum load (kW)")
+axes[1, 0].set_aspect('equal', adjustable='box')
+axes[1, 0].set_title("SPC")
+
+sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 1])
+axes[1, 1].set_xlim(left=0)
+axes[1, 1].set_ylim(bottom=-1000)
+axes[1, 1].set_xlabel("Ground truth maximum load (kW)")
+axes[1, 1].set_ylabel("Predicted maximum load (kW)")
+axes[1, 1].set_aspect('equal', adjustable='box')
+axes[1, 1].set_title("Seq BS+SPC")
+
+
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "maximum_load_estimates.png"), format="png")
+plt.savefig(os.path.join(figure_folder, "maximum_load_estimates.pdf"), format="pdf")
+plt.show()
+
+#%%
+
+
+Seq_best_df = best_minmax_dict["Seq BS+SPC"]
+BS_best_df = best_minmax_dict["BS"]
+SPC_best_df = best_minmax_dict["SPC"]
+
+Seq_min_best_df = Seq_best_df.loc[Seq_best_df["has_negative_load"]]
+BS_min_best_df = BS_best_df.loc[BS_best_df["has_negative_load"]]
+SPC_min_best_df = SPC_best_df.loc[SPC_best_df["has_negative_load"]]
+
+# Creating a 2x2 subplot grid
+fig, axes = plt.subplots(2, 2, figsize=(10, 10))
+
+# Plotting each dataframe on a separate subplot
+
+#For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_mins_no_filter", ax=axes[0, 0])
+axes[0, 0].set_xlim(right=0)
+axes[0, 0].set_ylim(top=1000)
+axes[0, 0].set_xlabel("Ground truth minimum load (kW)")
+axes[0, 0].set_ylabel("Predicted minimum load (kW)")
+axes[0, 0].set_aspect('equal', adjustable='box')
+axes[0, 0].set_title("Unfiltered")
+
+sns.scatterplot(data=BS_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[0, 1])
+axes[0, 1].set_xlim(right=0)
+axes[0, 1].set_ylim(top=1000)
+axes[0, 1].set_xlabel("Ground truth minimum load (kW)")
+axes[0, 1].set_ylabel("Predicted minimum load (kW)")
+axes[0, 1].set_aspect('equal', adjustable='box')
+axes[0, 1].set_title("BS")
+
+sns.scatterplot(data=SPC_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 0])
+axes[1, 0].set_xlim(right=0)
+axes[1, 0].set_ylim(top=1000)
+axes[1, 0].set_xlabel("Ground truth minimum load (kW)")
+axes[1, 0].set_ylabel("Predicted minimum load (kW)")
+axes[1, 0].set_aspect('equal', adjustable='box')
+axes[1, 0].set_title("SPC")
+
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 1])
+axes[1, 1].set_xlim(right=0)
+axes[1, 1].set_ylim(top=1000)
+axes[1, 1].set_xlabel("Ground truth minimum load (kW)")
+axes[1, 1].set_ylabel("Predicted minimum load (kW)")
+axes[1, 1].set_aspect('equal', adjustable='box')
+axes[1, 1].set_title("Seq BS+SPC")
+
+
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "minimum_load_estimates.png"), format="png")
+plt.savefig(os.path.join(figure_folder, "minimum_load_estimates.pdf"), format="pdf")
+plt.show()
+
+
+#%% print prediction stats:
+best_df = best_minmax_dict["Seq BS+SPC"]
 
 acceptable_margin = 10 #percentage the predictions need to be in
 
-plt.figure()
-sns.scatterplot(data=best_df, x="X_maxs", y="X_pred_maxs")
-plt.xlabel("Ground truth maximum load (kW)")
-plt.ylabel("Predicted maximum load (kW)")
-plt.show()
+percentage_perfect_min = np.sum(Seq_min_best_df["X_mins"] == Seq_min_best_df["X_pred_mins"])/Seq_min_best_df.shape[0]*100
+percentage_acceptable_min = np.sum(np.abs(Seq_min_best_df["min_differences"]/Seq_min_best_df["X_mins"]*100) < acceptable_margin)/Seq_min_best_df.shape[0]*100
 
-percentage_perfect_max = np.sum(best_df["X_maxs"] == best_df["X_pred_maxs"])/best_df.shape[0]*100
-percentage_acceptable_max = np.sum(np.abs(best_df["max_differences"]/best_df["X_maxs"]*100) < acceptable_margin)/best_df.shape[0]*100
+percentage_perfect_max = np.sum(Seq_best_df["X_maxs"] == Seq_best_df["X_pred_maxs"])/Seq_best_df.shape[0]*100
+percentage_acceptable_max = np.sum(np.abs(Seq_best_df["max_differences"]/Seq_best_df["X_maxs"]*100) < acceptable_margin)/Seq_best_df.shape[0]*100
 
-min_best_df = best_df.loc[best_df["has_negative_load"]]
-plt.figure()
-sns.scatterplot(data=min_best_df, x="X_mins", y="X_pred_mins")
-plt.xlabel("Ground truth minimum load (kW)")
-plt.ylabel("Predicted minimum load (kW)")
-plt.show()
-
-percentage_perfect_min = np.sum(min_best_df["X_mins"] == min_best_df["X_pred_mins"])/best_df.shape[0]*100
-percentage_acceptable_min = np.sum(np.abs(min_best_df["min_differences"]/min_best_df["X_mins"]*100) < acceptable_margin)/min_best_df.shape[0]*100
 
 print("The maximum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_max))
 print("The maximum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_max))
@@ -542,13 +638,4 @@ print("")
 print("The minimum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_min))
 print("The minimum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_min))
 
-# plt.figure()
-# sns.histplot(data=-best_df, x="max_differences", bins=50)
-# plt.xlabel("Maximum load estimate error (kW)")
-# plt.show()
-
-# plt.figure()
-# sns.histplot(data=min_best_df, x="min_differences", bins=50)
-# plt.xlabel("Minimum load estimate error (kW)")
-# plt.show()
 
