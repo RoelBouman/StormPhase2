@@ -17,6 +17,7 @@ import pandas as pd
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 import seaborn as sns
 
 
@@ -78,7 +79,7 @@ cutoff_replacement_dict = {"(0, 24)":"15m-8h", "(24, 288)":"8h-3d","(288, 4032)"
 #%% Visualize/tabularize input data and preprocessing
 
 #measurement_example.pdf
-station_ID = "001"
+station_ID = "005"
 
 n_xlabels = 10
 
@@ -101,16 +102,55 @@ y_df = pd.read_csv(os.path.join(data_folder, station_dataset_dict[station_ID], "
 
 
 fig = plt.figure(figsize=(30,16)) # add DPI=300+ in case some missing points don't show up'    
-plt.title("Station: " + station_ID, fontsize=60)
+#plt.title("Station: " + station_ID, fontsize=60)
 
 
 plot_S_original(X_df, label="S original")
 plot_BU_original(X_df, label="BU original")
 
-plt.axhline(y=np.max(X_df["S_original"]), color='black', linestyle='dashed', label="Maximum load")
-plt.axhline(y=np.min(X_df["S_original"]), color='black', linestyle='dotted', label="Minimum load")
+X_max = np.max(X_df["S_original"])
+X_min = np.min(X_df["S_original"])
 
-plt.legend(fontsize=30)
+T_0 = 0
+T_end = len(X_df["M_TIMESTAMP"])
+
+plt.axhline(y=X_max, color='black', linestyle='dashed', label="Maximum/minimum measured load")
+plt.axhline(y=X_min, color='black', linestyle='dashed')
+
+#Plot unused capacity and redundancy as rectangles:
+max_capacity = 90000
+redundant_capacity=30000
+    
+max_unused_capacity = max_capacity-redundant_capacity-X_max
+min_unused_capacity = -max_capacity+redundant_capacity-X_min
+
+opacity = 0.3
+
+ax = plt.gca()
+#Plot unused capacity patches
+max_unused_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_max), height=max_unused_capacity, width = T_end)
+min_unused_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_min), height=min_unused_capacity, width = T_end)
+
+pc = mpl.collections.PatchCollection([max_unused_capacity_patch, min_unused_capacity_patch], facecolor="g", alpha=opacity)
+ax.add_collection(pc)
+unused_capacity_handle = mpl.patches.Patch(color='g', alpha=opacity, label='Unused capacity')
+
+# #Plot redundant capacity patches
+max_redundant_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_max+max_unused_capacity), height=redundant_capacity, width = T_end)
+min_redundant_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_min+min_unused_capacity), height=-redundant_capacity, width = T_end)
+
+pc = mpl.collections.PatchCollection([max_redundant_capacity_patch, min_redundant_capacity_patch], facecolor="b", alpha=opacity)
+ax.add_collection(pc)
+redundant_capacity_handle = mpl.patches.Patch(color='b', alpha=opacity, label='Redundant capacity')
+
+plt.axhline(y=max_capacity, color='black', linestyle='dotted', linewidth=4, label="Load limit")
+plt.axhline(y=-max_capacity, color='black', linestyle='dotted', linewidth=4)
+
+existing_handles, _ = ax.get_legend_handles_labels()
+# plt.legend(handles=existing_handles+[unused_capacity_handle], fontsize=30)
+plt.legend(handles=existing_handles+[unused_capacity_handle, redundant_capacity_handle], fontsize=30)
+# plt.legend(fontsize=30)
+
 
 plt.yticks(fontsize=30)
 plt.ylabel("S", fontsize=30)
@@ -118,6 +158,8 @@ plt.ylabel("S", fontsize=30)
 ticks = np.linspace(0,len(X_df["S_original"])-1, n_xlabels, dtype=int)
 plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=30)
 plt.xlim((0, len(X_df)))
+
+plt.ylim((-max_capacity-5000, max_capacity+5000))
 
 plt.tight_layout()
 
