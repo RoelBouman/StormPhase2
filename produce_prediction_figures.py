@@ -38,7 +38,7 @@ sns.set()
 # choose station IDs per method:
 station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
                           #"SingleThresholdSPC":["17.csv"],
-                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["42.csv"],
+                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
                           }
 # station_IDs_per_method = {"DoubleThresholdBS":[str(ID)+".csv" for ID in range(1,202) if ID not in [25, 106, 130, 190]]}
 
