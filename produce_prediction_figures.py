@@ -36,80 +36,20 @@ sns.set()
 
 #%% Define user parameters:
 # choose station IDs per method:
-# station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
-#                           #"SingleThresholdSPC":["17.csv"],
-#                           "Sequential-SingleThresholdBS+SingleThresholdSPC":["17.csv"],
-#                           }
-
 station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
-                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
-                          # "Sequential-SingleThresholdBS+SingleThresholdSPC":['0.csv',
-                          #  '001.csv',
-                          #  '004.csv',
-                          #  '007.csv',
-                          #  '010.csv',
-                          #  '014.csv',
-                          #  '018.csv',
-                          #  '028.csv',
-                          #  '031.csv',
-                          #  '036.csv',
-                          #  '039.csv',
-                          #  '042.csv',
-                          #  '044.csv',
-                          #  '048.csv',
-                          #  '052.csv',
-                          #  '057.csv',
-                          #  '060.csv',
-                          #  '064.csv',
-                          #  '067.csv',
-                          #  '068.csv',
-                          #  '070.csv',
-                          #  '076.csv',
-                          #  '078.csv',
-                          #  '079.csv',
-                          #  '082.csv',
-                          #  '086.csv',
-                          #  '089.csv',
-                          #  '092.csv',
-                          #  '10.csv',
-                          #  '14.csv',
-                          #  '17.csv',
-                          #  '18.csv',
-                          #  '21.csv',
-                          #  '27.csv',
-                          #  '29.csv',
-                          #  '34.csv',
-                          #  '4.csv',
-                          #  '44.csv',
-                          #  '49.csv',
-                          #  '53.csv',
-                          #  '56.csv',
-                          #  '58.csv',
-                          #  '59.csv',
-                          #  '60.csv',
-                          #  '61.csv',
-                          #  '65.csv',
-                          #  '71.csv',
-                          #  '75.csv',
-                          #  '77.csv',
-                          #  '80.csv',
-                          #  '82.csv',
-                          #  '85.csv',
-                          #  '86.csv',
-                          #  '87.csv',
-                          #  '90.csv',
-                          #  '92.csv',
-                          #  '95.csv',
-                          #  '96.csv',
-                          #  '98.csv',
-                          #  '99.csv'],
+                          #"SingleThresholdSPC":["17.csv"],
+                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["42.csv"],
                           }
+# station_IDs_per_method = {"DoubleThresholdBS":[str(ID)+".csv" for ID in range(1,202) if ID not in [25, 106, 130, 190]]}
+
+                          # }
 
 
 #%% Data loading
 
 dataset = "OS_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
+
 result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
 model_folder = os.path.join("saved_models", dataset)
@@ -232,16 +172,16 @@ for method_name in station_IDs_per_method:
     X_dfs = []
     
     for station_ID in station_IDs:
-        X_df = pd.read_csv(os.path.join(preprocessed_X_folder, station_dataset_dict[station_ID], preprocessing_hash, station_ID + ".csv"))
+        X_df = pd.read_csv(os.path.join(preprocessed_X_folder, station_dataset_dict[station_ID], preprocessing_hash, "X", station_ID + ".csv"))
         
         X_dfs.append(X_df)
     
-    #%% load y dfs
+    #%% load preprocessed y dfs
     
     y_dfs = []
     
     for station_ID in station_IDs:
-        y_df = pd.read_csv(os.path.join(data_folder, station_dataset_dict[station_ID], "y", station_ID + ".csv"))
+        y_df = pd.read_csv(os.path.join(preprocessed_X_folder, station_dataset_dict[station_ID], preprocessing_hash, "y", station_ID + ".csv"))
         
         y_dfs.append(y_df)
         

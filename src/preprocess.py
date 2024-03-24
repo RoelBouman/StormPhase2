@@ -234,11 +234,15 @@ def preprocess_per_batch_and_write(X_dfs, y_dfs, intermediates_folder, which_spl
             y_dfs_preprocessed = pickle.load(handle)
         
     
-    # only happens for X, not for y
     if write_csv_intermediates and not dry_run:
         print("Writing CSV intermediates: X data")
         type_preprocessed_csvs_folder = os.path.join(preprocessed_csvs_folder, hyperparameter_hash)
-        save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder, overwrite = preprocessing_overwrite)
+        
+        type_preprocessed_csvs_folder_X = os.path.join(type_preprocessed_csvs_folder, "X")
+        type_preprocessed_csvs_folder_y = os.path.join(type_preprocessed_csvs_folder, "y")
+        
+        save_dataframe_list(X_dfs_preprocessed, file_names, type_preprocessed_csvs_folder_X, overwrite = preprocessing_overwrite)
+        save_dataframe_list(y_dfs_preprocessed, file_names, type_preprocessed_csvs_folder_y, overwrite = preprocessing_overwrite)
 
     #Preprocess Y_data AKA get the lengths of each event
     event_lengths_pickles_folder = os.path.join(intermediates_folder, "event_length_pickles", which_split)
