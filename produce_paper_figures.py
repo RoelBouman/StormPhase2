@@ -105,11 +105,11 @@ fig = plt.figure(figsize=(30,16)) # add DPI=300+ in case some missing points don
 #plt.title("Station: " + station_ID, fontsize=60)
 
 
-plot_S_original(X_df, label="S original")
-plot_BU_original(X_df, label="BU original")
+plot_S_original(pd.DataFrame(X_df["S_original"]/1000), label="S original")
+plot_BU_original(pd.DataFrame(X_df["BU_original"]/1000), label="BU original")
 
-X_max = np.max(X_df["S_original"])
-X_min = np.min(X_df["S_original"])
+X_max = np.max(X_df["S_original"])/1000
+X_min = np.min(X_df["S_original"])/1000
 
 T_0 = 0
 T_end = len(X_df["M_TIMESTAMP"])
@@ -118,8 +118,8 @@ plt.axhline(y=X_max, color='black', linestyle='dashed', label="Maximum/minimum m
 plt.axhline(y=X_min, color='black', linestyle='dashed')
 
 #Plot unused capacity and redundancy as rectangles:
-max_capacity = 90000
-redundant_capacity=30000
+max_capacity = 90000/1000
+redundant_capacity=30000/1000
     
 max_unused_capacity = max_capacity-redundant_capacity-X_max
 min_unused_capacity = -max_capacity+redundant_capacity-X_min
@@ -153,13 +153,13 @@ plt.legend(handles=existing_handles+[unused_capacity_handle, redundant_capacity_
 
 
 plt.yticks(fontsize=30)
-plt.ylabel("S", fontsize=30)
+plt.ylabel("load (MW)", fontsize=30)
 
 ticks = np.linspace(0,len(X_df["S_original"])-1, n_xlabels, dtype=int)
 plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=30)
 plt.xlim((0, len(X_df)))
 
-plt.ylim((-max_capacity-5000, max_capacity+5000))
+plt.ylim((-max_capacity-5000/1000, max_capacity+5000/1000))
 
 plt.tight_layout()
 
@@ -222,7 +222,7 @@ plt.figure()
 plt.hist(lengths_to_hist, bins=100)
 plt.yscale('log')
 plt.xlabel("Event Length (#data points)")
-plt.ylabel("Counts (log)")
+plt.ylabel("Counts")
 plt.savefig(os.path.join(figure_folder, "event_length_distribution.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "event_length_distribution.png"), format="png")
 plt.show()
@@ -558,9 +558,9 @@ for method_name in list(average_max_rows["Method class"].index):
     
     
 
-Seq_best_df = best_minmax_dict["Seq BS+SPC"]
-BS_best_df = best_minmax_dict["BS"]
-SPC_best_df = best_minmax_dict["SPC"]
+Seq_best_df = best_minmax_dict["Seq BS+SPC"]/1000
+BS_best_df = best_minmax_dict["BS"]/1000
+SPC_best_df = best_minmax_dict["SPC"]/1000
 
 # Creating a 2x2 subplot grid
 fig, axes = plt.subplots(2, 2, figsize=(10, 10))
@@ -570,33 +570,33 @@ fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 #For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
 sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_maxs_no_filter", ax=axes[0, 0])
 axes[0, 0].set_xlim(left=0)
-axes[0, 0].set_ylim(bottom=-1000)
-axes[0, 0].set_xlabel("Ground truth maximum load (kW)")
-axes[0, 0].set_ylabel("Predicted maximum load (kW)")
+axes[0, 0].set_ylim(bottom=-1)
+axes[0, 0].set_xlabel("Ground truth maximum load (MW)")
+axes[0, 0].set_ylabel("Predicted maximum load (MW)")
 axes[0, 0].set_aspect('equal', adjustable='box')
 axes[0, 0].set_title("Unfiltered")
 
 sns.scatterplot(data=BS_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[0, 1])
 axes[0, 1].set_xlim(left=0)
-axes[0, 1].set_ylim(bottom=-1000)
-axes[0, 1].set_xlabel("Ground truth maximum load (kW)")
-axes[0, 1].set_ylabel("Predicted maximum load (kW)")
+axes[0, 1].set_ylim(bottom=-1)
+axes[0, 1].set_xlabel("Ground truth maximum load (MW)")
+axes[0, 1].set_ylabel("Predicted maximum load (MW)")
 axes[0, 1].set_aspect('equal', adjustable='box')
 axes[0, 1].set_title("BS")
 
 sns.scatterplot(data=SPC_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 0])
 axes[1, 0].set_xlim(left=0)
-axes[1, 0].set_ylim(bottom=-1000)
-axes[1, 0].set_xlabel("Ground truth maximum load (kW)")
-axes[1, 0].set_ylabel("Predicted maximum load (kW)")
+axes[1, 0].set_ylim(bottom=-1)
+axes[1, 0].set_xlabel("Ground truth maximum load (MW)")
+axes[1, 0].set_ylabel("Predicted maximum load (MW)")
 axes[1, 0].set_aspect('equal', adjustable='box')
 axes[1, 0].set_title("SPC")
 
 sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 1])
 axes[1, 1].set_xlim(left=0)
-axes[1, 1].set_ylim(bottom=-1000)
-axes[1, 1].set_xlabel("Ground truth maximum load (kW)")
-axes[1, 1].set_ylabel("Predicted maximum load (kW)")
+axes[1, 1].set_ylim(bottom=-1)
+axes[1, 1].set_xlabel("Ground truth maximum load (MW)")
+axes[1, 1].set_ylabel("Predicted maximum load (MW)")
 axes[1, 1].set_aspect('equal', adjustable='box')
 axes[1, 1].set_title("Seq BS+SPC")
 
@@ -609,9 +609,9 @@ plt.show()
 #%%
 
 
-Seq_best_df = best_minmax_dict["Seq BS+SPC"]
-BS_best_df = best_minmax_dict["BS"]
-SPC_best_df = best_minmax_dict["SPC"]
+Seq_best_df = best_minmax_dict["Seq BS+SPC"]/1000
+BS_best_df = best_minmax_dict["BS"]/1000
+SPC_best_df = best_minmax_dict["SPC"]/1000
 
 Seq_min_best_df = Seq_best_df.loc[Seq_best_df["has_negative_load"]]
 BS_min_best_df = BS_best_df.loc[BS_best_df["has_negative_load"]]
@@ -625,33 +625,33 @@ fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 #For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
 sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_mins_no_filter", ax=axes[0, 0])
 axes[0, 0].set_xlim(right=0)
-axes[0, 0].set_ylim(top=1000)
-axes[0, 0].set_xlabel("Ground truth minimum load (kW)")
-axes[0, 0].set_ylabel("Predicted minimum load (kW)")
+axes[0, 0].set_ylim(top=1)
+axes[0, 0].set_xlabel("Ground truth minimum load (MW)")
+axes[0, 0].set_ylabel("Predicted minimum load (MW)")
 axes[0, 0].set_aspect('equal', adjustable='box')
 axes[0, 0].set_title("Unfiltered")
 
 sns.scatterplot(data=BS_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[0, 1])
 axes[0, 1].set_xlim(right=0)
-axes[0, 1].set_ylim(top=1000)
-axes[0, 1].set_xlabel("Ground truth minimum load (kW)")
-axes[0, 1].set_ylabel("Predicted minimum load (kW)")
+axes[0, 1].set_ylim(top=1)
+axes[0, 1].set_xlabel("Ground truth minimum load (MW)")
+axes[0, 1].set_ylabel("Predicted minimum load (MW)")
 axes[0, 1].set_aspect('equal', adjustable='box')
 axes[0, 1].set_title("BS")
 
 sns.scatterplot(data=SPC_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 0])
 axes[1, 0].set_xlim(right=0)
-axes[1, 0].set_ylim(top=1000)
-axes[1, 0].set_xlabel("Ground truth minimum load (kW)")
-axes[1, 0].set_ylabel("Predicted minimum load (kW)")
+axes[1, 0].set_ylim(top=1)
+axes[1, 0].set_xlabel("Ground truth minimum load (MW)")
+axes[1, 0].set_ylabel("Predicted minimum load (MW)")
 axes[1, 0].set_aspect('equal', adjustable='box')
 axes[1, 0].set_title("SPC")
 
 sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 1])
 axes[1, 1].set_xlim(right=0)
-axes[1, 1].set_ylim(top=1000)
-axes[1, 1].set_xlabel("Ground truth minimum load (kW)")
-axes[1, 1].set_ylabel("Predicted minimum load (kW)")
+axes[1, 1].set_ylim(top=1)
+axes[1, 1].set_xlabel("Ground truth minimum load (MW)")
+axes[1, 1].set_ylabel("Predicted minimum load (MW)")
 axes[1, 1].set_aspect('equal', adjustable='box')
 axes[1, 1].set_title("Seq BS+SPC")
 
