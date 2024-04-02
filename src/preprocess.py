@@ -100,7 +100,7 @@ def find_subsequent_duplicates(y, subsequent_duplicates):
 
     return subsequent_filter
 
-def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple, label_transform_dict: dict, remove_uncertain: bool) -> pd.DataFrame:
+def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, lin_fit_quantiles: tuple, label_transform_dict: dict, remove_uncertain: bool, rescale_S_to_kW=False) -> pd.DataFrame:
     """Match bottom up with substation measurements with linear regression and apply the sign value to the substation measurements.
 
     Args:
@@ -119,6 +119,9 @@ def preprocess_data(X_df: pd.DataFrame, y_df: pd.DataFrame, subsequent_nr: int, 
     y_df = y_df.copy()
         
     # Calculate difference and add label column.
+    if rescale_S_to_kW:
+        X_df["S_original"] = X_df["S_original"] * 1000
+        
     X_df['diff_original'] = X_df['S_original']-X_df['BU_original']
         
     # Flag measurement mistakes BU and SO

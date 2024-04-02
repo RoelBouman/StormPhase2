@@ -20,7 +20,7 @@ processed_data_folder = "data"
 
 
 
-dataset = "OS_data" #alternatively: route_data
+dataset = "route_data" #alternatively: route_data
 intermediates_folder = os.path.join(raw_data_folder, dataset+"_preprocessed")
 table_folder = os.path.join("Tables", dataset)
 
@@ -28,7 +28,7 @@ all_cutoffs = [(0, 24), (24, 288), (288, 4032), (4032, np.inf)]
 
 #%%
 
-dry_run = True
+dry_run = False
 
 make_table = True
 
@@ -75,8 +75,11 @@ filtered_X_dfs, filtered_y_dfs, filtered_file_names = zip(*filtered_data)
 
 filtered_X_dfs, filtered_y_dfs, filtered_file_names = list(filtered_X_dfs), list(filtered_y_dfs), list(filtered_file_names)
 
-all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [False]}
-
+if dataset == "OS_data":
+    all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [False]}
+elif dataset == "route_data":
+    all_preprocessing_hyperparameters = {'subsequent_nr': [5], 'lin_fit_quantiles': [(10, 90)], "label_transform_dict": [{0:0, 1:1, 4:5, 5:5}], "remove_uncertain": [True], "rescale_S_to_kW":[True]}
+    
 preprocessing_hyperparameters = list(ParameterGrid(all_preprocessing_hyperparameters))[0]
 
 preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
@@ -182,6 +185,7 @@ if make_table:
     
     event_length_distribution_table.rename(columns=cutoff_replacement_dict, inplace=True)
     
+    os.makedirs(table_folder, exist_ok=True)
     event_length_distribution_table.applymap("{0:.0f}".format).to_latex(buf=os.path.join(table_folder, "event_length_distribution_table.tex"), escape=False, multirow=True)
 #%% Save data to folder based on calculated split:
     
