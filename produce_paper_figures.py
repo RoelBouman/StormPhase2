@@ -459,6 +459,7 @@ method_groups = {
 
 best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
+best_models = {}
 
 PRF_mean_table_per_method = {}
 PRF_std_table_per_method = {}
@@ -486,6 +487,11 @@ for method_name in methods:
 
     best_hyperparameters[method_name] = jsonpickle.decode(hyperparameter_string_pickle, keys=True)
     best_preprocessing_hyperparameters[method_name] = jsonpickle.decode(preprocessing_hyperparameter_string_pickle, keys=True)
+
+    hyperparameters = best_hyperparameters[method_name]     
+    model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
+    best_models[method_name] = model
+
 
     PRF_mean_table_path = os.path.join(metric_folder, "PRF_mean_table", which_split, method_name, preprocessing_hash)
     PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, method_name, preprocessing_hash)
@@ -640,13 +646,16 @@ average_max_rows = bootstrapped_Fscore.loc[idx_max]
 average_max_rows.sort_values(by="Ordering", inplace=True)
 
 best_minmax_dict = {}
+best_hyperparameter_per_method_group = {}
+best_model_per_method_group = {}
 
 abbrev_bidict = bidict(name_abbreviations)
 
+
 for method_name in list(average_max_rows["Method class"].index):
     best_minmax_dict[method_groups[abbrev_bidict.inverse[method_name]]] = minmax_stats_per_method[abbrev_bidict.inverse[method_name]]
-    
-    
+    best_hyperparameter_per_method_group[method_groups[abbrev_bidict.inverse[method_name]]] = best_hyperparameters[abbrev_bidict.inverse[method_name]]
+    best_model_per_method_group[method_groups[abbrev_bidict.inverse[method_name]]] = best_models[abbrev_bidict.inverse[method_name]]
     
 
 Seq_best_df = best_minmax_dict["Seq BS+SPC"]/1000
@@ -700,13 +709,13 @@ plt.show()
 #%%
 
 
-Seq_best_df = best_minmax_dict["Seq BS+SPC"]/1000
-BS_best_df = best_minmax_dict["BS"]/1000
-SPC_best_df = best_minmax_dict["SPC"]/1000
+Seq_best_df = best_minmax_dict["Seq BS+SPC"]
+BS_best_df = best_minmax_dict["BS"]
+SPC_best_df = best_minmax_dict["SPC"]
 
-Seq_min_best_df = Seq_best_df.loc[Seq_best_df["has_negative_load"]]
-BS_min_best_df = BS_best_df.loc[BS_best_df["has_negative_load"]]
-SPC_min_best_df = SPC_best_df.loc[SPC_best_df["has_negative_load"]]
+Seq_min_best_df = Seq_best_df.loc[Seq_best_df["has_negative_load"]]/1000
+BS_min_best_df = BS_best_df.loc[BS_best_df["has_negative_load"]]/1000
+SPC_min_best_df = SPC_best_df.loc[SPC_best_df["has_negative_load"]]/1000
 
 # Creating a 2x2 subplot grid
 fig, axes = plt.subplots(2, 2, figsize=(10, 10))
@@ -771,4 +780,169 @@ print("")
 print("The minimum load predictions are perfect in {0:.2f}% of all cases".format(percentage_perfect_min))
 print("The minimum load predictions are within a {0}% error margin in {1:.2f}% of all cases".format(acceptable_margin, percentage_acceptable_min))
 
+#%% construct best hyperparameter table:
+    
+hyperparameter_translation_dict = {"n_estimators":"$n_{\\textrm{estimators}}$",
+                                   "quantiles":"($q_{\\textrm{lower}}\\%$, $q_{\\textrm{upper}}\\%$)",
+                                   "beta":"$\\beta$",
+                                   "model":None,
+                                   "min_size":"$l$",
+                                   "jump":"$j$",
+                                   "reference_point":"$\\textit{reference\\_point}$",
+                                   "forest_per_station":None,
+                                   "scaling":None,
+                                   "score_function_kwargs":None,
+                                   "penalty":"$C$",
+                                   "threshold_strategy":"Threshold strategy"}
 
+thresholds_strategy_translation_dict = {"DoubleThreshold":"Asymmetrical",
+                                        "SingleThreshold":"Symmetrical"}
+
+hyperparameter_list = []
+
+column_names = ["Ensemble method", "Combination", "Method", "Hyperparameter", "Hyperparameter values"]
+
+for method_name in best_hyperparameter_per_method_group:
+    model = best_model_per_method_group[method_name]
+    
+    if "method_hyperparameter_dict_list" in best_hyperparameter_per_method_group[method_name].keys():
+        print("is ensemble")
+        #if it is sequential ensemble:
+        if "segmentation_method" in best_hyperparameter_per_method_group[method_name].keys():
+            print("is sequential ensemble")
+            
+            #First do segmenter:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0]:
+                
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "Sequential"
+                    method_name_table = method_groups[model.segmentation_method.method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.segmentation_method.threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.segmentation_method.optimal_threshold}
+            hyperparameter_list.append(row)
+            
+            #then do anomaly detector:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1]:
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "Sequential"
+                    method_name_table = method_groups[model.anomaly_detection_method.method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.anomaly_detection_method.threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Seq ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.anomaly_detection_method.optimal_threshold}
+            hyperparameter_list.append(row)
+            
+        #DOC ensemble:
+        elif "cutoffs_per_method" in best_hyperparameter_per_method_group[method_name].keys():
+            print("is DOC ensemble")
+            
+            #First do segmenter:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0]:
+                
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "DOC"
+                    method_name_table = method_groups[model.models[0].method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.models[0].threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.models[0].optimal_threshold}
+            hyperparameter_list.append(row)
+            
+            #then do anomaly detector:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1]:
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "DOC"
+                    method_name_table = method_groups[model.models[1].method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.models[1].threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("DOC ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.models[1].optimal_threshold}
+            hyperparameter_list.append(row)
+            
+        elif "all_cutoffs" in best_hyperparameter_per_method_group[method_name].keys():
+            print("is naive ensemble")
+            
+            #First do segmenter:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0]:
+                
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "Naive"
+                    method_name_table = method_groups[model.models[0].method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][0][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.models[0].threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.models[0].optimal_threshold}
+            hyperparameter_list.append(row)
+            
+            #then do anomaly detector:
+            for hyperparameter in best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1]:
+                
+                hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+                if hyperparameter_name is not None:
+                    ensemble_name = "Naive"
+                    method_name_table = method_groups[model.models[1].method_name]
+                    row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name]["method_hyperparameter_dict_list"][1][hyperparameter]}
+                    hyperparameter_list.append(row)
+                    
+            #Additionally, append threshold strategy and optimal values:
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.models[1].threshold_optimization_method]}
+            hyperparameter_list.append(row)
+            row = {column_names[0]:ensemble_name, column_names[1]:method_name.replace("Naive ", ""), column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.models[1].optimal_threshold}
+            hyperparameter_list.append(row)
+            
+        else:
+            ValueError("Ensemble method does not have valid API, is it a DOC, Naive or Sequential ensemble?")
+    else:
+        print("is not ensemble")
+        for hyperparameter in best_hyperparameter_per_method_group[method_name]:
+            
+            
+            hyperparameter_name = hyperparameter_translation_dict[hyperparameter]
+            if hyperparameter_name is not None:
+                ensemble_name = "No ensemble"
+                method_name_table = method_name
+                row = {column_names[0]:ensemble_name, column_names[1]:"-", column_names[2]:method_name_table, column_names[3]:hyperparameter_name, column_names[4]:best_hyperparameter_per_method_group[method_name][hyperparameter]}
+                hyperparameter_list.append(row)
+                
+        #Additionally, append threshold strategy and optimal values:
+        row = {column_names[0]:ensemble_name, column_names[1]:"-", column_names[2]:method_name_table, column_names[3]:"Threshold strategy", column_names[4]:thresholds_strategy_translation_dict[model.threshold_optimization_method]}
+        hyperparameter_list.append(row)
+        row = {column_names[0]:ensemble_name, column_names[1]:"-", column_names[2]:method_name_table, column_names[3]:"Optimal threshold(s)", column_names[4]:model.optimal_threshold}
+        hyperparameter_list.append(row)
+
+
+hyperparameter_df = pd.DataFrame(hyperparameter_list, columns=column_names)
+
+hyperparameter_df_index = pd.MultiIndex.from_frame(hyperparameter_df[["Ensemble method", "Combination", "Method", "Hyperparameter"]])
+
+hyperparameter_df = pd.DataFrame(hyperparameter_df["Hyperparameter values"])
+hyperparameter_df.index = hyperparameter_df_index
+
+hyperparameter_df.to_latex(buf=os.path.join(table_folder, "best_hyperparameters.tex"), escape=False, multirow=True)
