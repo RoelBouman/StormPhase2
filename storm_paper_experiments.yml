@@ -1,4 +1,7 @@
 name: storm_paper_experiments
+channels:
+  - defaults
+  - conda-forge
 dependencies:
   - python==3.10
   - numpy
@@ -6,9 +9,11 @@ dependencies:
   - scikit-learn>=1.4
   - matplotlib
   - seaborn
-  - jsonpickle
   - sqlite
   - ruptures
   - jinja2
   - numba
   - bidict
+  - pip
+  - pip:
+    - jsonpickle
