@@ -945,4 +945,6 @@ hyperparameter_df_index = pd.MultiIndex.from_frame(hyperparameter_df[["Ensemble 
 hyperparameter_df = pd.DataFrame(hyperparameter_df["Hyperparameter values"])
 hyperparameter_df.index = hyperparameter_df_index
 
-hyperparameter_df.to_latex(buf=os.path.join(table_folder, "best_hyperparameters.tex"), escape=False, multirow=True)
+hyperparameter_df.loc[["No ensemble", "Naive"]].to_latex(buf=os.path.join(table_folder, "best_hyperparameters_first_half.tex"), escape=False, multirow=True)
+
+hyperparameter_df.loc[["DOC", "Sequential"]].to_latex(buf=os.path.join(table_folder, "best_hyperparameters_second_half.tex"), escape=False, multirow=True)
