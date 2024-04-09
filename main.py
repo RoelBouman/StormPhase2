@@ -30,7 +30,7 @@ from src.reporting_functions import print_metrics_and_stats, bootstrap_stats_to_
 
 #%% set process variables
 
-dataset = "OS_data" #alternatively: route_data
+dataset = "route_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
@@ -62,7 +62,7 @@ dry_run = False
 
 verbose = False
 
-model_test_run = False #Only run 1 hyperparameter setting per model type if True
+model_test_run = True #Only run 1 hyperparameter setting per model type if True
 
 
 #%% set up database
@@ -220,12 +220,12 @@ methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
             # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             
             # "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
-            # "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
+            "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
             # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
             # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
             
             # "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
-            # "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
             # "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
             # "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
             
@@ -272,126 +272,126 @@ hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
                        
                        }
 
-# #%% Preprocess Train data and run algorithms:
-# # Peprocess entire batch
-# # Save preprocessed data for later recalculations
-
-# # load Train data
-# which_split = "Train"
-# print("-----------------------------------------------")
-# print("Split: Train")
-# print("-----------------------------------------------")
-# X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
-
-# train_file_names = X_train_files
-
-# base_scores_path = os.path.join(score_folder, which_split)
-# base_predictions_path = os.path.join(predictions_folder, which_split)
-# base_intermediates_path = os.path.join(intermediates_folder, which_split)
-
-# preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
-# for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
-#     preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
-#     preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
-    
-#     print("-----------------------------------------------")
-#     print("Now preprocessing: ")
-#     print("-----------------------------------------------")
-#     print(preprocessing_hyperparameter_string)
-
-#     X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, dry_run)
-    
-#     for method_name in methods:
-#         print("-----------------------------------------------")
-#         print("Now training: " + method_name)
-#         print("-----------------------------------------------")
-#         all_hyperparameters = hyperparameter_dict[method_name]
-#         hyperparameter_list = list(ParameterGrid(all_hyperparameters))
-        
-#         for hyperparameters in hyperparameter_list:
-#             hyperparameter_string = str(hyperparameters)
-#             print(hyperparameter_string)
-            
-#             model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
-#             model_name = model.method_name
-#             hyperparameter_hash = model.get_hyperparameter_hash()
-#             hyperparameter_hash_filename = model.get_filename()
-            
-#             scores_path = os.path.join(base_scores_path, preprocessing_hash)
-#             predictions_path = os.path.join(base_predictions_path, preprocessing_hash)
-#             intermediates_path = os.path.join(base_intermediates_path, preprocessing_hash)
-#             fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
-#             PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
-#             minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
-            
-#             full_model_path = model.get_full_model_path()
-#             full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
-#             full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
-#             full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
-            
-#             if training_overwrite or not os.path.exists(full_model_path) or not os.path.exists(full_metric_path) or not os.path.exists(full_table_path) or not os.path.exists(full_minmax_path):
-                
-#                 y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=training_overwrite, fit=True, dry_run=dry_run, verbose=verbose)
-    
-#                 metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
-                
-#                 minmax_stats = calculate_signed_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
-#                 # absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
-#                 PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
-                
-#                 if not dry_run:
-
-#                     save_metric(metric, fscore_path, hyperparameter_hash)
-#                     save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
-#                     save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
-                    
-                
-#             else:
-#                 print("Model already evaluated, loading results instead:")
-#                 metric = load_metric(fscore_path, hyperparameter_hash)
-#                 PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
-                
-#                 #check if loaded model has saved thresholds for correct optimization cutoff set:
-#                 #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
-#                 if not hasattr(model, "is_ensemble"):
-#                     if not model.check_cutoffs(all_cutoffs):
-#                         print("Loaded model has wrong cutoffs, recalculating thresholds...")
-#                         model.used_cutoffs = all_cutoffs
-#                         model.calculate_and_set_thresholds(all_cutoffs)
-                    
-#             model.report_thresholds()
-                        
-#             if report_metrics_and_stats:
-#                 print_metrics_and_stats(metric, PRFAUC_table)
-                
-#             if not dry_run:
-#                 #save metric to database for easy querying:
-#                 db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
-#                 db_connection.commit()
-            
-#             if model_test_run:
-#                 break
-# #%% dry_run check
-
-# if dry_run:
-#     raise RuntimeError("Dry run is not implemented past training.")
-# #%% Validation
-# #%% load Validation data
-# which_split = "Validation"
-# print("-----------------------------------------------")
-# print("Split: Validation")
-# print("-----------------------------------------------")
-# X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
-
-# val_file_names = X_val_files
-
-# base_scores_path = os.path.join(score_folder, which_split)
-# base_predictions_path = os.path.join(predictions_folder, which_split)
-# base_intermediates_path = os.path.join(intermediates_folder, which_split)
-    
-# #%% Preprocess val data and run algorithms:
+#%% Preprocess Train data and run algorithms:
 # Peprocess entire batch
 # Save preprocessed data for later recalculations
+
+# load Train data
+which_split = "Train"
+print("-----------------------------------------------")
+print("Split: Train")
+print("-----------------------------------------------")
+X_train_dfs, y_train_dfs, X_train_files = load_batch(data_folder, which_split)
+
+train_file_names = X_train_files
+
+base_scores_path = os.path.join(score_folder, which_split)
+base_predictions_path = os.path.join(predictions_folder, which_split)
+base_intermediates_path = os.path.join(intermediates_folder, which_split)
+
+preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
+for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
+    preprocessing_hyperparameter_string = str(preprocessing_hyperparameters)
+    preprocessing_hash = sha256(preprocessing_hyperparameter_string.encode("utf-8")).hexdigest()
+    
+    print("-----------------------------------------------")
+    print("Now preprocessing: ")
+    print("-----------------------------------------------")
+    print(preprocessing_hyperparameter_string)
+
+    X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, event_lengths_train = preprocess_per_batch_and_write(X_train_dfs, y_train_dfs, intermediates_folder, which_split, preprocessing_overwrite, write_csv_intermediates, train_file_names, all_cutoffs, preprocessing_hyperparameters, preprocessing_hash, remove_missing, dry_run)
+    
+    for method_name in methods:
+        print("-----------------------------------------------")
+        print("Now training: " + method_name)
+        print("-----------------------------------------------")
+        all_hyperparameters = hyperparameter_dict[method_name]
+        hyperparameter_list = list(ParameterGrid(all_hyperparameters))
+        
+        for hyperparameters in hyperparameter_list:
+            hyperparameter_string = str(hyperparameters)
+            print(hyperparameter_string)
+            
+            model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
+            model_name = model.method_name
+            hyperparameter_hash = model.get_hyperparameter_hash()
+            hyperparameter_hash_filename = model.get_filename()
+            
+            scores_path = os.path.join(base_scores_path, preprocessing_hash)
+            predictions_path = os.path.join(base_predictions_path, preprocessing_hash)
+            intermediates_path = os.path.join(base_intermediates_path, preprocessing_hash)
+            fscore_path = os.path.join(metric_folder, "F"+str(beta), which_split, model_name, preprocessing_hash)
+            PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, model_name, preprocessing_hash)
+            minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, model_name, preprocessing_hash)
+            
+            full_model_path = model.get_full_model_path()
+            full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
+            full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
+            full_minmax_path = os.path.join(minmax_stats_path, hyperparameter_hash+".csv")
+            
+            if training_overwrite or not os.path.exists(full_model_path) or not os.path.exists(full_metric_path) or not os.path.exists(full_table_path) or not os.path.exists(full_minmax_path):
+                
+                y_train_scores_dfs, y_train_predictions_dfs = model.fit_transform_predict(X_train_dfs_preprocessed, y_train_dfs_preprocessed, label_filters_for_all_cutoffs_train, base_scores_path=scores_path, base_predictions_path=predictions_path, base_intermediates_path=intermediates_path, overwrite=training_overwrite, fit=True, dry_run=dry_run, verbose=verbose)
+    
+                metric = cutoff_averaged_f_beta(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+                
+                minmax_stats = calculate_signed_and_relative_stats(X_train_dfs_preprocessed, y_train_dfs_preprocessed, y_train_predictions_dfs, load_column="S_original")
+                # absolute_min_differences, absolute_max_differences, relative_min_differences, relative_max_differences = minmax_stats
+                PRFAUC_table = calculate_PRFAUC_table(y_train_dfs_preprocessed, y_train_predictions_dfs, label_filters_for_all_cutoffs_train, beta)
+                
+                if not dry_run:
+
+                    save_metric(metric, fscore_path, hyperparameter_hash)
+                    save_table(PRFAUC_table, PRFAUC_table_path, hyperparameter_hash)
+                    save_minmax_stats(minmax_stats, minmax_stats_path, hyperparameter_hash)
+                    
+                
+            else:
+                print("Model already evaluated, loading results instead:")
+                metric = load_metric(fscore_path, hyperparameter_hash)
+                PRFAUC_table = load_table(PRFAUC_table_path, hyperparameter_hash)
+                
+                #check if loaded model has saved thresholds for correct optimization cutoff set:
+                #-Not implemented specifically for ensembles, as only non-ensembles need to be optimized for all cutoffs at once:
+                if not hasattr(model, "is_ensemble"):
+                    if not model.check_cutoffs(all_cutoffs):
+                        print("Loaded model has wrong cutoffs, recalculating thresholds...")
+                        model.used_cutoffs = all_cutoffs
+                        model.calculate_and_set_thresholds(all_cutoffs)
+                    
+            model.report_thresholds()
+                        
+            if report_metrics_and_stats:
+                print_metrics_and_stats(metric, PRFAUC_table)
+                
+            if not dry_run:
+                #save metric to database for easy querying:
+                db_cursor.execute("INSERT OR REPLACE INTO experiment_results VALUES (?, ?, ?, ?, ?, ?, ?)", (preprocessing_hash, hyperparameter_hash, method_name, which_split, jsonpickle.encode(preprocessing_hyperparameters, keys=True), jsonpickle.encode(hyperparameters, keys=True), metric))
+                db_connection.commit()
+            
+            if model_test_run:
+                break
+#%% dry_run check
+
+if dry_run:
+    raise RuntimeError("Dry run is not implemented past training.")
+#%% Validation
+#%% load Validation data
+which_split = "Validation"
+print("-----------------------------------------------")
+print("Split: Validation")
+print("-----------------------------------------------")
+X_val_dfs, y_val_dfs, X_val_files = load_batch(data_folder, which_split)
+
+val_file_names = X_val_files
+
+base_scores_path = os.path.join(score_folder, which_split)
+base_predictions_path = os.path.join(predictions_folder, which_split)
+base_intermediates_path = os.path.join(intermediates_folder, which_split)
+    
+#%% Preprocess val data and run algorithms:
+#Preprocess entire batch
+#Save preprocessed data for later recalculations
 
 preprocessing_hyperparameter_list = list(ParameterGrid(all_preprocessing_hyperparameters))
 for preprocessing_hyperparameters in preprocessing_hyperparameter_list:
