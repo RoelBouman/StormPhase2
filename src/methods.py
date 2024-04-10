@@ -596,9 +596,32 @@ class BinarySegmentationBreakpointCalculator():
                 ref_point = np.mean(signal[first_bkp_longest_segment:last_bkp_longest_segment])
             elif reference_point.lower() == "longest_median":
                 ref_point = np.median(signal[first_bkp_longest_segment:last_bkp_longest_segment])
+        elif reference_point.lower() == "minimum_length_best_fit":
+           
+            minimum_segment_length = 24*4*30*3 #equivalent to 90 days of 15m measurements
+            
+            lowest_qualifying_segment_MSE = np.inf
+            at_least_one_segment_with_minimum_length = False
+            
+            prev_bkp = 0
+            for bkp in bkps:
+                segment_length = bkp-prev_bkp
+                if segment_length > minimum_segment_length:
+                    at_least_one_segment_with_minimum_length = True
+                    
+                    segment_MSE = np.mean(signal[prev_bkp:bkp]**2)
+                    
+                    if segment_MSE < lowest_qualifying_segment_MSE:
+                        lowest_qualifying_segment_MSE = segment_MSE
+                        ref_point = np.mean(signal[prev_bkp:bkp])
+                    
+                prev_bkp = bkp
+            
+            if not at_least_one_segment_with_minimum_length: #use fallback strategy: mean
+                ref_point = self.calculate_reference_point_value(signal, bkps, "mean")
                 
         else:
-            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median'}")
+            raise ValueError("reference_point needs to be =: {'median', 'mean', 'longest_mean', 'longest_median', 'minimum_length_best_fit'}")
             
             
         return ref_point

@@ -58,7 +58,7 @@ testing_overwrite = False
 bootstrap_validation = True
 bootstrap_iterations = 10000
 
-dry_run = False
+dry_run = True
 
 verbose = False
 
@@ -111,7 +111,7 @@ SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0
                                      "quantiles": [(10,90), (15, 85), (20,80)], 
                                      "scaling": [True], 
                                      "penalty": ['L1'], 
-                                     "reference_point":["mean", "median", "longest_median", "longest_mean"],
+                                     "reference_point":["minimum_length_best_fit"], #"mean", "median", "longest_median", "longest_mean", 
                                      "score_function_kwargs":[{"beta":beta}]}
 
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
