@@ -74,7 +74,7 @@ db_connection = sqlite3.connect(DBFILE) # implicitly creates DBFILE if it doesn'
 db_cursor = db_connection.cursor()
 
 #%% replace cutoff by category:
-cutoff_replacement_dict = {"(0, 24)":"15m-8h", "(24, 288)":"8h-3d","(288, 4032)":"3d-42d", "(4032, inf)":"42d and longer"}
+cutoff_replacement_dict = {"(0, 24)":"15m-6h", "(24, 288)":"6h-3d","(288, 4032)":"3d-42d", "(4032, inf)":"42d and longer"}
 
 #%% Visualize/tabularize input data and preprocessing
 
