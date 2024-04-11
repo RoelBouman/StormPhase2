@@ -598,7 +598,7 @@ class BinarySegmentationBreakpointCalculator():
                 ref_point = np.median(signal[first_bkp_longest_segment:last_bkp_longest_segment])
         elif reference_point.lower() == "minimum_length_best_fit":
            
-            minimum_segment_length = 24*4*30*3 #equivalent to 90 days of 15m measurements
+            minimum_segment_length = 24*4*30*3/35040 * len(signal) #equivalent to approx 90 days of 15m measurements, if much is filtered away, reduce size accordingly
             
             lowest_qualifying_segment_MSE = np.inf
             at_least_one_segment_with_minimum_length = False
