@@ -45,18 +45,23 @@ class DoubleThresholdMethod:
         return score_function(*args, **kwargs)
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
-        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
-        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
-            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
-                
-        if not self.scores_calculated or recalculate_scores:
-            self.lower_false_positives, self.lower_true_positives, self.lower_false_negatives, self.negative_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
-            self.upper_false_positives, self.upper_true_positives, self.upper_false_negatives, self.positive_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
+        #if label filters is empty, no data is actually passed to this method: set thresholds to (-inf, +inf)
+        if label_filters_for_all_cutoffs == []:
+            self.optimal_threshold = (-np.inf, np.inf)
+        else:
+            self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
             
-            self.scores_calculated = True
-
-        self.calculate_and_set_thresholds(used_cutoffs)
+            if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+                raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+                    
+            if not self.scores_calculated or recalculate_scores:
+                self.lower_false_positives, self.lower_true_positives, self.lower_false_negatives, self.negative_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="negative", interpolation_range_length=interpolation_range_length)
+                self.upper_false_positives, self.upper_true_positives, self.upper_false_negatives, self.positive_thresholds = self._calculate_interpolated_partial_confmat(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="positive", interpolation_range_length=interpolation_range_length)
+                
+                self.scores_calculated = True
+    
+            self.calculate_and_set_thresholds(used_cutoffs)
         
     def _calculate_interpolated_partial_confmat(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold, interpolation_range_length=1000):
         
@@ -206,17 +211,23 @@ class SingleThresholdMethod:
         return score_function(*args, **self.score_function_kwargs)
         
     def optimize_thresholds(self, y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, used_cutoffs, recalculate_scores=False, interpolation_range_length=1000):
-        self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
         
-        if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
-            raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
-                
-        if not self.scores_calculated or recalculate_scores:
-            self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical", interpolation_range_length=interpolation_range_length)
+        #if label filters is empty, no data is actually passed to this method: set thresholds to +inf
+        if label_filters_for_all_cutoffs == []:
+            self.optimal_threshold = np.inf
+        else:
             
-            self.scores_calculated = True
-        
-        self.calculate_and_set_thresholds(used_cutoffs)
+            self.all_cutoffs = list(label_filters_for_all_cutoffs[0].keys())
+            
+            if not all([str(used_cutoff) in self.all_cutoffs for used_cutoff in used_cutoffs]):
+                raise ValueError("Not all used cutoffs: " +str(used_cutoffs) +" are in all cutoffs used in preprocessing: " + str(self.all_cutoffs))
+                    
+            if not self.scores_calculated or recalculate_scores:
+                self.recall, self.precision, self.thresholds = self._calculate_interpolated_recall_precision(y_dfs, y_scores_dfs, label_filters_for_all_cutoffs, which_threshold="symmetrical", interpolation_range_length=interpolation_range_length)
+                
+                self.scores_calculated = True
+            
+            self.calculate_and_set_thresholds(used_cutoffs)
         
     def calculate_and_set_thresholds(self, used_cutoffs):
         self.scores = self._calculate_interpolated_scores(self.recall, self.precision, used_cutoffs)

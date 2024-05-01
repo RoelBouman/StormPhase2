@@ -58,11 +58,11 @@ testing_overwrite = False
 bootstrap_validation = True
 bootstrap_iterations = 10000
 
-dry_run = True
+dry_run = False
 
 verbose = False
 
-model_test_run = True #Only run 1 hyperparameter setting per model type if True
+model_test_run = False #Only run 1 hyperparameter setting per model type if True
 
 
 #%% set up database
@@ -104,14 +104,14 @@ SingleThresholdSPC_hyperparameters = {"quantiles":[(10,90), (15, 85), (20,80)],
 
 DoubleThresholdSPC_hyperparameters = SingleThresholdSPC_hyperparameters
 
-SingleThresholdBS_hyperparameters = {"beta": [0.005, 0.008, 0.015, 0.05, 0.08, 0.12], 
+SingleThresholdBS_hyperparameters = {"beta": [0.12, 0.15, 0.20, 0.30, 0.45], 
                                      "model": ['l1'], 
                                      'min_size': [150, 200, 288], 
                                      "jump": [5, 10], 
                                      "quantiles": [(10,90), (15, 85), (20,80)], 
                                      "scaling": [True], 
                                      "penalty": ['L1'], 
-                                     "reference_point":["minimum_length_best_fit"], #"mean", "median", "longest_median", "longest_mean", 
+                                     "reference_point":["minimum_length_best_fit", "mean", "median", "longest_median", "longest_mean"], 
                                      "score_function_kwargs":[{"beta":beta}]}
 
 DoubleThresholdBS_hyperparameters = SingleThresholdBS_hyperparameters
@@ -207,36 +207,36 @@ Sequential_DoubleThresholdBS_SingleThresholdIF_hyperparameters["segmentation_met
 
 #%% define methods:
 
-methods = { #"SingleThresholdIF":SingleThresholdIsolationForest,
-            # "SingleThresholdBS":SingleThresholdBinarySegmentation, 
-            # "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
+methods = { "SingleThresholdIF":SingleThresholdIsolationForest,
+            "SingleThresholdBS":SingleThresholdBinarySegmentation, 
+            "SingleThresholdSPC":SingleThresholdStatisticalProcessControl,
             
             "DoubleThresholdBS":DoubleThresholdBinarySegmentation, 
-            # "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
+            "DoubleThresholdSPC":DoubleThresholdStatisticalProcessControl, 
             
-            # "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
+            "Naive-SingleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble, 
             "Naive-DoubleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
-            # "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+DoubleThresholdSPC":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdSPC":NaiveStackEnsemble,
             
-            # "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
+            "SingleThresholdBS+SingleThresholdSPC":StackEnsemble, 
             "DoubleThresholdBS+DoubleThresholdSPC":StackEnsemble, 
-            # "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
-            # "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
+            "SingleThresholdBS+DoubleThresholdSPC":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdSPC":StackEnsemble,
             
-            # "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
+            "Sequential-SingleThresholdBS+SingleThresholdSPC":SequentialEnsemble, 
             "Sequential-DoubleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
-            # "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+DoubleThresholdSPC":SequentialEnsemble,
+            "Sequential-DoubleThresholdBS+SingleThresholdSPC":SequentialEnsemble,
             
-            # "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
-            # "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-SingleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
+            "Naive-DoubleThresholdBS+SingleThresholdIF":NaiveStackEnsemble,
                 
-            # "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
-            # "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
+            "SingleThresholdBS+SingleThresholdIF":StackEnsemble,
+            "DoubleThresholdBS+SingleThresholdIF":StackEnsemble,
             
-            # "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
-            # "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
+            "Sequential-SingleThresholdBS+SingleThresholdIF":SequentialEnsemble, 
+            "Sequential-DoubleThresholdBS+SingleThresholdIF":SequentialEnsemble,
             }
 
 hyperparameter_dict = {"SingleThresholdIF":SingleThresholdIF_hyperparameters,
