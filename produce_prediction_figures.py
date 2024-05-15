@@ -36,18 +36,21 @@ sns.set()
 
 #%% Define user parameters:
 # choose station IDs per method:
-station_IDs_per_method = {#"DoubleThresholdBS":['17.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
+#station_IDs_per_method = {"DoubleThresholdBS":['8.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
                           #"SingleThresholdSPC":["17.csv"],
-                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
-                          }
-# station_IDs_per_method = {"DoubleThresholdBS":[str(ID)+".csv" for ID in range(1,202) if ID not in [25, 106, 130, 190]]}
+                          #"Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
+                          # }
+station_IDs_per_method = {"Sequential-SingleThresholdBS+SingleThresholdSPC":[str(ID)+".csv" for ID in range(1,202) if ID not in [8, 25, 35, 70, 106, 130, 190]]}
 
                           # }
 
+save_predictions = True
+best_predictions_folder = "best_route_labels"
+os.makedirs(best_predictions_folder, exist_ok=True)
 
 #%% Data loading
 
-dataset = "OS_data" #alternatively: route_data
+dataset = "route_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 
 result_folder = os.path.join("results", dataset)
@@ -267,3 +270,9 @@ for method_name in station_IDs_per_method:
         plt.savefig(os.path.join(base_plot_path, station_IDs[station]  + ".pdf"), format="pdf")
         
         plt.show()
+        
+        if save_predictions:
+            csv_name = os.path.join(best_predictions_folder, str(station)+".csv")
+            y_pred_df["M_TIMESTAMP"] = X_df["M_TIMESTAMP"]
+            
+            y_pred_df.to_csv(csv_name)
