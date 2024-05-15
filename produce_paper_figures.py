@@ -200,11 +200,20 @@ plot_BU_original(pd.DataFrame(X_df["BU_original"]/1000), label="BU original")
 X_max = np.max(X_df["S_original"])/1000
 X_min = np.min(X_df["S_original"])/1000
 
+X_max_true = np.max(X_df["S_original"].loc[y_df["label"]==0])/1000
+X_min_true = np.min(X_df["S_original"].loc[y_df["label"]==0])/1000
+
 T_0 = 0
 T_end = len(X_df["M_TIMESTAMP"])
 
 plt.axhline(y=X_max, color='black', linestyle='dashed', label="Maximum/minimum measured load")
 plt.axhline(y=X_min, color='black', linestyle='dashed')
+
+
+
+
+plt.axhline(y=X_max_true, color='red', linestyle='dashed', label="True maximum/minimum load")
+plt.axhline(y=X_min_true, color='red', linestyle='dashed')
 
 #Plot unused capacity and redundancy as rectangles:
 max_capacity = 120000/1000
@@ -216,31 +225,21 @@ min_unused_capacity = -max_capacity+redundant_capacity-X_min
 opacity = 0.3
 
 ax = plt.gca()
-# # #Plot unused capacity patches
-# #max_redundant_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_max+max_unused_capacity), height=redundant_capacity, width = T_end)
-# min_redundant_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_min+min_unused_capacity), height=-redundant_capacity, width = T_end)
+#Plot unused capacity patches
+incorrect_max_capacity = mpl.patches.Rectangle(xy=(T_0, X_max_true), height=X_max-X_max_true, width = T_end)
+incorrect_min_capacity = mpl.patches.Rectangle(xy=(T_0, X_min), height=X_min_true-X_min, width = T_end)
+#min_unused_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_min), height=min_unused_capacity, width = T_end)
 
-# pc = mpl.collections.PatchCollection([min_redundant_capacity_patch], facecolor="g", alpha=opacity)
-# ax.add_collection(pc)
-# redundant_capacity_handle = mpl.patches.Patch(color='g', alpha=opacity, label='Unused capacity')
+pc = mpl.collections.PatchCollection([incorrect_max_capacity, incorrect_min_capacity], facecolor="r", alpha=opacity)
 
-# #Plot redundant capacity patches
-# #max_unused_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_max), height=max_unused_capacity, width = T_end)
-# min_unused_capacity_patch = mpl.patches.Rectangle(xy=(T_0, X_min), height=min_unused_capacity, width = T_end)
+ax.add_collection(pc)
+incorrect_capacity_handle = mpl.patches.Patch(color='r', alpha=opacity, label='Incorrectly estimated capacity')
 
-# pc = mpl.collections.PatchCollection([max_unused_capacity_patch, min_unused_capacity_patch], facecolor="b", alpha=opacity)
-# ax.add_collection(pc)
-# unused_capacity_handle = mpl.patches.Patch(color='b', alpha=opacity, label='Redundant capacity')
+existing_handles, _ = ax.get_legend_handles_labels()
+# plt.legend(handles=existing_handles+[unused_capacity_handle], fontsize=30)
+plt.legend(handles=existing_handles+[incorrect_capacity_handle], fontsize=30)
 
-
-
-# plt.axhline(y=max_capacity, color='black', linestyle='dotted', linewidth=4, label="Load limit")
-# plt.axhline(y=-max_capacity, color='black', linestyle='dotted', linewidth=4)
-
-# existing_handles, _ = ax.get_legend_handles_labels()
-# # plt.legend(handles=existing_handles+[unused_capacity_handle], fontsize=30)
-# plt.legend(handles=existing_handles+[redundant_capacity_handle, unused_capacity_handle], fontsize=30)
-plt.legend(fontsize=30)
+#plt.legend(fontsize=30)
 
 
 plt.yticks(fontsize=30)
