@@ -167,6 +167,60 @@ plt.savefig(os.path.join(figure_folder, "measurement_example.pdf"), format="pdf"
 plt.savefig(os.path.join(figure_folder, "measurement_example.png"), format="png")
 plt.show()
 
+#%% switch event illustration plot
+
+no_switch_data = np.repeat(5,1000)
+
+negative_switch_data = np.concatenate([np.repeat(5,500), np.repeat(1,500)])
+positive_switch_data = np.concatenate([np.repeat(5,500), np.repeat(9,500)])
+
+plt.figure(figsize=(6,4))
+plt.plot(no_switch_data,  "black")
+plt.xlabel("time", fontsize=20)
+plt.ylabel("S", fontsize=20)
+plt.xlim(0,1000)
+plt.ylim(0,10)
+plt.yticks(fontsize=20)
+plt.xticks(fontsize=20)
+plt.grid(False)
+plt.tight_layout()
+
+plt.savefig(os.path.join(figure_folder, "no_switch_event_example.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "no_switch_event_example.png"), format="png")
+plt.show()
+
+plt.figure(figsize=(6,4))
+plt.plot(negative_switch_data,  "black")
+plt.xlabel("time", fontsize=20)
+plt.ylabel("S", fontsize=20)
+plt.xlim(0,1000)
+plt.ylim(0,10)
+plt.yticks(fontsize=20)
+plt.xticks(fontsize=20)
+plt.grid(False)
+plt.tight_layout()
+
+plt.savefig(os.path.join(figure_folder, "negative_switch_event_example.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "negative_switch_event_example.png"), format="png")
+plt.show()
+
+plt.figure(figsize=(6,4))
+plt.plot(positive_switch_data,  "black")
+plt.xlabel("time", fontsize=20)
+plt.ylabel("S", fontsize=20)
+plt.xlim(0,1000)
+plt.ylim(0,10)
+plt.yticks(fontsize=20)
+plt.xticks(fontsize=20)
+plt.grid(False)
+plt.tight_layout()
+
+plt.savefig(os.path.join(figure_folder, "positive_switch_event_example.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "positive_switch_event_example.png"), format="png")
+plt.show()
+
+
+
 #%% measurement_example.pdf (normal)
 station_ID = "018"
 
