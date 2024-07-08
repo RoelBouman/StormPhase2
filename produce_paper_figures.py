@@ -594,10 +594,15 @@ for cutoffs in all_cutoffs:
     category = str(cutoffs)
     fbetas = {method_name:PRF_mean_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
     fbeta_stds = {method_name:PRF_std_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
+    recalls = {method_name:PRF_mean_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
+    recall_stds = {method_name:PRF_std_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
+    precisions = {method_name:PRF_mean_table_per_method[method_name]["precision"].loc[str(category)] for method_name in methods}
+    precision_stds = {method_name:PRF_std_table_per_method[method_name]["precision"].loc[str(category)] for method_name in methods}
+    
     category_names = {method_name:cutoff_replacement_dict[category] for method_name in methods}
     ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
-    bootstrapped_Fscore = pd.concat([pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
-    bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+    bootstrapped_Fscore = pd.concat([pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(recalls), pd.Series(recall_stds), pd.Series(precisions), pd.Series(precision_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+    bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Recall average", "Recall stdev", "Precision average", "Precision stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
     
     bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
     
@@ -608,11 +613,12 @@ for cutoffs in all_cutoffs:
     max_rows.sort_values(by="Ordering", inplace=True)
 
     base_plot_df = pd.concat([base_plot_df, max_rows])
-base_plot_df = pd.concat([base_plot_df, average_max_rows])
+
+F_score_base_plot_df = pd.concat([base_plot_df, average_max_rows])
 
 
 plt.figure(figsize=(10,6))
-sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['F1.5 average'], hue="Length category")
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['F1.5 average'], hue="Length category")
 
 ax = plt.gca()
 bars = ax.patches
@@ -620,7 +626,7 @@ bars = ax.patches
 # Calculate the x-values of the center of each bar
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
-plt.errorbar(x=bar_centers[:len(base_plot_df['F1.5 average'])], y=base_plot_df['F1.5 average'], yerr=base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
+plt.errorbar(x=bar_centers[:len(F_score_base_plot_df['F1.5 average'])], y=F_score_base_plot_df['F1.5 average'], yerr=F_score_base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
 
 
 plt.xticks(rotation=90)
@@ -632,31 +638,9 @@ plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.png"), format="png")
 
+
+
 plt.show()
-
-#%% Plot recall per category:
-    
-base_plot_df = pd.DataFrame()
-for cutoffs in all_cutoffs:
-    category = str(cutoffs)
-    recalls = {method_name:PRF_mean_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
-    recall_stds = {method_name:PRF_std_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
-    category_names = {method_name:cutoff_replacement_dict[category] for method_name in methods}
-    ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
-    bootstrapped_Fscore = pd.concat([pd.Series(recalls), pd.Series(recall_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
-    bootstrapped_Fscore.columns = ["Recall average", "Recall stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
-    
-    bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
-    
-    bootstrapped_Fscore = bootstrapped_Fscore.dropna(subset=['Validation F1.5'])
-    idx_max = bootstrapped_Fscore.groupby('Method class')['Validation F1.5'].idxmax()
-    # Select the rows with the maximal 'Validation F1.5' for each 'Method class'
-    max_rows = bootstrapped_Fscore.loc[idx_max]
-    max_rows.sort_values(by="Ordering", inplace=True)
-
-    base_plot_df = pd.concat([base_plot_df, max_rows])
-#base_plot_df = pd.concat([base_plot_df, average_max_rows])
-
 
 plt.figure(figsize=(10,6))
 sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Recall average'], hue="Length category")
@@ -678,6 +662,29 @@ plt.ylabel('Recall (Average)')
 plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.png"), format="png")
+
+plt.show()
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Precision average'], hue="Length category")
+
+ax = plt.gca()
+bars = ax.patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+#Only get the first X bar centers, after that are dummy values
+plt.errorbar(x=bar_centers[:len(base_plot_df['Precision average'])], y=base_plot_df['Precision average'], yerr=base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
+
+
+plt.xticks(rotation=90)
+
+# Adding labels and title
+plt.xlabel('Method')
+plt.ylabel('Precision (Average)')
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "precision_bootstrap_results_per_category.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "precision_bootstrap_results_per_category.png"), format="png")
 
 plt.show()
 
