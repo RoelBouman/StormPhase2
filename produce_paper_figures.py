@@ -514,6 +514,7 @@ best_hyperparameters = {}
 best_preprocessing_hyperparameters = {}
 best_models = {}
 
+PRFAUC_table_per_method = {}
 PRF_mean_table_per_method = {}
 PRF_std_table_per_method = {}
 avg_fbeta_mean_per_method = {}
@@ -545,13 +546,14 @@ for method_name in methods:
     model = methods[method_name](model_folder, preprocessing_hash, **hyperparameters)
     best_models[method_name] = model
 
-
+    PRFAUC_table_path = os.path.join(metric_folder, "PRFAUC_table", which_split, method_name, preprocessing_hash)
     PRF_mean_table_path = os.path.join(metric_folder, "PRF_mean_table", which_split, method_name, preprocessing_hash)
     PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, method_name, preprocessing_hash)
     avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, method_name, preprocessing_hash)
     avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, method_name, preprocessing_hash)
     minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name, preprocessing_hash)
     
+    PRFAUC_table_per_method[method_name] = load_table(PRFAUC_table_path, hyperparameter_hash)
     PRF_mean_table_per_method[method_name] = load_table(PRF_mean_table_path, hyperparameter_hash)
     PRF_std_table_per_method[method_name] = load_table(PRF_std_table_path, hyperparameter_hash)
     avg_fbeta_mean_per_method[method_name] = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
@@ -588,10 +590,11 @@ plt.savefig(os.path.join(figure_folder, "bootstrap_results.png"), format="png")
 plt.show()
 
 
-#%%Make plot of F score per category:
+#%%Make plot of F score and AUC per category:
 base_plot_df = pd.DataFrame()
 for cutoffs in all_cutoffs:
     category = str(cutoffs)
+    aucs = {method_name:PRFAUC_table_per_method[method_name]["ROC/AUC"].loc[str(category)] for method_name in methods}
     fbetas = {method_name:PRF_mean_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
     fbeta_stds = {method_name:PRF_std_table_per_method[method_name]["F1.5"].loc[str(category)] for method_name in methods}
     recalls = {method_name:PRF_mean_table_per_method[method_name]["recall"].loc[str(category)] for method_name in methods}
@@ -601,8 +604,8 @@ for cutoffs in all_cutoffs:
     
     category_names = {method_name:cutoff_replacement_dict[category] for method_name in methods}
     ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
-    bootstrapped_Fscore = pd.concat([pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(recalls), pd.Series(recall_stds), pd.Series(precisions), pd.Series(precision_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
-    bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Recall average", "Recall stdev", "Precision average", "Precision stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+    bootstrapped_Fscore = pd.concat([pd.Series(aucs), pd.Series(fbetas), pd.Series(fbeta_stds), pd.Series(recalls), pd.Series(recall_stds), pd.Series(precisions), pd.Series(precision_stds), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+    bootstrapped_Fscore.columns = ["AUC", "F1.5 average", "F1.5 stdev", "Recall average", "Recall stdev", "Precision average", "Precision stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
     
     bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
     
@@ -615,6 +618,27 @@ for cutoffs in all_cutoffs:
     base_plot_df = pd.concat([base_plot_df, max_rows])
 
 F_score_base_plot_df = pd.concat([base_plot_df, average_max_rows])
+
+
+plt.figure(figsize=(10,6))
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['AUC'], hue="Length category")
+
+ax = plt.gca()
+bars = ax.patches
+
+plt.xticks(rotation=90)
+
+# Adding labels and title
+plt.xlabel('Method')
+plt.ylabel('AUROC')
+plt.tight_layout()
+plt.savefig(os.path.join(figure_folder, "AUC_results_per_category.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "AUC_results_per_category.png"), format="png")
+
+plt.legend()
+
+
+plt.show()
 
 
 plt.figure(figsize=(10,6))
@@ -688,6 +712,61 @@ plt.savefig(os.path.join(figure_folder, "precision_bootstrap_results_per_categor
 
 plt.show()
 
+#%% combine previous plots:
+
+
+fig, axes = plt.subplots(3, 1, figsize=(12, 14.3), sharex=True)
+
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['F1.5 average'], hue="Length category", ax=axes[0])
+
+bars = axes[0].patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+#Only get the first X bar centers, after that are dummy values
+
+axes[0].errorbar(x=bar_centers[:len(F_score_base_plot_df['F1.5 average'])], y=F_score_base_plot_df['F1.5 average'], yerr=F_score_base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
+axes[0].set_ylabel('F1.5 Score (Average)')
+
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Recall average'], hue="Length category", ax=axes[1])
+
+bars = axes[1].patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+#Only get the first X bar centers, after that are dummy values
+
+axes[1].errorbar(x=bar_centers[:len(base_plot_df['Recall average'])], y=base_plot_df['Recall average'], yerr=base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
+axes[1].set_ylabel('Recall (Average)')
+
+sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Precision average'], hue="Length category", ax=axes[2])
+
+bars = axes[2].patches
+
+# Calculate the x-values of the center of each bar
+bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
+#Only get the first X bar centers, after that are dummy values
+
+axes[2].errorbar(x=bar_centers[:len(base_plot_df['Precision average'])], y=base_plot_df['Precision average'], yerr=base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
+axes[2].set_ylabel('Precision (Average)')
+
+# Rotate x-axis labels and add a common x-axis label
+#plt.setp(axes, xticks=range(len(base_plot_df["Method class"].unique())), xticklabels=base_plot_df["Method class"].unique(), xticksrotation=90)
+axes[2].set_xticks(range(len(base_plot_df["Method class"].unique())))
+axes[2].set_xticklabels(base_plot_df["Method class"].unique(), rotation=90)
+fig.tight_layout(rect=[0, 0.03, 1, 0.95])
+
+# Move the legend to the top of the figure
+handles, labels = axes[0].get_legend_handles_labels()
+fig.legend(handles, labels, loc='upper center', ncol=len(F_score_base_plot_df["Length category"].unique()), bbox_to_anchor=(0.5, 0.98))
+axes[0].get_legend().remove()
+axes[1].get_legend().remove()
+axes[2].get_legend().remove()
+
+plt.savefig(os.path.join(figure_folder, "combined_bootstrap_results_per_category.pdf"), format="pdf")
+plt.savefig(os.path.join(figure_folder, "combined_bootstrap_results_per_category.png"), format="png")
+
+plt.show()
 #%% visualize minmax stats
 from bidict import bidict
 #subset dict so we only get stats for best performing method on validation:
