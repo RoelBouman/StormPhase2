@@ -630,12 +630,13 @@ plt.xticks(rotation=90)
 
 # Adding labels and title
 plt.xlabel('Method')
-plt.ylabel('AUROC')
+plt.ylabel('AUC-ROC')
 plt.tight_layout()
+
+plt.legend()
 plt.savefig(os.path.join(figure_folder, "AUC_results_per_category.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "AUC_results_per_category.png"), format="png")
 
-plt.legend()
 
 
 plt.show()
