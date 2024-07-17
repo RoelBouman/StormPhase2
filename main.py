@@ -30,7 +30,7 @@ from src.reporting_functions import print_metrics_and_stats, bootstrap_stats_to_
 
 #%% set process variables
 
-dataset = "route_data" #alternatively: route_data
+dataset = "OS_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 result_folder = os.path.join("results", dataset)
 intermediates_folder = os.path.join("intermediates", dataset)
@@ -53,12 +53,12 @@ preprocessing_overwrite = False #if set to True, overwrite previous preprocessed
 
 training_overwrite = False 
 validation_overwrite = False
-testing_overwrite = False
+testing_overwrite = True
 
 bootstrap_validation = True
 bootstrap_iterations = 10000
 
-dry_run = False
+dry_run = True
 
 verbose = False
 
@@ -535,6 +535,10 @@ for method_name in methods:
     PRF_std_table_path = os.path.join(metric_folder, "PRF_std_table", which_split, model_name, preprocessing_hash)
     avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, model_name, preprocessing_hash)
     avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, model_name, preprocessing_hash)
+    avg_precision_mean_path = os.path.join(metric_folder, "bootstrap_mean_precision", which_split, model_name, preprocessing_hash)
+    avg_precision_std_path = os.path.join(metric_folder, "bootstrap_std_precision", which_split, model_name, preprocessing_hash)
+    avg_recall_mean_path = os.path.join(metric_folder, "bootstrap_mean_recall", which_split, model_name, preprocessing_hash)
+    avg_recall_std_path = os.path.join(metric_folder, "bootstrap_std_recall", which_split, model_name, preprocessing_hash)
 
     full_metric_path = os.path.join(fscore_path, hyperparameter_hash+".csv")
     full_table_path = os.path.join(PRFAUC_table_path, hyperparameter_hash+".csv")
@@ -551,7 +555,7 @@ for method_name in methods:
         PRFAUC_table = calculate_PRFAUC_table(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta)
         
         if bootstrap_validation:
-            PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std = calculate_bootstrap_stats(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta, bootstrap_iterations=bootstrap_iterations)
+            PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std, avg_precision_mean, avg_precision_std, avg_recall_mean, avg_recall_std = calculate_bootstrap_stats(y_test_dfs_preprocessed, y_test_predictions_dfs, label_filters_for_all_cutoffs_test, beta, bootstrap_iterations=bootstrap_iterations)
             
         if not dry_run:
             save_metric(metric, fscore_path, hyperparameter_hash)
@@ -563,6 +567,10 @@ for method_name in methods:
                 save_table(PRF_std_table, PRF_std_table_path, hyperparameter_hash)
                 save_metric(avg_fbeta_mean, avg_fbeta_mean_path, hyperparameter_hash)
                 save_metric(avg_fbeta_std, avg_fbeta_std_path, hyperparameter_hash)
+                save_metric(avg_precision_mean, avg_precision_mean_path, hyperparameter_hash)
+                save_metric(avg_precision_std, avg_precision_std_path, hyperparameter_hash)
+                save_metric(avg_recall_mean, avg_recall_mean_path, hyperparameter_hash)
+                save_metric(avg_recall_std, avg_recall_std_path, hyperparameter_hash)
                 
     else:
         print("Model already evaluated, loading results instead:")
@@ -574,7 +582,11 @@ for method_name in methods:
             PRF_std_table = load_table(PRF_std_table_path, hyperparameter_hash)
             avg_fbeta_mean = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
             avg_fbeta_std = load_metric(avg_fbeta_std_path, hyperparameter_hash)
-    
+            avg_precision_mean = load_metric(avg_precision_mean_path, hyperparameter_hash)
+            avg_precision_std = load_metric(avg_precision_std_path, hyperparameter_hash)
+            avg_recall_mean = load_metric(avg_recall_mean_path, hyperparameter_hash)
+            avg_recall_std = load_metric(avg_recall_std_path, hyperparameter_hash)
+
     model.report_thresholds()
     
     if report_metrics_and_stats:

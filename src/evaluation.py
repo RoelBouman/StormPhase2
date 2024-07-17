@@ -139,8 +139,10 @@ def bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, be
     std_metrics[2] = np.std(metrics[:,2])
     
     fbetas = metrics[:,2]
+    precisions = metrics[:,0]
+    recalls = metrics[:,1]
     
-    return mean_metrics, std_metrics, fbetas
+    return mean_metrics, std_metrics, fbetas, precisions, recalls
 
 
 def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations=10000):
@@ -157,6 +159,8 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
     table_mean = np.zeros((n_cutoffs,3))
     table_std = np.zeros((n_cutoffs,3))
     fbetas = np.zeros((n_cutoffs, bootstrap_iterations,))
+    precisions = np.zeros((n_cutoffs, bootstrap_iterations,))
+    recalls = np.zeros((n_cutoffs, bootstrap_iterations,))
     
     for i, cutoffs in enumerate(all_cutoffs):
         filtered_y, filtered_y_preds = filter_label_and_predictions(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, cutoffs)
@@ -167,7 +171,7 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
         
         #confmat_per_station_per_cutoff[str(cutoffs)] = confmat_per_station
         
-        table_mean[i,:], table_std[i,:], fbetas[i,:] = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta)
+        table_mean[i,:], table_std[i,:], fbetas[i,:], precisions[i,:], recalls[i,:] = bootstrap_stats_per_confmat_array(bootstrap_samples, confmat_per_station, beta)
     
     
     PRF_mean_table = pd.DataFrame(index=all_cutoffs)
@@ -187,10 +191,15 @@ def calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, 
     avg_fbeta_mean = np.mean(np.mean(fbetas, axis=0))
     avg_fbeta_std = np.std(np.mean(fbetas, axis=0))
     
+    avg_precision_mean = np.mean(np.mean(precisions, axis=0))
+    avg_precision_std = np.std(np.mean(precisions, axis=0))
+    avg_recall_mean = np.mean(np.mean(recalls, axis=0))
+    avg_recall_std = np.std(np.mean(recalls, axis=0))
+    
     #if any nans, repeat procedure:
     if PRF_mean_table.isnull().any().any():
         print("NaN in validation results due to invalid split, recalculating:...")
-        PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations)
+        PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std, avg_precision_mean, avg_precision_std, avg_recall_mean, avg_recall_std = calculate_bootstrap_stats(y_dfs, y_pred_dfs, label_filters_for_all_cutoffs, beta, bootstrap_iterations)
 
-    return PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std
+    return PRF_mean_table, PRF_std_table, avg_fbeta_mean, avg_fbeta_std, avg_precision_mean, avg_precision_std, avg_recall_mean, avg_recall_std
 
