@@ -409,7 +409,7 @@ plt.axvline(x = model.optimal_threshold, color = sns.color_palette()[3], linesty
 
 plt.legend()
 plt.xlabel(r"Threshold ($\theta$)")
-plt.ylabel(r"F$1.5_{average}$")
+plt.ylabel(r"F1.5")
 plt.xlim((0, 4)) #hardcoded
 plt.savefig(os.path.join(figure_folder, "threshold_optimization.pdf"), format="pdf")
 plt.savefig(os.path.join(figure_folder, "threshold_optimization.png"), format="png")
@@ -519,6 +519,10 @@ PRF_mean_table_per_method = {}
 PRF_std_table_per_method = {}
 avg_fbeta_mean_per_method = {}
 avg_fbeta_std_per_method = {}
+avg_precision_mean_per_method = {}
+avg_precision_std_per_method = {}
+avg_recall_mean_per_method = {}
+avg_recall_std_per_method = {}
 
 validation_fbeta_per_method = {}
 
@@ -552,6 +556,10 @@ for method_name in methods:
     avg_fbeta_mean_path = os.path.join(metric_folder, "bootstrap_mean_F"+str(beta), which_split, method_name, preprocessing_hash)
     avg_fbeta_std_path = os.path.join(metric_folder, "bootstrap_std_F"+str(beta), which_split, method_name, preprocessing_hash)
     minmax_stats_path = os.path.join(metric_folder, "minmax_stats", which_split, method_name, preprocessing_hash)
+    avg_precision_mean_path = os.path.join(metric_folder, "bootstrap_mean_precision", which_split, method_name, preprocessing_hash)
+    avg_precision_std_path = os.path.join(metric_folder, "bootstrap_std_precision", which_split, method_name, preprocessing_hash)
+    avg_recall_mean_path = os.path.join(metric_folder, "bootstrap_mean_recall", which_split, method_name, preprocessing_hash)
+    avg_recall_std_path = os.path.join(metric_folder, "bootstrap_std_recall", which_split, method_name, preprocessing_hash)
     
     PRFAUC_table_per_method[method_name] = load_table(PRFAUC_table_path, hyperparameter_hash)
     PRF_mean_table_per_method[method_name] = load_table(PRF_mean_table_path, hyperparameter_hash)
@@ -559,14 +567,19 @@ for method_name in methods:
     avg_fbeta_mean_per_method[method_name] = load_metric(avg_fbeta_mean_path, hyperparameter_hash)
     avg_fbeta_std_per_method[method_name] = load_metric(avg_fbeta_std_path, hyperparameter_hash)
     minmax_stats_per_method[method_name] = load_minmax_stats(minmax_stats_path, hyperparameter_hash)
+    avg_precision_mean_per_method[method_name] = load_metric(avg_precision_mean_path, hyperparameter_hash)
+    avg_precision_std_per_method[method_name] = load_metric(avg_precision_std_path, hyperparameter_hash)
+    avg_recall_mean_per_method[method_name] = load_metric(avg_recall_mean_path, hyperparameter_hash)
+    avg_recall_std_per_method[method_name] = load_metric(avg_recall_std_path, hyperparameter_hash)
+    
     
     validation_fbeta_per_method[method_name] = validation_metric
     
 #Make plot of average F score
 ordering = {k:i for i, k in enumerate(avg_fbeta_mean_per_method)}
 category_names = {method_name:"Average" for method_name in methods}
-bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
-bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
+bootstrapped_Fscore = pd.concat([pd.Series(avg_fbeta_mean_per_method), pd.Series(avg_fbeta_std_per_method), pd.Series(avg_precision_mean_per_method), pd.Series(avg_precision_std_per_method), pd.Series(avg_recall_mean_per_method), pd.Series(avg_recall_std_per_method) , pd.Series(method_groups), pd.Series(validation_fbeta_per_method), pd.Series(ordering), pd.Series(category_names)], axis=1)
+bootstrapped_Fscore.columns = ["F1.5 average", "F1.5 stdev", "Precision average", "Precision stdev", "Recall average", "Recall stdev", "Method class", "Validation F1.5", "Ordering", "Length category"]
 
 bootstrapped_Fscore.rename(index=name_abbreviations, inplace=True)
 
@@ -668,7 +681,7 @@ plt.savefig(os.path.join(figure_folder, "bootstrap_results_per_category.png"), f
 plt.show()
 
 plt.figure(figsize=(10,6))
-sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Recall average'], hue="Length category")
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Recall average'], hue="Length category")
 
 ax = plt.gca()
 bars = ax.patches
@@ -676,7 +689,7 @@ bars = ax.patches
 # Calculate the x-values of the center of each bar
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
-plt.errorbar(x=bar_centers[:len(base_plot_df['Recall average'])], y=base_plot_df['Recall average'], yerr=base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
+plt.errorbar(x=bar_centers[:len(F_score_base_plot_df['Recall average'])], y=F_score_base_plot_df['Recall average'], yerr=F_score_base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
 
 
 plt.xticks(rotation=90)
@@ -691,7 +704,7 @@ plt.savefig(os.path.join(figure_folder, "recall_bootstrap_results_per_category.p
 plt.show()
 
 plt.figure(figsize=(10,6))
-sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Precision average'], hue="Length category")
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Precision average'], hue="Length category")
 
 ax = plt.gca()
 bars = ax.patches
@@ -699,7 +712,7 @@ bars = ax.patches
 # Calculate the x-values of the center of each bar
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
-plt.errorbar(x=bar_centers[:len(base_plot_df['Precision average'])], y=base_plot_df['Precision average'], yerr=base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
+plt.errorbar(x=bar_centers[:len(F_score_base_plot_df['Precision average'])], y=F_score_base_plot_df['Precision average'], yerr=F_score_base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
 
 
 plt.xticks(rotation=90)
@@ -729,7 +742,7 @@ bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 axes[0].errorbar(x=bar_centers[:len(F_score_base_plot_df['F1.5 average'])], y=F_score_base_plot_df['F1.5 average'], yerr=F_score_base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
 axes[0].set_ylabel('F1.5 Score (Average)')
 
-sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Recall average'], hue="Length category", ax=axes[1])
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Recall average'], hue="Length category", ax=axes[1])
 
 bars = axes[1].patches
 
@@ -737,10 +750,10 @@ bars = axes[1].patches
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
 
-axes[1].errorbar(x=bar_centers[:len(base_plot_df['Recall average'])], y=base_plot_df['Recall average'], yerr=base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
+axes[1].errorbar(x=bar_centers[:len(F_score_base_plot_df['Recall average'])], y=F_score_base_plot_df['Recall average'], yerr=F_score_base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
 axes[1].set_ylabel('Recall (Average)')
 
-sns.barplot(data=base_plot_df, x=base_plot_df["Method class"], y=base_plot_df['Precision average'], hue="Length category", ax=axes[2])
+sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Precision average'], hue="Length category", ax=axes[2])
 
 bars = axes[2].patches
 
@@ -748,13 +761,13 @@ bars = axes[2].patches
 bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
 
-axes[2].errorbar(x=bar_centers[:len(base_plot_df['Precision average'])], y=base_plot_df['Precision average'], yerr=base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
+axes[2].errorbar(x=bar_centers[:len(F_score_base_plot_df['Precision average'])], y=F_score_base_plot_df['Precision average'], yerr=F_score_base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
 axes[2].set_ylabel('Precision (Average)')
 
 # Rotate x-axis labels and add a common x-axis label
 #plt.setp(axes, xticks=range(len(base_plot_df["Method class"].unique())), xticklabels=base_plot_df["Method class"].unique(), xticksrotation=90)
-axes[2].set_xticks(range(len(base_plot_df["Method class"].unique())))
-axes[2].set_xticklabels(base_plot_df["Method class"].unique(), rotation=90)
+axes[2].set_xticks(range(len(F_score_base_plot_df["Method class"].unique())))
+axes[2].set_xticklabels(F_score_base_plot_df["Method class"].unique(), rotation=90)
 fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 # Move the legend to the top of the figure
