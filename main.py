@@ -53,12 +53,12 @@ preprocessing_overwrite = False #if set to True, overwrite previous preprocessed
 
 training_overwrite = False 
 validation_overwrite = False
-testing_overwrite = True
+testing_overwrite = False
 
 bootstrap_validation = True
 bootstrap_iterations = 10000
 
-dry_run = True
+dry_run = False
 
 verbose = False
 

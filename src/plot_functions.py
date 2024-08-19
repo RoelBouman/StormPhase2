@@ -42,7 +42,7 @@ def plot_labels(df, **kwargs):
     #plt.imshow((df["label"]==5).values.reshape(1, len(df["label"])), cmap=cmap, aspect="auto")
     plt.plot(df["label"], **kwargs)
 
-def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1)):
+def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1)):
     """
     Colour the background of the plot according to the true and false positives, and the false negatives
 
@@ -88,11 +88,11 @@ def plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize=20, legend_loc="uppe
     FP_handle = mpatches.Patch(color='y', label='False Positive')
     FN_handle = mpatches.Patch(color='c', label='False Negative')
     
-    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], fontsize=legend_fontsize, loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor)
+    legend1 = plt.legend(handles=[TP_handle, FP_handle, FN_handle], loc=legend_loc, bbox_to_anchor=legend_bbox_to_anchor, fontsize=30)
 
     ax.add_artist(legend1)
 
-def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_fontsize=20, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1), **kwargs):
+def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_loc="upper left", legend_bbox_to_anchor=(1.01, 1), **kwargs):
     """
     Adapted from rpt.display for our purposes
     (https://dev.ipol.im/~truong/ruptures-docs/build/html/_modules/ruptures/show/display.html)
@@ -100,7 +100,7 @@ def plot_bkps(signal, y_df, preds, bkps, show_TP_FP_FN, opacity, ax, legend_font
     """
     # colour background according to TP,FP,FN
     if show_TP_FP_FN:
-        plot_TP_FP_FN(y_df, preds, opacity, ax, legend_fontsize, legend_loc, legend_bbox_to_anchor)
+        plot_TP_FP_FN(y_df, preds, opacity, ax, legend_loc, legend_bbox_to_anchor)
     
     ax.plot(signal, **kwargs)
     
@@ -295,7 +295,7 @@ def plot_SP(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
-        plt.title("SPC, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        plt.title("SPC, " + model_string + "\n Predictions station: " + file)
         gs = GridSpec(5, 1, figure=fig)
     
     # diff plot coloured correctly:       
@@ -308,8 +308,7 @@ def plot_SP(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     dates = plot_threshold_colour(np.array(X_df["diff"]), np.array(X_df["M_TIMESTAMP"]), ax1, upper_threshold=upper_threshold, lower_threshold=lower_threshold)
     sns.set_theme()
     
-    plt.yticks(fontsize=20)
-    plt.ylabel("Scaled difference vector", fontsize=25)
+    plt.ylabel("Scaled difference vector")
     
     # plot thresholds
     threshold_handle = plt.axhline(y=lower_threshold, color='black', linestyle='dashed', label = "threshold")
@@ -318,7 +317,7 @@ def plot_SP(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     # helper to add red colour to legend
     red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
     
-    plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+    plt.legend(handles=[threshold_handle, red_handle], loc="lower left", bbox_to_anchor=(1.01, 0), fontsize=30)
     
     # Predictions plot
     if not pretty_plot:
@@ -326,12 +325,12 @@ def plot_SP(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
         plot_labels(preds, label="label")
         sns.set_theme()
         
-        ax2.set_ylabel("Predictions", fontsize=25)
+        ax2.set_ylabel("Predictions")
     
     ticks = np.linspace(0,len(X_df)-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45, fontsize=20)
+    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45)
     plt.xlim((0, len(X_df)))
-    plt.xlabel("Date", fontsize=25)
+    plt.xlabel("Date",)
     
     fig.tight_layout()
     
@@ -377,7 +376,7 @@ def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     if pretty_plot:
         gs = GridSpec(4, 1, figure=fig)
     else:
-        plt.title("BS, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        plt.title("BS, " + model_string + "\n Predictions station: " + file)
         gs = GridSpec(5, 1, figure=fig)
     
     #Diff plot:    
@@ -388,11 +387,10 @@ def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1)
     sns.set_theme()
 
-    plt.yticks(fontsize=20)
     if model.scaling:
-        plt.ylabel("Scaled difference vector", fontsize=25)
+        plt.ylabel("Scaled difference vector")
     else:
-        plt.ylabel("Difference vector", fontsize=25)
+        plt.ylabel("Difference vector")
     
     # plot reference point and thresholds
     ref_point_value = model.calculate_reference_point_value(signal, bkps, model.reference_point)
@@ -414,7 +412,7 @@ def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
     # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+    plt.legend(by_label.values(), by_label.keys(), loc="lower left", bbox_to_anchor=(1.01, 0), fontsize=30)
     
     # Predictions plot
     if not pretty_plot:
@@ -422,12 +420,12 @@ def plot_BS(X_df, y_df, preds, file, model, model_string, show_TP_FP_FN, opacity
         plot_labels(preds, label="label")
         sns.set_theme()
         
-        ax2.set_ylabel("Predictions", fontsize=25)
+        ax2.set_ylabel("Predictions")
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=20)
+    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45)
     plt.xlim((0, len(X_df)))
-    plt.xlabel("Date", fontsize=25)
+    plt.xlabel("Date")
     
     fig.tight_layout()
     
@@ -481,14 +479,14 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
     bkps = model.segmentation_method.get_breakpoints(signal)
     
     ax1 = fig.add_subplot(gs[:4,:])
-    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1, legend_fontsize=25, legend_loc="lower left", legend_bbox_to_anchor=(0, 0))
+    plot_bkps(X_df['diff'], y_df, preds, bkps, show_TP_FP_FN, opacity_TP, ax1, legend_loc="lower left", legend_bbox_to_anchor=(0, 0))
     sns.set_theme()
 
-    plt.yticks(fontsize=20)
+    plt.yticks()
     if model.segmentation_method.scaling:
-        plt.ylabel("Scaled difference vector", fontsize=35)
+        plt.ylabel("Scaled difference vector")
     else:
-        plt.ylabel("Difference vector", fontsize=35)
+        plt.ylabel("Difference vector")
     
     # plot reference point and thresholds
     ref_point_value = model.segmentation_method.calculate_reference_point_value(signal, bkps, model.segmentation_method.reference_point)
@@ -535,20 +533,20 @@ def plot_Sequential_BS_SPC(X_df, y_df, preds, file, model, model_string, show_TP
             # helper to add red colour to legend
             red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
             
-            plt.legend(handles=[threshold_handle, red_handle], fontsize=25, loc="upper left", bbox_to_anchor=(0, 1))
+            plt.legend(handles=[threshold_handle, red_handle], loc="upper left", bbox_to_anchor=(0, 1), fontsize=30)
         
         prev_bkp = bkp
     
     # stop repeating labels for legend
     handles, labels = plt.gca().get_legend_handles_labels()
     by_label = dict(zip(labels, handles))
-    plt.legend(by_label.values(), by_label.keys(), fontsize=25, loc="upper left", bbox_to_anchor=(0, 1))
+    plt.legend(by_label.values(), by_label.keys(), loc="upper left", bbox_to_anchor=(0, 1), fontsize=30)
     
     
     ticks = np.linspace(0,len(X_df["S"])-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=25)
+    plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45)
     plt.xlim((0, len(X_df)))
-    plt.xlabel("Date", fontsize=35)
+    plt.xlabel("Date")
     
     
     fig.tight_layout()
@@ -594,10 +592,10 @@ def plot_IF(X_df, y_df, preds, file, model, model_string, show_IF_scores, show_T
     elif pretty_plot and not show_IF_scores:
         gs = GridSpec(2, 1, figure=fig)
     elif not pretty_plot and not show_IF_scores:
-        plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        plt.title("IF, " + model_string + "\n Predictions station: " + file)
         gs = GridSpec(3, 1, figure=fig)
     else:
-        plt.title("IF, " + model_string + "\n Predictions station: " + file, fontsize=60)
+        plt.title("IF, " + model_string + "\n Predictions station: " + file)
         gs = GridSpec(5, 1, figure=fig)
     
     # Diff plot:    
@@ -610,8 +608,7 @@ def plot_IF(X_df, y_df, preds, file, model, model_string, show_IF_scores, show_T
     plot_diff(X_df)
     sns.set_theme()
 
-    plt.yticks(fontsize=20)
-    plt.ylabel("Difference vector", fontsize=25)    
+    plt.ylabel("Difference vector")    
     
     # remove x-ticks if scores are also shown
     if show_IF_scores:
@@ -631,11 +628,11 @@ def plot_IF(X_df, y_df, preds, file, model, model_string, show_IF_scores, show_T
         # plot threshold on scores
         threshold_handle = plt.axhline(y=threshold, color='black', linestyle='dashed', label = "threshold")
         
-        ax2.set_ylabel("Scores", fontsize=25)
+        ax2.set_ylabel("Scores")
         
         # helper to add red colour to legend
         red_handle = mpatches.Patch(color='red', label='Predicted as outlier')
-        plt.legend(handles=[threshold_handle, red_handle], fontsize=20, loc="lower left", bbox_to_anchor=(1.01, 0))
+        plt.legend(handles=[threshold_handle, red_handle], loc="lower left", bbox_to_anchor=(1.01, 0), fontsize=30)
     
     # Predictions plot
     if not pretty_plot:
@@ -643,12 +640,12 @@ def plot_IF(X_df, y_df, preds, file, model, model_string, show_IF_scores, show_T
         plot_labels(preds, label="label")
         sns.set_theme()
         
-        ax3.set_ylabel("Predictions", fontsize=25)
+        ax3.set_ylabel("Predictions")
     
     ticks = np.linspace(0,len(X_df)-1, 10, dtype=int)
-    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45, fontsize=20)
+    plt.xticks(ticks=ticks, labels=pd.Series(dates).iloc[ticks], rotation=45)
     plt.xlim((0, len(X_df)))
-    plt.xlabel("Date", fontsize=25)
+    plt.xlabel("Date")
     
     fig.tight_layout()
     

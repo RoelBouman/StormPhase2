@@ -39,6 +39,8 @@ from src.methods import SequentialEnsemble
 
 sns.set()
 
+
+
 #%% Data loading
 
 dataset = "OS_data" #alternatively: route_data
@@ -148,15 +150,15 @@ plt.axhline(y=-max_capacity, color='black', linestyle='dotted', linewidth=4)
 
 existing_handles, _ = ax.get_legend_handles_labels()
 # plt.legend(handles=existing_handles+[unused_capacity_handle], fontsize=30)
-plt.legend(handles=existing_handles+[unused_capacity_handle, redundant_capacity_handle], fontsize=30)
+plt.legend(handles=existing_handles+[unused_capacity_handle, redundant_capacity_handle], fontsize=40)
 # plt.legend(fontsize=30)
 
 
-plt.yticks(fontsize=30)
-plt.ylabel("load (MW)", fontsize=30)
+plt.yticks(fontsize=40)
+plt.ylabel("load (MW)", fontsize=40)
 
 ticks = np.linspace(0,len(X_df["S_original"])-1, n_xlabels, dtype=int)
-plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=30)
+plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=40)
 plt.xlim((0, len(X_df)))
 
 plt.ylim((-max_capacity-5000/1000, max_capacity+5000/1000))
@@ -174,14 +176,15 @@ no_switch_data = np.repeat(5,1000)
 negative_switch_data = np.concatenate([np.repeat(5,500), np.repeat(1,500)])
 positive_switch_data = np.concatenate([np.repeat(5,500), np.repeat(9,500)])
 
+
 plt.figure(figsize=(6,4))
 plt.plot(no_switch_data,  "black")
-plt.xlabel("time", fontsize=20)
-plt.ylabel("S", fontsize=20)
+plt.xlabel("time", fontsize=30)
+plt.ylabel("S", fontsize=30)
 plt.xlim(0,1000)
 plt.ylim(0,10)
-plt.yticks(fontsize=20)
-plt.xticks(fontsize=20)
+plt.yticks(fontsize=30)
+plt.xticks(fontsize=30)
 plt.grid(False)
 plt.tight_layout()
 
@@ -191,12 +194,12 @@ plt.show()
 
 plt.figure(figsize=(6,4))
 plt.plot(negative_switch_data,  "black")
-plt.xlabel("time", fontsize=20)
-plt.ylabel("S", fontsize=20)
+plt.xlabel("time", fontsize=30)
+plt.ylabel("S", fontsize=30)
 plt.xlim(0,1000)
 plt.ylim(0,10)
-plt.yticks(fontsize=20)
-plt.xticks(fontsize=20)
+plt.yticks(fontsize=30)
+plt.xticks(fontsize=30)
 plt.grid(False)
 plt.tight_layout()
 
@@ -206,12 +209,12 @@ plt.show()
 
 plt.figure(figsize=(6,4))
 plt.plot(positive_switch_data,  "black")
-plt.xlabel("time", fontsize=20)
-plt.ylabel("S", fontsize=20)
+plt.xlabel("time", fontsize=30)
+plt.ylabel("S", fontsize=30)
 plt.xlim(0,1000)
 plt.ylim(0,10)
-plt.yticks(fontsize=20)
-plt.xticks(fontsize=20)
+plt.yticks(fontsize=30)
+plt.xticks(fontsize=30)
 plt.grid(False)
 plt.tight_layout()
 
@@ -291,16 +294,16 @@ incorrect_capacity_handle = mpl.patches.Patch(color='r', alpha=opacity, label='I
 
 existing_handles, _ = ax.get_legend_handles_labels()
 # plt.legend(handles=existing_handles+[unused_capacity_handle], fontsize=30)
-plt.legend(handles=existing_handles+[incorrect_capacity_handle], fontsize=30)
+plt.legend(handles=existing_handles+[incorrect_capacity_handle], fontsize=40)
 
 #plt.legend(fontsize=30)
 
 
-plt.yticks(fontsize=30)
-plt.ylabel("load (MW)", fontsize=30)
+plt.yticks(fontsize=40)
+plt.ylabel("load (MW)", fontsize=40)
 
 ticks = np.linspace(0,len(X_df["S_original"])-1, n_xlabels, dtype=int)
-plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=30)
+plt.xticks(ticks=ticks, labels=X_df["M_TIMESTAMP"].iloc[ticks], rotation=45, fontsize=40)
 plt.xlim((0, len(X_df)))
 
 #plt.ylim((-max_capacity-5000/1000, max_capacity+5000/1000))
@@ -740,9 +743,11 @@ bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
 
 axes[0].errorbar(x=bar_centers[:len(F_score_base_plot_df['F1.5 average'])], y=F_score_base_plot_df['F1.5 average'], yerr=F_score_base_plot_df["F1.5 stdev"], fmt="none", c="k", capsize=4)
-axes[0].set_ylabel('F1.5 Score (Average)')
+axes[0].set_ylabel('F1.5 Score (Average)', fontsize=18)
 
 sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Recall average'], hue="Length category", ax=axes[1])
+
+axes[0].tick_params(axis='y', labelsize=18)
 
 bars = axes[1].patches
 
@@ -751,9 +756,11 @@ bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
 
 axes[1].errorbar(x=bar_centers[:len(F_score_base_plot_df['Recall average'])], y=F_score_base_plot_df['Recall average'], yerr=F_score_base_plot_df["Recall stdev"], fmt="none", c="k", capsize=4)
-axes[1].set_ylabel('Recall (Average)')
+axes[1].set_ylabel('Recall (Average)', fontsize=18)
 
 sns.barplot(data=F_score_base_plot_df, x=F_score_base_plot_df["Method class"], y=F_score_base_plot_df['Precision average'], hue="Length category", ax=axes[2])
+
+axes[1].tick_params(axis='y', labelsize=18)
 
 bars = axes[2].patches
 
@@ -762,17 +769,21 @@ bar_centers = [(bar.get_x() + bar.get_width() / 2) for bar in bars]
 #Only get the first X bar centers, after that are dummy values
 
 axes[2].errorbar(x=bar_centers[:len(F_score_base_plot_df['Precision average'])], y=F_score_base_plot_df['Precision average'], yerr=F_score_base_plot_df["Precision stdev"], fmt="none", c="k", capsize=4)
-axes[2].set_ylabel('Precision (Average)')
+axes[2].set_ylabel('Precision (Average)', fontsize=18)
 
 # Rotate x-axis labels and add a common x-axis label
 #plt.setp(axes, xticks=range(len(base_plot_df["Method class"].unique())), xticklabels=base_plot_df["Method class"].unique(), xticksrotation=90)
 axes[2].set_xticks(range(len(F_score_base_plot_df["Method class"].unique())))
-axes[2].set_xticklabels(F_score_base_plot_df["Method class"].unique(), rotation=90)
+axes[2].set_xticklabels(F_score_base_plot_df["Method class"].unique(), rotation=90, fontsize=18)
+axes[2].set_xlabel("Method Class", fontsize=25)
+
+axes[2].tick_params(axis='y', labelsize=18)
+
 fig.tight_layout(rect=[0, 0.03, 1, 0.95])
 
 # Move the legend to the top of the figure
 handles, labels = axes[0].get_legend_handles_labels()
-fig.legend(handles, labels, loc='upper center', ncol=len(F_score_base_plot_df["Length category"].unique()), bbox_to_anchor=(0.5, 0.98))
+fig.legend(handles, labels, loc='upper center', ncol=len(F_score_base_plot_df["Length category"].unique()), bbox_to_anchor=(0.5, 0.98), fontsize=20)
 axes[0].get_legend().remove()
 axes[1].get_legend().remove()
 axes[2].get_legend().remove()
@@ -821,37 +832,49 @@ fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 # Plotting each dataframe on a separate subplot
 
 #For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
-sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_maxs_no_filter", ax=axes[0, 0])
+sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_maxs_no_filter", ax=axes[0, 0], s=60)
 axes[0, 0].set_xlim(left=0)
 axes[0, 0].set_ylim(bottom=-1)
-axes[0, 0].set_xlabel("Ground truth maximum load (MW)")
-axes[0, 0].set_ylabel("Predicted maximum load (MW)")
+axes[0, 0].set_xlabel("Ground truth maximum load (MW)", fontsize=15)
+axes[0, 0].set_ylabel("Predicted maximum load (MW)", fontsize=15)
 axes[0, 0].set_aspect('equal', adjustable='box')
-axes[0, 0].set_title("Unfiltered")
+axes[0, 0].set_title("Unfiltered", fontsize=18)
 
-sns.scatterplot(data=BS_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[0, 1])
+axes[0, 0].tick_params(axis='x', labelsize=15)
+axes[0, 0].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=BS_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[0, 1], s=60)
 axes[0, 1].set_xlim(left=0)
 axes[0, 1].set_ylim(bottom=-1)
-axes[0, 1].set_xlabel("Ground truth maximum load (MW)")
-axes[0, 1].set_ylabel("Predicted maximum load (MW)")
+axes[0, 1].set_xlabel("Ground truth maximum load (MW)", fontsize=15)
+axes[0, 1].set_ylabel("Predicted maximum load (MW)", fontsize=15)
 axes[0, 1].set_aspect('equal', adjustable='box')
-axes[0, 1].set_title("BS")
+axes[0, 1].set_title("BS", fontsize=18)
 
-sns.scatterplot(data=SPC_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 0])
+axes[0, 1].tick_params(axis='x', labelsize=15)
+axes[0, 1].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=SPC_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 0], s=60)
 axes[1, 0].set_xlim(left=0)
 axes[1, 0].set_ylim(bottom=-1)
-axes[1, 0].set_xlabel("Ground truth maximum load (MW)")
-axes[1, 0].set_ylabel("Predicted maximum load (MW)")
+axes[1, 0].set_xlabel("Ground truth maximum load (MW)", fontsize=15)
+axes[1, 0].set_ylabel("Predicted maximum load (MW)", fontsize=15)
 axes[1, 0].set_aspect('equal', adjustable='box')
-axes[1, 0].set_title("SPC")
+axes[1, 0].set_title("SPC", fontsize=18)
 
-sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 1])
+axes[1, 0].tick_params(axis='x', labelsize=15)
+axes[1, 0].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=Seq_best_df, x="X_maxs", y="X_pred_maxs", ax=axes[1, 1], s=60)
 axes[1, 1].set_xlim(left=0)
 axes[1, 1].set_ylim(bottom=-1)
-axes[1, 1].set_xlabel("Ground truth maximum load (MW)")
-axes[1, 1].set_ylabel("Predicted maximum load (MW)")
+axes[1, 1].set_xlabel("Ground truth maximum load (MW)", fontsize=15)
+axes[1, 1].set_ylabel("Predicted maximum load (MW)", fontsize=15)
 axes[1, 1].set_aspect('equal', adjustable='box')
-axes[1, 1].set_title("Seq BS+SPC")
+axes[1, 1].set_title("Seq BS+SPC", fontsize=18)
+
+axes[1, 1].tick_params(axis='x', labelsize=15)
+axes[1, 1].tick_params(axis='y', labelsize=15)
 
 
 plt.tight_layout()
@@ -876,38 +899,49 @@ fig, axes = plt.subplots(2, 2, figsize=(10, 10))
 # Plotting each dataframe on a separate subplot
 
 #For no filtering plot we can use whatever method, as unfiltered mins and maxs are the same
-sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_mins_no_filter", ax=axes[0, 0])
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_mins_no_filter", ax=axes[0, 0], s=60)
 axes[0, 0].set_xlim(right=0)
 axes[0, 0].set_ylim(top=1)
-axes[0, 0].set_xlabel("Ground truth minimum load (MW)")
-axes[0, 0].set_ylabel("Predicted minimum load (MW)")
+axes[0, 0].set_xlabel("Ground truth minimum load (MW)", fontsize=15)
+axes[0, 0].set_ylabel("Predicted minimum load (MW)", fontsize=15)
 axes[0, 0].set_aspect('equal', adjustable='box')
-axes[0, 0].set_title("Unfiltered")
+axes[0, 0].set_title("Unfiltered", fontsize=18)
 
-sns.scatterplot(data=BS_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[0, 1])
+axes[0, 0].tick_params(axis='x', labelsize=15)
+axes[0, 0].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[0, 1], s=60)
 axes[0, 1].set_xlim(right=0)
 axes[0, 1].set_ylim(top=1)
-axes[0, 1].set_xlabel("Ground truth minimum load (MW)")
-axes[0, 1].set_ylabel("Predicted minimum load (MW)")
+axes[0, 1].set_xlabel("Ground truth minimum load (MW)", fontsize=15)
+axes[0, 1].set_ylabel("Predicted minimum load (MW)", fontsize=15)
 axes[0, 1].set_aspect('equal', adjustable='box')
-axes[0, 1].set_title("BS")
+axes[0, 1].set_title("BS", fontsize=18)
 
-sns.scatterplot(data=SPC_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 0])
+axes[0, 1].tick_params(axis='x', labelsize=15)
+axes[0, 1].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 0], s=60)
 axes[1, 0].set_xlim(right=0)
 axes[1, 0].set_ylim(top=1)
-axes[1, 0].set_xlabel("Ground truth minimum load (MW)")
-axes[1, 0].set_ylabel("Predicted minimum load (MW)")
+axes[1, 0].set_xlabel("Ground truth minimum load (MW)", fontsize=15)
+axes[1, 0].set_ylabel("Predicted minimum load (MW)", fontsize=15)
 axes[1, 0].set_aspect('equal', adjustable='box')
-axes[1, 0].set_title("SPC")
+axes[1, 0].set_title("SPC", fontsize=18)
 
-sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 1])
+axes[1, 0].tick_params(axis='x', labelsize=15)
+axes[1, 0].tick_params(axis='y', labelsize=15)
+
+sns.scatterplot(data=Seq_min_best_df, x="X_mins", y="X_pred_mins", ax=axes[1, 1], s=60)
 axes[1, 1].set_xlim(right=0)
 axes[1, 1].set_ylim(top=1)
-axes[1, 1].set_xlabel("Ground truth minimum load (MW)")
-axes[1, 1].set_ylabel("Predicted minimum load (MW)")
+axes[1, 1].set_xlabel("Ground truth minimum load (MW)", fontsize=15)
+axes[1, 1].set_ylabel("Predicted minimum load (MW)", fontsize=15)
 axes[1, 1].set_aspect('equal', adjustable='box')
-axes[1, 1].set_title("Seq BS+SPC")
+axes[1, 1].set_title("Seq BS+SPC", fontsize=18)
 
+axes[1, 1].tick_params(axis='x', labelsize=15)
+axes[1, 1].tick_params(axis='y', labelsize=15)
 
 plt.tight_layout()
 plt.savefig(os.path.join(figure_folder, "minimum_load_estimates.png"), format="png")

@@ -34,13 +34,19 @@ from src.evaluation import f_beta
 
 sns.set()
 
+#%% plot options:
+    
+plt.rcParams['axes.labelsize'] = 40  # Font size for x and y labels
+plt.rcParams['xtick.labelsize'] = 35  # Font size for x tick labels
+plt.rcParams['ytick.labelsize'] = 35  # Font size for y tick labels
+plt.rcParams['legend.fontsize'] = 32  # Font size for legend
 #%% Define user parameters:
 # choose station IDs per method:
-#station_IDs_per_method = {"DoubleThresholdBS":['8.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
+station_IDs_per_method = {#"DoubleThresholdBS":['8.csv'], #'042.csv', '089.csv', '17.csv', '96.csv'
                           #"SingleThresholdSPC":["17.csv"],
-                          #"Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
-                          # }
-station_IDs_per_method = {"Sequential-SingleThresholdBS+SingleThresholdSPC":[str(ID)+".csv" for ID in range(1,202) if ID not in [8, 25, 35, 70, 106, 130, 190]]}
+                          "Sequential-SingleThresholdBS+SingleThresholdSPC":["042.csv"],
+                           }
+#station_IDs_per_method = {"Sequential-SingleThresholdBS+SingleThresholdSPC":[str(ID)+".csv" for ID in range(1,202) if ID not in [8, 25, 35, 70, 106, 130, 190]]}
 
                           # }
 
@@ -50,7 +56,7 @@ os.makedirs(best_predictions_folder, exist_ok=True)
 
 #%% Data loading
 
-dataset = "route_data" #alternatively: route_data
+dataset = "OS_data" #alternatively: route_data
 data_folder = os.path.join("data", dataset)
 
 result_folder = os.path.join("results", dataset)
